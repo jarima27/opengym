@@ -157,6 +157,13 @@ describe('Settings — footer', () => {
   it('links the source code to its home on GitHub', () => {
     mount()
     const link = [...host.querySelectorAll('a')].find(a => a.textContent === 'source code')
+    expect(link.getAttribute('href')).toBe('https://github.com/jarima27/opengym')
+  })
+
+  // AGPL: Tiza is a fork, and the credit to the project it comes from stays on screen.
+  it('credits openGym as the upstream project', () => {
+    mount()
+    const link = [...host.querySelectorAll('a')].find(a => a.textContent === 'openGym')
     expect(link.getAttribute('href')).toBe('https://github.com/DuarteSantos8/openGym')
   })
 })

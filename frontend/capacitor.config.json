@@ -1,8 +1,8 @@
 {
-  "appId": "ch.duartesantos.opengym",
-  "appName": "openGym",
+  "appId": "fit.tiza.app",
+  "appName": "Tiza",
   "webDir": "dist",
-  "backgroundColor": "#0c0e12",
+  "backgroundColor": "#0b0d12",
   "android": {
     "allowMixedContent": false
   }
