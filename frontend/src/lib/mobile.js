@@ -212,7 +212,7 @@ export async function printHtml(html, name) {
   await Print.printHtml({ html, name })
 }
 
-// "Auto-backup on changes" (Settings): a dated snapshot dropped into Documents/openGym/ —
+// "Auto-backup on changes" (Settings): a dated snapshot dropped into Documents/Tiza/ —
 // visible in Files (iOS) / a file manager (Android), unlike the private mirror nativeSave keeps
 // — so whatever the user points at that folder (a sync app, a manual copy) always has something
 // recent. One file per day; later triggers the same day just overwrite it.
@@ -223,7 +223,7 @@ export async function printHtml(html, name) {
 // The root is never pruned: a manual export saved there carries the same name, and nothing
 // tells it apart from an old automatic copy, so those stay for the person to clear (Import
 // backup still reads either kind).
-export const AUTO_BACKUP_DIR = 'openGym'
+export const AUTO_BACKUP_DIR = 'Tiza'
 export const AUTO_BACKUP_KEEP = 14
 // Only the exact names writeAutoBackup gives its files are ever pruned; anything else someone
 // keeps in the folder is theirs.

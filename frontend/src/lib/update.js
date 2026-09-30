@@ -6,7 +6,10 @@
 // and handed to the system installer via a content:// URI.
 
 import { MOBILE } from './mobile.js'
+import { SOURCE } from './brand.js'
 
+// Still upstream's project: the updater is off in this build (APK_UPDATES in brand.js) and
+// must be pointed at our own releases before it is ever switched back on.
 const GITLAB_PROJECT_ID = 'DuarteSantos8%2Fopengym'
 const RELEASES_URL = `https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases`
 
@@ -93,7 +96,7 @@ export async function sha256(buffer) {
 export async function downloadAndInstall(url, expectedHash = null, onProgress = null) {
   if (!MOBILE) {
     // On web, just open the release page
-    window.open('https://gitlab.com/DuarteSantos8/opengym/-/releases', '_blank', 'noopener')
+    window.open(SOURCE + '/releases', '_blank', 'noopener')
     return
   }
 

@@ -11,7 +11,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 // flips the two gates (MOBILE flag, Capacitor platform) and watches whether Settings even
 // asks gitlab.com for the latest release.
 const mocks = vi.hoisted(() => {
-  const state = { S: null, MOBILE: false, android: false }
+  const state = { S: null, MOBILE: false, android: false, apkUpdates: true }
   state.snapshot = () => ({
     S: state.S,
     user: null,
@@ -54,6 +54,12 @@ vi.mock('../lib/update.js', () => ({
   checkForUpdate: (...a) => mocks.checkForUpdate(...a),
   downloadAndInstall: vi.fn(),
 }))
+// The updater is a build switch (brand.js): these tests exercise it switched on, and the last
+// block checks that a store build, where it is off, neither shows it nor asks for releases.
+vi.mock('../lib/brand.js', async importOriginal => {
+  const real = await importOriginal()
+  return { ...real, get APK_UPDATES() { return mocks.apkUpdates } }
+})
 vi.mock('./MobileOnboarding.jsx', () => ({ ConnectSheet: () => null }))
 vi.mock('../sheets.jsx', () => ({
   starterPlanSheet: vi.fn(), confirmSheet: (...a) => mocks.confirmSheet(...a), importFromApp: vi.fn(),
@@ -70,6 +76,7 @@ beforeEach(() => {
   }
   mocks.MOBILE = false
   mocks.android = false
+  mocks.apkUpdates = true
   mocks.checkForUpdate.mockClear()
   mocks.confirmSheet.mockClear()
   host = document.createElement('div')
@@ -86,7 +93,7 @@ const mount = async () => {
   await act(async () => { root.render(<Settings />) })
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }
-const updateRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Update to openGym v9.9.9'))
+const updateRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Update to Tiza v9.9.9'))
 const checkRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Check for updates'))
 const webRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Get the Android app'))
 
@@ -140,5 +147,24 @@ describe('Settings — in-app update check', () => {
     await mount()
     expect(updateRow()).toBeUndefined()
     expect(checkRow()).toBeTruthy()
+  })
+})
+
+describe('Settings — store build (APK_UPDATES off)', () => {
+  it('web: no Updates section, no APK link', async () => {
+    mocks.apkUpdates = false
+    await mount()
+    expect(mocks.checkForUpdate).not.toHaveBeenCalled()
+    expect(webRow()).toBeUndefined()
+  })
+
+  it('Android: never asks for releases and shows no update row', async () => {
+    mocks.apkUpdates = false
+    mocks.MOBILE = true
+    mocks.android = true
+    await mount()
+    expect(mocks.checkForUpdate).not.toHaveBeenCalled()
+    expect(updateRow()).toBeUndefined()
+    expect(checkRow()).toBeUndefined()
   })
 })

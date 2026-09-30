@@ -1,5 +1,5 @@
 /* ============================================================================
-   openGym — design system
+   Tiza — design system
    ----------------------------------------------------------------------------
    Rebuilt around four rules, each aimed at a specific "generated" tell in the
    previous sheet:
@@ -19,7 +19,7 @@
 /* ---------------------------------------------------------------- tokens -- */
 :root {
   /* surfaces — dark is the default */
-  --bg:        #000000;
+  --bg:        #0b0d12;   /* Tiza "tinta" */
   --bg-el:     #0e0e10;   /* elevated backdrop (sheets, bars) */
   --surface:   #1c1c1e;   /* card / grouped-list fill */
   --surface-2: #2c2c2e;   /* pressed + nested fill */
@@ -41,9 +41,9 @@
   --yellow:#ffd60a; --teal:#40c8e0; --indigo:#5e5ce6; --pink:#ff375f;
   --purple:#bf5af2; --mint:#63e6e2; --brown:#ac8e68; --grey:#8e8e93;
 
-  /* accent (per-account, synced) */
-  --acc:  var(--green);
-  --acc-2:#248a3d;
+  /* accent (per-account, synced) — Tiza's chalk yellow by default */
+  --acc:  #ffd23f;
+  --acc-2:#e0b000;
   --on-acc:#000000;
   --acc-soft: color-mix(in srgb, var(--acc) 16%, transparent);
   --acc-line: color-mix(in srgb, var(--acc) 38%, transparent);
@@ -99,7 +99,7 @@
 :root[data-accent="pink"]  { --acc:var(--pink);   --acc-2:#d70036; --on-acc:#fff }
 :root[data-accent="red"]   { --acc:var(--red);    --acc-2:#d70015; --on-acc:#fff }
 :root[data-accent="teal"]  { --acc:var(--teal);   --acc-2:#0071a4; --on-acc:#000 }
-:root[data-accent="gold"]  { --acc:var(--yellow); --acc-2:#b25000; --on-acc:#000 }
+:root[data-accent="gold"]  { --acc:#ffd23f;      --acc-2:#e0b000; --on-acc:#000 }
 /* Label colour on a filled accent button is picked per accent by measured contrast,
    not by taste. Button text is 17px/600, so the AA bar is 3:1 (large text). White on
    the light-theme green is 2.22:1 and on teal 2.57:1 — both fail, and green is the
@@ -112,6 +112,10 @@
 :root[data-theme="light"][data-accent="violet"],
 :root[data-theme="light"][data-accent="pink"],
 :root[data-theme="light"][data-accent="red"]   { --on-acc:#fff }
+/* Chalk yellow is the brand colour, but on white it is 1.4:1 — unreadable as a link and as a
+   button label's ground. Light mode draws it as dark amber instead: 5.9:1 against white, and
+   white text on it passes too. */
+:root[data-theme="light"][data-accent="gold"]  { --acc:#8a6400; --acc-2:#6b4e00; --on-acc:#fff }
 
 /* ---------------------------------------------------------------- reset -- */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}

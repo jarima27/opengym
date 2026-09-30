@@ -1,3 +1,9 @@
+> **Tiza** — this repository is the source of Tiza (<https://tiza.fit>), a modified version of
+> [openGym](https://github.com/DuarteSantos8/openGym) by Duarte Santos, under the same AGPL-3.0
+> licence. The rename is in progress: the app, its store identity and its defaults say Tiza; much of
+> the documentation below is still openGym's and describes the upstream project. See
+> [NOTICE.md](NOTICE.md).
+
 <div align="center">
 
 <img src="assets/banner.png" alt="openGym" width="720">

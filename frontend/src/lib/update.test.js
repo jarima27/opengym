@@ -145,7 +145,7 @@ describe('checkForUpdate', () => {
   const REAL_RELEASE = [
     {
       "tag_name": "v1.3.1",
-      "name": "openGym v1.3.1",
+      "name": "Tiza v1.3.1",
       "assets": {
         "count": 7,
         "sources": [
@@ -176,16 +176,16 @@ describe('checkForUpdate', () => {
           },
           {
             "id": 12790839,
-            "name": "openGym-1.3.1.apk.sha256 (checksum)",
-            "url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk.sha256",
-            "direct_asset_url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk.sha256",
+            "name": "Tiza-1.3.1.apk.sha256 (checksum)",
+            "url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk.sha256",
+            "direct_asset_url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk.sha256",
             "link_type": "other"
           },
           {
             "id": 12790838,
-            "name": "openGym-1.3.1.apk (Android, sideload)",
-            "url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk",
-            "direct_asset_url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk",
+            "name": "Tiza-1.3.1.apk (Android, sideload)",
+            "url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk",
+            "direct_asset_url": "https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk",
             "link_type": "package"
           }
         ]
@@ -197,8 +197,8 @@ describe('checkForUpdate', () => {
     mockFetch(REAL_RELEASE)
     const result = await checkForUpdate()
     expect(result.latestVersion).toBe('1.3.1')
-    expect(result.apkUrl).toBe('https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk')
-    expect(result.hashUrl).toBe('https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/openGym-1.3.1.apk.sha256')
+    expect(result.apkUrl).toBe('https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk')
+    expect(result.hashUrl).toBe('https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/1.3.1/Tiza-1.3.1.apk.sha256')
   })
 
   it('returns null hashUrl when no hash link exists', async () => {
