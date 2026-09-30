@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S } from '../billing.js';
+import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk } from '../billing.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-01T12:00:00Z');
@@ -28,11 +28,17 @@ const sign = (body, secret, t = Math.floor(Date.now() / 1000)) =>
 
 /* ------------------------------ config ------------------------------ */
 
-test('billing is off unless both the key and the price are set', () => {
+test('billing is off unless Stripe (key and a price) or RevenueCat is set', () => {
   assert.equal(billingConfig({}).on, false);
   assert.equal(billingConfig({ STRIPE_SECRET_KEY: 'sk' }).on, false);
   assert.equal(billingConfig({ STRIPE_PRICE_ID: 'price' }).on, false);
   assert.equal(billingConfig({ STRIPE_SECRET_KEY: 'sk', STRIPE_PRICE_ID: 'price' }).on, true);
+  assert.equal(billingConfig({ STRIPE_SECRET_KEY: 'sk', STRIPE_PRICE_ID: 'price' }).stripe.prices.monthly, 'price', 'the first spelling is the monthly price');
+  assert.equal(billingConfig({ STRIPE_SECRET_KEY: 'sk', STRIPE_PRICE_ANNUAL: 'y' }).stripe.on, true);
+  const store = billingConfig({ REVENUECAT_WEBHOOK_AUTH: 'Bearer x' });
+  assert.deepEqual([store.on, store.stripe.on, store.rc.on, store.rc.entitlement], [true, false, true, 'pro']);
+  assert.equal(billingConfig({}).cardTrialDays, 0);
+  assert.equal(billingConfig({ STRIPE_TRIAL_DAYS: '30' }).cardTrialDays, 30);
   assert.equal(billingConfig({}).trialDays, 30);
   assert.equal(billingConfig({ TRIAL_DAYS: '14' }).trialDays, 14);
   assert.equal(billingConfig({ TRIAL_DAYS: 'nonsense' }).trialDays, 30);
@@ -81,7 +87,7 @@ test('admins and profiles marked comp are never charged', () => {
 
 test('subscribing mid-trial does not charge before the trial would have ended', () => {
   const u = { id: 'uid1', created: iso(NOW - 10 * DAY), email: 'a@b.c' };
-  const f = checkoutForm(u, ON, { origin: 'https://gym.example/', now: NOW });
+  const f = checkoutForm(u, ON, { origin: 'https://gym.example/', price: 'price_x', now: NOW });
   assert.equal(f.get('mode'), 'subscription');
   assert.equal(f.get('line_items[0][price]'), 'price_x');
   assert.equal(f.get('client_reference_id'), 'uid1');
@@ -91,11 +97,11 @@ test('subscribing mid-trial does not charge before the trial would have ended', 
   assert.equal(f.get('subscription_data[trial_end]'), String(Math.floor((NOW + 20 * DAY) / 1000)));
 
   // Under 48 hours left is under Stripe's minimum: no trial_end, the charge is today.
-  const late = checkoutForm({ id: 'u2', created: iso(NOW - 29 * DAY) }, ON, { origin: 'https://gym.example', now: NOW });
+  const late = checkoutForm({ id: 'u2', created: iso(NOW - 29 * DAY) }, ON, { origin: 'https://gym.example', price: 'price_x', now: NOW });
   assert.equal(late.has('subscription_data[trial_end]'), false);
 
   // A returning customer is reused rather than duplicated, and the e-mail is then not sent.
-  const back = checkoutForm({ id: 'u3', created: iso(0), email: 'a@b.c', billing: { customer: 'cus_9', status: 'canceled' } }, ON, { origin: 'x', now: NOW });
+  const back = checkoutForm({ id: 'u3', created: iso(0), email: 'a@b.c', billing: { customer: 'cus_9', status: 'canceled' } }, ON, { origin: 'x', price: 'price_x', now: NOW });
   assert.equal(back.get('customer'), 'cus_9');
   assert.equal(back.has('customer_email'), false);
 });
@@ -124,7 +130,7 @@ const subEvent = (type, created, o) => ({ type, created, data: { object: { id: '
 test('checkout links the customer; subscription events carry the status', () => {
   const users = [{ id: 'u1', created: iso(0) }];
   const r = applyEvent(users, { type: 'checkout.session.completed', created: 1, data: { object: { mode: 'subscription', client_reference_id: 'u1', customer: 'cus_1', subscription: 'sub_1' } } });
-  assert.equal(r.user.id, 'u1');
+  assert.equal(r.id, 'u1');
   assert.deepEqual(users[0].billing, { customer: 'cus_1', subscription: 'sub_1' });
 
   applyEvent(users, subEvent('customer.subscription.created', 2, { status: 'trialing', current_period_end: 2000 }));
@@ -145,8 +151,7 @@ test('an event older than the one applied is ignored', () => {
 test('a profile is found by customer when the subscription carries no uid', () => {
   const users = [{ id: 'u1', created: iso(0), billing: { customer: 'cus_1' } }];
   const r = applyEvent(users, { type: 'customer.subscription.updated', created: 1, data: { object: { id: 'sub_1', customer: 'cus_1', status: 'active' } } });
-  assert.equal(r.user.id, 'u1');
-  assert.equal(r.was, null);
+  assert.equal(r.id, 'u1');
   assert.equal(users[0].billing.status, 'active');
 });
 
@@ -154,8 +159,7 @@ test('deleted means canceled; a scheduled cancellation is shown as its end date'
   const users = [{ id: 'u1', created: iso(0) }];
   applyEvent(users, subEvent('customer.subscription.updated', 1, { status: 'active', current_period_end: 5000, cancel_at_period_end: true }));
   assert.equal(users[0].billing.endsAt, 5000 * 1000);
-  const r = applyEvent(users, subEvent('customer.subscription.deleted', 2, { status: 'active' }));
-  assert.equal(r.was, 'active');
+  applyEvent(users, subEvent('customer.subscription.deleted', 2, { status: 'active' }));
   assert.equal(users[0].billing.status, 'canceled');
 });
 
@@ -248,7 +252,7 @@ test('trial, expiry, checkout, webhook and portal, end to end', async t => {
     db: { billingSince: Date.now() - 200 * DAY }
   });
 
-  assert.deepEqual((await (await h.call('/api/config')).json()).billing, { trial_days: 30 });
+  assert.deepEqual((await (await h.call('/api/config')).json()).billing, { trial_days: 30, card_trial_days: 0, web: true });
   assert.equal((await h.call('/api/billing')).status, 401);
 
   const fresh = await (await h.call('/api/billing', { uid: 'new' })).json();
@@ -325,4 +329,228 @@ test('deleting a paying profile cancels its subscription at Stripe', async t => 
   const cancel = stripeApi.calls.find(c => c.method === 'DELETE');
   assert.ok(cancel, 'Stripe was asked to cancel');
   assert.equal(cancel.url, '/v1/subscriptions/sub_p');
+});
+
+/* ------------------------------ v2: card trials, bonus days, stores ------------------------------ */
+
+const CARD = billingConfig({ STRIPE_SECRET_KEY: 'sk', STRIPE_PRICE_MONTHLY: 'p_m', STRIPE_PRICE_ANNUAL: 'p_y', TRIAL_DAYS: '0', STRIPE_TRIAL_DAYS: '30', REVENUECAT_WEBHOOK_AUTH: 'Bearer rc' });
+
+test('with no open trial, a new profile has nothing yet — not an expired trial', () => {
+  const fresh = { id: 'u', created: iso(NOW) };
+  const a = accessOf(fresh, CARD, { now: NOW });
+  assert.deepEqual([a.plan, a.ai, a.cardTrialDays], ['none', false, 30]);
+  // Once a subscription has come and gone, it is expired.
+  assert.equal(accessOf({ ...fresh, billing: { status: 'canceled', trialUsed: true } }, CARD, { now: NOW }).plan, 'expired');
+  assert.equal(accessOf({ ...fresh, billing: { status: 'canceled', trialUsed: true } }, CARD, { now: NOW }).cardTrialDays, 0);
+});
+
+test('a creator code’s bonus days come first, and the card trial starts after them', () => {
+  const coded = { id: 'u', created: iso(NOW), bonusDays: 30 };
+  const a = accessOf(coded, CARD, { now: NOW });
+  assert.deepEqual([a.plan, a.trialDaysLeft], ['trial', 30]);
+  // Subscribing on day one: 30 bonus days, then the 30-day card trial.
+  const f = checkoutForm(coded, CARD, { origin: 'x', price: 'p_y', now: NOW });
+  assert.equal(f.get('line_items[0][price]'), 'p_y');
+  assert.equal(f.get('subscription_data[trial_end]'), String(Math.floor((NOW + 60 * DAY) / 1000)));
+  // Without a code: the card trial starts today.
+  assert.equal(checkoutForm({ id: 'v', created: iso(NOW) }, CARD, { origin: 'x', price: 'p_m', now: NOW }).get('subscription_data[trial_end]'), String(Math.floor((NOW + 30 * DAY) / 1000)));
+  // A second card trial is not given: the charge is today.
+  assert.equal(checkoutForm({ id: 'w', created: iso(NOW), billing: { customer: 'c', status: 'canceled', trialUsed: true } }, CARD, { origin: 'x', price: 'p_m', now: NOW }).has('subscription_data[trial_end]'), false);
+  assert.equal(checkoutForm({ id: 'w', created: iso(NOW), store: { active: false, trialUsed: true } }, CARD, { origin: 'x', price: 'p_m', now: NOW }).has('subscription_data[trial_end]'), false);
+});
+
+test('a Stripe card trial marks the trial as used', () => {
+  const users = [{ id: 'u1', created: iso(0) }];
+  applyEvent(users, subEvent('customer.subscription.created', 1, { status: 'trialing', trial_end: 5000 }));
+  assert.equal(users[0].billing.trialUsed, true);
+  assert.equal(accessOf(users[0], CARD, { now: NOW }).cardTrial, true);
+});
+
+test('transitions: trial started, then subscribed, then one cancellation', () => {
+  const none = snapshot(null);
+  const trialing = snapshot({ billing: { status: 'trialing' } });
+  const active = snapshot({ billing: { status: 'active' } });
+  const cancelling = snapshot({ billing: { status: 'active', endsAt: 1 } });
+  const gone = snapshot({ billing: { status: 'canceled' } });
+  assert.deepEqual(transitions(none, trialing), ['trial_started']);
+  assert.deepEqual(transitions(trialing, active), ['subscribed']);
+  assert.deepEqual(transitions(none, active), ['subscribed'], 'bought without a trial');
+  assert.deepEqual(transitions(active, active), []);
+  assert.deepEqual(transitions(active, cancelling), ['cancelled']);
+  assert.deepEqual(transitions(cancelling, gone), [], 'counted when it was scheduled, not again when it ends');
+  assert.deepEqual(transitions(active, gone), ['cancelled'], 'an end nobody scheduled (refund, unpaid) is counted');
+  // The same through a store.
+  const storeTrial = snapshot({ store: { active: true, expiresAt: Date.now() + DAY, periodType: 'TRIAL', willRenew: true, store: 'app_store' } });
+  assert.deepEqual(transitions(none, storeTrial), ['trial_started']);
+  assert.equal(storeTrial.via, 'app_store');
+});
+
+const rc = (type, o = {}) => ({ api_version: '1.0', event: { type, app_user_id: 'u1', entitlement_ids: ['pro'], store: 'APP_STORE', product_id: 'annual', period_type: 'NORMAL', event_timestamp_ms: 1000, expiration_at_ms: NOW + 30 * DAY, ...o } });
+
+test('RevenueCat: the header must match exactly', () => {
+  assert.equal(revenueCatAuthOk('Bearer rc', CARD), true);
+  assert.equal(revenueCatAuthOk('Bearer rc ', CARD), false);
+  assert.equal(revenueCatAuthOk('', CARD), false);
+  assert.equal(revenueCatAuthOk('Bearer rc', billingConfig({})), false, 'unset never matches');
+});
+
+test('RevenueCat: a store trial, a cancellation that keeps access until it ends, an expiration', () => {
+  const users = [{ id: 'u1', created: iso(NOW) }];
+  applyRevenueCat(users, rc('INITIAL_PURCHASE', { period_type: 'TRIAL' }), CARD);
+  assert.deepEqual([users[0].store.active, users[0].store.store, users[0].store.trialUsed], [true, 'app_store', true]);
+  let a = accessOf(users[0], CARD, { now: NOW });
+  assert.deepEqual([a.plan, a.ai, a.via, a.cardTrial], ['active', true, 'app_store', true]);
+
+  applyRevenueCat(users, rc('CANCELLATION', { period_type: 'TRIAL', event_timestamp_ms: 2000 }), CARD);
+  a = accessOf(users[0], CARD, { now: NOW });
+  assert.equal(a.ai, true, 'still on until the period ends');
+  assert.equal(a.endsAt, iso(NOW + 30 * DAY));
+
+  applyRevenueCat(users, rc('BILLING_ISSUE', { event_timestamp_ms: 2500 }), CARD);
+  assert.equal(accessOf(users[0], CARD, { now: NOW }).plan, 'past_due');
+
+  applyRevenueCat(users, rc('EXPIRATION', { event_timestamp_ms: 3000 }), CARD);
+  assert.equal(accessOf(users[0], CARD, { now: NOW }).plan, 'expired');
+  // A late RENEWAL from before the expiration does not bring it back.
+  assert.deepEqual(applyRevenueCat(users, rc('RENEWAL', { event_timestamp_ms: 2900 }), CARD).changed, []);
+  // And an expiry date that has passed is not access, whatever the last event said.
+  assert.equal(accessOf({ id: 'x', created: iso(0), store: { active: true, expiresAt: NOW - 1 } }, CARD, { now: NOW }).ai, false);
+});
+
+test('RevenueCat: another entitlement, an unknown user, an alias, a transfer', () => {
+  const users = [{ id: 'u1', created: iso(0) }, { id: 'u2', created: iso(0) }];
+  assert.deepEqual(applyRevenueCat(users, rc('INITIAL_PURCHASE', { entitlement_ids: ['other'] }), CARD).changed, []);
+  assert.deepEqual(applyRevenueCat(users, rc('INITIAL_PURCHASE', { app_user_id: '$RCAnonymousID:abc', aliases: ['nobody'] }), CARD).changed, []);
+  const r = applyRevenueCat(users, rc('INITIAL_PURCHASE', { app_user_id: '$RCAnonymousID:abc', aliases: ['$RCAnonymousID:abc', 'u2'] }), CARD);
+  assert.equal(r.changed[0].id, 'u2');
+  const t = applyRevenueCat(users, { event: { type: 'TRANSFER', transferred_from: ['u2'], transferred_to: ['u1'], event_timestamp_ms: 5000 } }, CARD);
+  assert.equal(users[1].store.active, false);
+  assert.deepEqual(t.refresh.map(u => u.id), ['u1'], 'the receiver is read back from RevenueCat');
+});
+
+test('RevenueCat read-back: what RevenueCat computes is what is stored', () => {
+  const sub = {
+    entitlements: { pro: { expires_date: iso(NOW + 10 * DAY), product_identifier: 'monthly', grace_period_expires_date: null } },
+    subscriptions: { monthly: { store: 'play_store', period_type: 'trial', unsubscribe_detected_at: null, billing_issues_detected_at: null } }
+  };
+  const s = storeFromSubscriber(sub, CARD, { now: NOW });
+  assert.deepEqual([s.active, s.store, s.periodType, s.trialUsed, s.willRenew], [true, 'play_store', 'TRIAL', true, true]);
+  // In its grace period after a failed charge.
+  const grace = storeFromSubscriber({ entitlements: { pro: { expires_date: iso(NOW - DAY), grace_period_expires_date: iso(NOW + 3 * DAY), product_identifier: 'm' } }, subscriptions: { m: { billing_issues_detected_at: iso(NOW - DAY) } } }, CARD, { now: NOW });
+  assert.deepEqual([grace.active, grace.billingIssue], [true, true]);
+  // The entitlement gone: inactive, and the trial it once had is remembered.
+  assert.deepEqual(storeFromSubscriber({ entitlements: {} }, CARD, { now: NOW, prev: { active: true, trialUsed: true } }).active, false);
+  assert.equal(storeFromSubscriber({ entitlements: {} }, CARD, { now: NOW }), null);
+});
+
+/* ------------------------------ v2 against a real server ------------------------------ */
+
+/** A stand-in for RevenueCat's REST API and PostHog's /batch/, recording what they were sent. */
+async function fakeServices(t, subscriber = {}) {
+  const seen = { rc: [], posthog: [] };
+  const srv = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', d => { body += d; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.startsWith('/v1/subscribers/')) {
+        seen.rc.push({ url: req.url, auth: req.headers.authorization });
+        return res.end(JSON.stringify({ subscriber: subscriber[decodeURIComponent(req.url.split('/').pop())] || { entitlements: {}, subscriptions: {} } }));
+      }
+      if (req.url === '/batch/') { seen.posthog.push(...JSON.parse(body).batch.map(e => ({ ...e, api_key: JSON.parse(body).api_key }))); return res.end('{"status":1}'); }
+      res.statusCode = 404; res.end('{}');
+    });
+  });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  t.after(() => srv.close());
+  return { base: `http://127.0.0.1:${srv.address().port}`, seen };
+}
+const settle = async (cond, ms = 3000) => { for (let i = 0; i < ms / 25 && !cond(); i++) await new Promise(r => setTimeout(r, 25)); };
+
+test('store purchases: RevenueCat webhook and the app’s read-back', async t => {
+  const fake = await fakeServices(t, {
+    u2: { entitlements: { pro: { expires_date: iso(Date.now() + 30 * DAY), product_identifier: 'annual' } }, subscriptions: { annual: { store: 'play_store', period_type: 'trial' } } }
+  });
+  const h = await startServer(t, {
+    env: { TRIAL_DAYS: '0', REVENUECAT_WEBHOOK_AUTH: 'Bearer rc-secret', REVENUECAT_SECRET_KEY: 'sk_rc', REVENUECAT_API_BASE: fake.base },
+    users: [{ id: 'u1', name: 'A', created: iso(Date.now()) }, { id: 'u2', name: 'B', created: iso(Date.now()) }]
+  });
+  // No web checkout on an instance that only sells in the stores.
+  assert.equal((await h.call('/api/billing/checkout', { uid: 'u1', method: 'POST', body: {} })).status, 404);
+  assert.equal((await (await h.call('/api/billing', { uid: 'u1' })).json()).plan, 'none');
+
+  const hook = (b, auth = 'Bearer rc-secret') => h.call('/api/billing/revenuecat', { method: 'POST', body: b, headers: { Authorization: auth } });
+  assert.equal((await hook(rc('INITIAL_PURCHASE', { event_timestamp_ms: Date.now(), expiration_at_ms: Date.now() + 30 * DAY }), 'Bearer wrong')).status, 401);
+  assert.equal((await hook(rc('INITIAL_PURCHASE', { period_type: 'TRIAL', event_timestamp_ms: Date.now(), expiration_at_ms: Date.now() + 30 * DAY }))).status, 200);
+  const a = await (await h.call('/api/billing', { uid: 'u1' })).json();
+  assert.deepEqual([a.plan, a.ai, a.via, a.cardTrial], ['active', true, 'app_store', true]);
+
+  // Right after a purchase the app asks, and RevenueCat's own answer is taken.
+  const synced = await (await h.call('/api/billing/sync', { uid: 'u2', method: 'POST', body: {} })).json();
+  assert.deepEqual([synced.plan, synced.via], ['active', 'play_store']);
+  assert.equal(fake.seen.rc[0].auth, 'Bearer sk_rc');
+  assert.equal(fake.seen.rc[0].url, '/v1/subscribers/u2');
+});
+
+test('creator codes: the admin makes one, a sign-up with it gets the bonus, the admin sees who came', async t => {
+  const fake = await fakeServices(t);
+  const h = await startServer(t, {
+    env: { ...stripeEnv('http://127.0.0.1:9'), ADMIN_UIDS: 'boss', PASSWORD_LOGIN: '1', POSTHOG_KEY: 'phc_test', POSTHOG_HOST: fake.base, POSTHOG_FLUSH_MS: '50' },
+    users: [{ id: 'boss', name: 'Boss', created: LONG_AGO }]
+  });
+  assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'lucia', label: 'Lucía — PT', days: 30 } })).status, 200);
+  assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'LUCIA', days: 30 } })).status, 409);
+  assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'x', days: 30 } })).status, 400);
+  assert.deepEqual(await (await h.call('/api/code?c=lucia')).json(), { code: 'LUCIA', days: 30 });
+  assert.equal((await h.call('/api/code?c=NOPE')).status, 404);
+
+  const signup = async (name, src) => {
+    const r = await h.call('/api/register/password', { method: 'POST', body: { name, password: 'correct horse battery staple', src } });
+    assert.equal(r.status, 200, name);
+    return (await r.json()).user.id;
+  };
+  const coded = await signup('Carla', { ref: 'lucia', utm_source: 'instagram', utm_campaign: 'launch', platform: 'web', junk: { nested: 1 } });
+  const typo = await signup('Dani', { ref: 'LUCIAA' });
+  const stored = JSON.parse(fs.readFileSync(path.join(h.dataDir, 'db.json'), 'utf8')).users;
+  const carla = stored.find(u => u.id === coded);
+  assert.deepEqual(carla.src, { ref: 'LUCIA', utm_source: 'instagram', utm_campaign: 'launch', platform: 'web' });
+  assert.equal(carla.bonusDays, 30);
+  assert.equal(stored.find(u => u.id === typo).src, undefined, 'an unknown code is not recorded as one');
+  assert.equal((await (await h.call('/api/billing', { uid: coded })).json()).trialDaysLeft, 60);
+
+  const codes = (await (await h.call('/api/admin/codes', { uid: 'boss' })).json()).codes;
+  assert.deepEqual(codes.map(c => [c.code, c.signups, c.paying]), [['LUCIA', 1, 0]]);
+  // Revoked: no more days for new sign-ups, and the page says so.
+  assert.equal((await h.call('/api/admin/codes/revoke', { uid: 'boss', method: 'POST', body: { code: 'LUCIA' } })).status, 200);
+  assert.equal((await h.call('/api/code?c=LUCIA')).status, 404);
+
+  // Analytics: the sign-ups arrived, with the creator on them and no name.
+  await settle(() => fake.seen.posthog.filter(e => e.event === 'signup').length >= 2);
+  const sign = fake.seen.posthog.find(e => e.event === 'signup' && e.properties.distinct_id === coded);
+  assert.equal(sign.api_key, 'phc_test');
+  assert.deepEqual([sign.properties.ref, sign.properties.utm_source, sign.properties.method], ['LUCIA', 'instagram', 'password']);
+  assert.equal(JSON.stringify(fake.seen.posthog).includes('Carla'), false, 'names never leave');
+  assert.ok(fake.seen.posthog.some(e => e.event === 'trial_started' && e.properties.distinct_id === coded && e.properties.days === 60));
+});
+
+test('the app’s own events: only the listed ones, forwarded with the profile’s attribution', async t => {
+  const fake = await fakeServices(t);
+  const h = await startServer(t, {
+    env: { POSTHOG_KEY: 'phc_test', POSTHOG_HOST: fake.base, POSTHOG_FLUSH_MS: '50' },
+    users: [{ id: 'u1', name: 'A', created: LONG_AGO, src: { ref: 'LUCIA' } }]
+  });
+  assert.equal((await (await h.call('/api/config')).json()).analytics, true);
+  assert.equal((await h.call('/api/track', { method: 'POST', body: { event: 'import_done' } })).status, 401);
+  assert.equal((await h.call('/api/track', { uid: 'u1', method: 'POST', body: { event: 'subscribed' } })).status, 400, 'a client cannot claim a payment');
+  assert.equal((await h.call('/api/track', { uid: 'u1', method: 'POST', body: { event: 'import_done', props: { source: 'strong', workouts: 212, deep: { x: 1 } } } })).status, 200);
+  await settle(() => fake.seen.posthog.some(e => e.event === 'import_done'));
+  const e = fake.seen.posthog.find(x => x.event === 'import_done');
+  assert.deepEqual([e.properties.distinct_id, e.properties.ref, e.properties.source, e.properties.workouts, e.properties.deep], ['u1', 'LUCIA', 'strong', 212, undefined]);
+});
+
+test('without PostHog, no event route and nothing sent', async t => {
+  const h = await startServer(t, { users: [{ id: 'u1', name: 'A', created: LONG_AGO }] });
+  assert.equal((await h.call('/api/track', { uid: 'u1', method: 'POST', body: { event: 'import_done' } })).status, 404);
+  assert.equal((await h.call('/api/code?c=ANY')).status, 404);
+  assert.equal('analytics' in await (await h.call('/api/config')).json(), false);
 });

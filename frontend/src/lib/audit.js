@@ -40,6 +40,10 @@ const LABELS = {
   // subscription status: active, trialing, past_due, canceled…
   'billing.checkout': 'Opened the subscription checkout',
   'billing.change': 'Subscription changed',
+  // Creator and trainer codes (Admin → Creator codes): `msg` is the code.
+  'admin.code.create': 'Created a creator code',
+  'admin.code.revoke': 'Revoked a creator code',
+  'auth.account.delete': 'Deleted their own account',
   'auth.email.set': 'Added a sign-in e-mail',
   'auth.email.change': 'Changed their sign-in e-mail',
   'auth.email.remove': 'Removed their sign-in e-mail',

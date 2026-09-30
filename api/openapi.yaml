@@ -155,10 +155,16 @@ tags:
       instance has the Coach switched on and a provider connected.
   - name: billing
     description: >-
-      Paid access on a hosted instance: a free trial (`TRIAL_DAYS`, 30), then a Stripe
-      subscription that pays for the AI Coach's jobs. Logging, history and export are never
-      gated. Every route here is a 404 unless `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are
-      both set.
+      Paid access on a hosted instance: an open trial (`TRIAL_DAYS`, plus a creator code's
+      bonus days), then a subscription that pays for the AI Coach's jobs — bought with Stripe
+      on the website (monthly or annual, optionally with a card trial, `STRIPE_TRIAL_DAYS`) or in
+      the App Store / Google Play through RevenueCat. Logging, history and export are never
+      gated. `GET /api/billing` exists when either side is configured; the Stripe routes need
+      `STRIPE_SECRET_KEY` and a price, the store routes `REVENUECAT_WEBHOOK_AUTH`.
+  - name: growth
+    description: >-
+      Creator and trainer codes, and the app's own product events forwarded to PostHog. Every
+      route here is a 404 unless the instance charges or has `POSTHOG_KEY` set.
 
 security:
   - cookieAuth: []
@@ -270,7 +276,13 @@ paths:
                       `STRIPE_PRICE_ID` set), for everybody: the sign-in screen is where a
                       free trial is offered.
                     properties:
-                      trial_days: { type: integer, example: 30 }
+                      trial_days: { type: integer, example: 30, description: Open trial, no card. }
+                      card_trial_days: { type: integer, example: 30, description: Free days of a first web subscription. }
+                      web: { type: boolean, description: Whether the website sells (Stripe) at all. }
+                  analytics:
+                    type: boolean
+                    const: true
+                    description: Present only with POSTHOG_KEY set — the app then reports its own events.
               examples:
                 anonymous: { value: { invite_only: true, allow_guest: false } }
                 signedInNoCoach: { value: { invite_only: true, allow_guest: false, coach: null } }
@@ -527,6 +539,48 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Ok' }
+
+  /api/account/delete:
+    post:
+      tags: [auth]
+      operationId: deleteAccount
+      summary: Delete your own account
+      description: |
+        What the App Store requires of an app that lets people create an account. Removes the
+        profile, its passkeys, push subscriptions, training history, Coach credential and
+        photos and videos — exactly what the admin's delete removes — and cancels a Stripe
+        subscription. A store subscription (App Store, Google Play) cannot be cancelled from
+        here; the app tells the person to cancel it in the store. `confirm` must be the
+        profile's name. Audited as `auth.account.delete`, and the session cookie is cleared.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                confirm: { type: string, description: The profile's name, typed by the person. }
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, const: true }
+        '400':
+          description: '`confirm` is not the profile''s name (`code: confirm`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The last admin cannot delete their own account (`code: last-admin`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /api/logout/all:
     post:
@@ -2362,7 +2416,9 @@ paths:
         - `trial` — inside the free trial; `trialDaysLeft` counts down to `trialEnds`.
         - `active` — a live subscription (Stripe `active` or `trialing`).
         - `past_due` — the last charge failed and Stripe is retrying; the AI stays on meanwhile.
-        - `expired` — no trial left and no live subscription; Coach jobs answer 402.
+        - `expired` — had a trial or a subscription, has neither now; Coach jobs answer 402.
+        - `none` — never had either: an instance with no open trial (`TRIAL_DAYS=0`), before the
+          first checkout or store purchase. Coach jobs answer 402.
         - `free` — an admin, or a profile the operator marked `comp`; never charged.
 
         A profile that existed before the instance started charging gets its trial from that
@@ -2376,8 +2432,14 @@ paths:
                 type: object
                 properties:
                   on: { type: boolean, const: true }
-                  plan: { type: string, enum: [trial, active, past_due, expired, free] }
+                  plan: { type: string, enum: [trial, active, past_due, expired, none, free] }
                   ai: { type: boolean, description: Whether Coach jobs are allowed. }
+                  via:
+                    type: ['string', 'null']
+                    description: Where the live subscription is managed — `stripe`, `app_store`, `play_store`, …
+                  cardTrial: { type: boolean, description: Inside the subscription's own free period. }
+                  cardTrialDays: { type: integer, description: Free days a checkout now would start with. }
+                  web: { type: boolean, description: Whether POST /api/billing/checkout exists. }
                   trialEnds: { type: string, format: date-time }
                   trialDaysLeft: { type: integer }
                   status: { type: ['string', 'null'], description: Stripe's subscription status, as last reported. }
@@ -2393,15 +2455,19 @@ paths:
       operationId: billingCheckout
       summary: Start a Stripe Checkout for this profile
       description: |
-        Creates a Checkout Session for `STRIPE_PRICE_ID` and answers its `url`; the app sends the
-        browser there, and Stripe sends it back to `/#/settings`. Subscribing during the trial
-        does not cut it short: the first charge is set for the day the trial ends (when that is
-        at least 48 hours away — Stripe's minimum). Audited as `billing.checkout`.
+        Creates a Checkout Session for the plan's price (`STRIPE_PRICE_MONTHLY` or
+        `STRIPE_PRICE_ANNUAL`) and answers its `url`; the app sends the browser there, and Stripe
+        sends it back to `/#/settings`. The first charge waits for the open trial to end, and then
+        for the card trial (`STRIPE_TRIAL_DAYS`, once per person), when that is at least 48 hours
+        away — Stripe's minimum. Audited as `billing.checkout`.
       requestBody:
         content:
           application/json:
-            schema: { type: object }
-            example: {}
+            schema:
+              type: object
+              properties:
+                plan: { type: string, enum: [monthly, annual], default: monthly }
+            example: { plan: annual }
       responses:
         '200':
           description: The Checkout page.
@@ -2412,10 +2478,15 @@ paths:
                 properties:
                   url: { type: string, format: uri }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '400':
+          description: That plan has no price on this instance (`code: plan`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: |
-            Nothing to buy: `subscribed` (a live subscription exists — use the portal) or `free`
-            (this profile is not charged).
+            Nothing to buy: `subscribed` (a live subscription exists, on the web or in a store) or
+            `free` (this profile is not charged).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2490,6 +2561,231 @@ paths:
                   received: { type: boolean, const: true }
         '400':
           description: The signature does not verify (or `STRIPE_WEBHOOK_SECRET` is not set).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/revenuecat:
+    post:
+      tags: [billing]
+      operationId: billingRevenueCat
+      summary: RevenueCat's events — not for the app
+      description: |
+        Point a RevenueCat webhook here and set its Authorization header to the exact value of
+        `REVENUECAT_WEBHOOK_AUTH`. Events for the entitlement `REVENUECAT_ENTITLEMENT` (`pro`)
+        update the profile whose id is the event's app user id (or one of its aliases). A
+        TRANSFER is read back from RevenueCat's API when `REVENUECAT_SECRET_KEY` is set. An event
+        older than the last one applied is ignored. Changes are audited as `billing.change`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Taken — used or not, so RevenueCat does not retry it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: boolean, const: true }
+        '401':
+          description: The Authorization header is not the configured one.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/sync:
+    post:
+      tags: [billing]
+      operationId: billingSync
+      summary: Read this profile's store purchase back from RevenueCat
+      description: |
+        What the app calls right after a store purchase, so the Coach opens without waiting for
+        the webhook. Asks RevenueCat's API (`REVENUECAT_SECRET_KEY`) for this profile's
+        entitlement and answers the same body as `GET /api/billing`. Without the secret key it
+        only answers what the webhooks have said. At most 30 an hour per profile.
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+            example: {}
+      responses:
+        '200':
+          description: Where this profile stands now — the body of `GET /api/billing`.
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429':
+          description: Asked too often.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: RevenueCat did not answer (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/code:
+    get:
+      tags: [growth]
+      operationId: creatorCode
+      summary: Whether a creator code exists, and how many days it gives
+      security: []
+      parameters:
+        - name: c
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: A live code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, example: LUCIA }
+                  days: { type: integer, example: 30 }
+        '404':
+          description: No such code, or revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/track:
+    post:
+      tags: [growth]
+      operationId: track
+      summary: Report one of the app's own product events
+      description: |
+        Forwarded to PostHog with the profile's id and the attribution recorded at sign-up
+        (creator code, UTM tags). Only these events are taken: `import_done`,
+        `workout_completed`, `paywall_viewed`, `paywall_dismissed`, `checkout_started`,
+        `onboarding_import_shown`, `onboarding_import_skipped`, `review_prompted`. `signup`,
+        `trial_started`, `subscribed` and `cancelled` come from the server alone. `props` keeps
+        at most 12 short scalar values; anything else is dropped. At most 120 an hour per profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event: { type: string, example: import_done }
+                props: { type: object, example: { source: strong, workouts: 212 } }
+      responses:
+        '200':
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '400':
+          description: Not an event the app may report (`code: event`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429':
+          description: Too many events.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/codes:
+    get:
+      tags: [admin]
+      operationId: adminCodes
+      summary: 'Admin: creator codes, and what each brought in'
+      responses:
+        '200':
+          description: Every code, with its sign-ups and how many of them pay now.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string }
+                        label: { type: string }
+                        days: { type: integer }
+                        created: { type: string, format: date-time }
+                        revoked: { type: boolean }
+                        signups: { type: integer }
+                        paying: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin]
+      operationId: adminCodeCreate
+      summary: 'Admin: create a creator code'
+      description: |
+        A sign-up that arrives with the code (`?ref=CODE` on any link to the app) gets `days` on
+        top of the open trial and is counted under it. Audited as `admin.code.create`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, days]
+              properties:
+                code: { type: string, pattern: '^[A-Za-z0-9_-]{2,24}$' }
+                label: { type: string, description: Who it is for — only the admin sees it. }
+                days: { type: integer, minimum: 0, maximum: 365 }
+      responses:
+        '200':
+          description: Created.
+          content:
+            application/json:
+              schema: { type: object }
+        '400':
+          description: A malformed code (`format`) or day count (`days`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: That code exists already (`code: taken`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/codes/revoke:
+    post:
+      tags: [admin]
+      operationId: adminCodeRevoke
+      summary: 'Admin: stop a creator code giving days'
+      description: Profiles that used it keep what it gave and keep counting under it. Audited as `admin.code.revoke`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such code.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3596,7 +3892,7 @@ components:
           description: PASSWORD_LOGIN instances only — the e-mail the profile signs in with, if any.
         plan:
           type: string
-          enum: [trial, active, past_due, expired, free]
+          enum: [trial, active, past_due, expired, none, free]
           description: Instances that charge only (see the billing tag) — who pays.
 
     Presence:
@@ -3632,7 +3928,7 @@ components:
               description: PASSWORD_LOGIN instances only — expiry (ms) of an unused reset code.
             plan:
               type: string
-              enum: [trial, active, past_due, expired, free]
+              enum: [trial, active, past_due, expired, none, free]
               description: Instances that charge only — who pays.
         unit: { type: string, enum: [kg, lb] }
         lastSync: { oneOf: [{ type: number }, { type: 'null' }] }

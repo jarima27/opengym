@@ -133,6 +133,7 @@ const TAGS = {
   // spec needs a line here.
   coach: { title: 'AI Coach', side: 'Plans, reviews, debriefs' },
   billing: { title: 'Billing', side: 'Trial &amp; subscription (hosted instances)' },
+  growth: { title: 'Growth', side: 'Creator codes &amp; product events (hosted instances)' },
   admin: { title: 'Admin', side: 'Users, invites, audit log, Coach' }
 }
 

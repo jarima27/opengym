@@ -31,7 +31,11 @@ import {
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } from './device-link.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
-import { billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe } from './billing.js';
+import {
+  billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
+  revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber
+} from './billing.js';
+import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -106,8 +110,15 @@ const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(us
    Stripe variables are set, and then none of the billing routes exist and nobody is charged. */
 const BILLING = billingConfig();
 if (BILLING.on && !db.billingSince) db.billingSince = Date.now();   // saved with the next write
-if (BILLING.on && !BILLING.webhookSecret) console.warn('billing: STRIPE_WEBHOOK_SECRET is not set — no payment will ever be recorded');
+if (BILLING.stripe.on && !BILLING.stripe.webhookSecret) console.warn('billing: STRIPE_WEBHOOK_SECRET is not set — no web payment will ever be recorded');
+if (BILLING.rc.on && !BILLING.rc.secretKey) console.warn('billing: REVENUECAT_SECRET_KEY is not set — a store purchase waits for its webhook');
 const billingAccess = user => accessOf(user, BILLING, { since: db.billingSince || 0, staff: isAdmin(user) });
+/* Product analytics (analytics.js): PostHog, from this server only. Off unless POSTHOG_KEY. */
+const ANALYTICS = createAnalytics(analyticsConfig());
+/* Creator and trainer codes, UTM attribution and the analytics that read them belong to an
+   instance that sells itself; on any other the routes do not exist. */
+const GROWTH_ON = BILLING.on || ANALYTICS.on;
+db.codes = db.codes || [];   // creator codes: { code, label, days, created, revoked }
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2), 0o600); }
@@ -550,8 +561,8 @@ const CSRF_EXEMPT = new Set([
   'POST /api/register/options', 'POST /api/register/verify',
   'POST /api/login/options', 'POST /api/login/verify',
   'POST /api/pair/redeem',
-  // Stripe calling in: no browser, no session, and its own signature is the check.
-  'POST /api/billing/webhook'
+  // Stripe and RevenueCat calling in: no browser, no session, and their own secret is the check.
+  'POST /api/billing/webhook', 'POST /api/billing/revenuecat'
 ]);
 const originsMatch = (a, b) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 function csrfOk(req, key) {
@@ -1196,9 +1207,11 @@ const passwordRoutes = {
     const created = new Date().toISOString();
     const user = { id: crypto.randomBytes(12).toString('base64url'), name, created, pw: { h, set: created }, ...(email ? { email } : {}) };
     if (inv) { user.invitedBy = inv.code; inv.usedBy = user.id; inv.usedAt = created; }
+    adoptSource(user, body.src);
     db.users.push(user);
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: inv ? inv.code + ' · password' : 'password' });
+    signedUp(user, 'password');
     json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
@@ -1743,27 +1756,116 @@ const mediaRoutes = {
   }
 };
 
+/* ---------- attribution: where a profile came from ---------- */
+/* What the app remembered from the link that brought someone in — a creator code (?ref=) and the
+   campaign tags (?utm_*) — sent once, with the sign-up. Kept on the profile (user.src) so every
+   later event says which creator or campaign it belongs to. Only short, plain values survive. */
+const SRC_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'];
+function cleanSource(raw) {
+  if (!GROWTH_ON || !raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  const ref = text(raw.ref).trim().toUpperCase();
+  if (/^[A-Z0-9_-]{2,24}$/.test(ref)) out.ref = ref;
+  for (const k of SRC_KEYS) {
+    const v = text(raw[k]).trim().slice(0, 64);
+    if (v && /^[\w .:/@+-]+$/.test(v)) out[k] = v;
+  }
+  const platform = text(raw.platform);
+  if (['web', 'ios', 'android'].includes(platform)) out.platform = platform;
+  return Object.keys(out).length ? out : null;
+}
+const activeCode = code => db.codes.find(c => c.code === code && !c.revoked) || null;
+/* A creator code that exists gives its bonus days on top of the trial; one that does not is kept
+   out of the record, so a typo cannot pass for a creator's sign-up. */
+function adoptSource(user, raw) {
+  const src = cleanSource(raw);
+  if (!src) return;
+  if (src.ref) {
+    const code = activeCode(src.ref);
+    if (code) user.bonusDays = code.days;
+    else delete src.ref;
+  }
+  if (Object.keys(src).length) user.src = src;
+}
+function signedUp(user, method) {
+  ANALYTICS.capture('signup', user, { method }, { created: user.created });
+  if (!BILLING.on) return;
+  const days = BILLING.trialDays + (user.bonusDays || 0);
+  if (days > 0) ANALYTICS.capture('trial_started', user, { kind: 'open', days });
+}
+
+/* Everything a profile is, gone: the record, its passkeys and push subscriptions, its training
+   history, its Coach credential, its photos and videos — and its subscription at Stripe, which
+   must not go on charging for a profile that no longer exists. The admin's delete and a person
+   deleting their own account both end here. */
+function removeProfile(u) {
+  db.users = db.users.filter(x => x.id !== u.id);
+  db.creds = (db.creds || []).filter(c => c.userId !== u.id);
+  db.subs = (db.subs || []).filter(x => x.userId !== u.id);
+  dropDeviceLinks(db, u.id);
+  presence.delete(u.id);
+  // The training history and any Coach credential of theirs, both outside db.json.
+  try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
+  try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
+  // Their photos and videos — the one place a profile's folder under uploads/ is removed.
+  try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
+  // Best effort: Stripe being unreachable does not keep the profile, and the log says which
+  // subscription to cancel by hand. A store subscription (App Store, Google Play) cannot be
+  // cancelled from here at all; the app tells the person to cancel it in the store.
+  if (BILLING.stripe.on && isPaying(u.billing) && u.billing.subscription) {
+    stripe(BILLING, 'DELETE', 'subscriptions/' + encodeURIComponent(u.billing.subscription))
+      .catch(e => console.error('billing: could not cancel', u.billing.subscription, 'of deleted profile', u.id, '-', e.message));
+  }
+  saveDb();
+}
+
 /* ---------- billing (billing.js) ---------- */
 const PAYMENT_DOWN = { error: 'the payment provider did not answer — try again in a moment', code: 'provider' };
+// Where each profile stood before an event — to tell what the event changed.
+const snapshots = () => new Map(db.users.map(u => [u.id, snapshot(u)]));
+/* What a billing event changed, said to analytics and to the activity log: a trial started, a
+   subscription started paying, or one was cancelled. */
+function billingChanged(req, before, users) {
+  for (const user of users) {
+    const after = snapshot(user);
+    const moved = transitions(before.get(user.id) || snapshot(null), after);
+    if (!moved.length) continue;
+    for (const ev of moved) ANALYTICS.capture(ev, user, { via: after.via || before.get(user.id)?.via || null }, { plan: billingAccess(user).plan });
+    audit(req, 'billing.change', { user, msg: moved.join(' ') + (after.via || before.get(user.id)?.via ? ' · ' + (after.via || before.get(user.id).via) : '') });
+  }
+}
+const PLANS = ['monthly', 'annual'];
+const priceFor = plan => BILLING.stripe.prices[plan] || null;
+const SYNC_BUDGET = createWindow({ max: 30, windowMs: 3600000 });
+
 const billingRoutes = {
   // Where this profile stands: trial days left, or the subscription's state.
   'GET /api/billing': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     json(res, 200, billingAccess(user));
-  },
+  }
+};
 
-  // A Stripe Checkout page for this profile. The app sends the browser to `url`.
+// Selling on the website: Stripe Checkout, the customer portal, and Stripe's webhook.
+const stripeRoutes = {
+  // A Stripe Checkout page for this profile and the plan it picked (`monthly` or `annual`). The
+  // app sends the browser to `url`.
   'POST /api/billing/checkout': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
     const { plan } = billingAccess(user);
     if (plan === 'free') return json(res, 409, { error: 'this profile is not charged', code: 'free' });
-    if (plan === 'active' || plan === 'past_due') return json(res, 409, { error: 'already subscribed — manage it from the billing portal', code: 'subscribed' });
+    if (plan === 'active' || plan === 'past_due') return json(res, 409, { error: 'already subscribed — manage it where you subscribed', code: 'subscribed' });
+    const which = PLANS.includes(body.plan) ? body.plan : 'monthly';
+    const price = priceFor(which);
+    if (!price) return json(res, 400, { error: 'this plan is not offered', code: 'plan' });
     let session;
-    try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, since: db.billingSince || 0 })); }
+    try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, price, since: db.billingSince || 0 })); }
     catch (e) { console.error('billing: checkout for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
-    audit(req, 'billing.checkout', { user });
+    audit(req, 'billing.checkout', { user, msg: which });
+    ANALYTICS.capture('checkout_started', user, { plan: which, via: 'stripe' });
     json(res, 200, { url: session.url });
   },
 
@@ -1782,15 +1884,114 @@ const billingRoutes = {
   // makes Stripe retry the same event for three days.
   'POST /api/billing/webhook': async (req, res) => {
     const raw = await readRaw(req);
-    const event = verifyWebhook(raw, req.headers['stripe-signature'], BILLING.webhookSecret);
+    const event = verifyWebhook(raw, req.headers['stripe-signature'], BILLING.stripe.webhookSecret);
     if (!event) return json(res, 400, { error: 'signature does not verify' });
-    const changed = applyEvent(db.users, event);
-    if (changed) {
-      saveDb();
-      const { user, was } = changed;
-      if (user.billing.status && user.billing.status !== was) audit(req, 'billing.change', { user, msg: user.billing.status });
-    }
+    const before = snapshots();
+    const user = applyEvent(db.users, event);
+    if (user) { saveDb(); billingChanged(req, before, [user]); }
     json(res, 200, { received: true });
+  }
+};
+
+// Selling in the App Store and Google Play: RevenueCat's webhook, and a read-back for the app.
+const storeRoutes = {
+  // RevenueCat telling us what a store did. It sends the Authorization header it was set up
+  // with; that is the whole check, so it is compared in constant time.
+  'POST /api/billing/revenuecat': async (req, res) => {
+    if (!revenueCatAuthOk(req.headers.authorization, BILLING)) return json(res, 401, { error: 'not authorised' });
+    const body = await readBody(req);
+    const before = snapshots();
+    const { changed, refresh } = applyRevenueCat(db.users, body, BILLING);
+    if (BILLING.rc.secretKey) {
+      for (const u of refresh) {
+        try {
+          const next = storeFromSubscriber(await revenueCatSubscriber(BILLING, u.id), BILLING, { prev: u.store });
+          if (next) { u.store = next; changed.push(u); }
+        } catch (e) { console.error('billing: revenuecat read-back for', u.id, '-', e.message); }
+      }
+    }
+    if (changed.length) { saveDb(); billingChanged(req, before, [...new Set(changed)]); }
+    json(res, 200, { received: true });
+  },
+
+  // What the app asks right after a purchase: RevenueCat's own view of this profile, so the
+  // Coach opens without waiting for the webhook.
+  'POST /api/billing/sync': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!BILLING.rc.secretKey) return json(res, 200, billingAccess(user));
+    const wait = SYNC_BUDGET.take(user.id);
+    if (wait) return tooMany(res, wait);
+    const before = new Map([[user.id, snapshot(user)]]);
+    try {
+      const next = storeFromSubscriber(await revenueCatSubscriber(BILLING, user.id), BILLING, { prev: user.store });
+      if (next) { user.store = next; saveDb(); billingChanged(req, before, [user]); }
+    } catch (e) { console.error('billing: revenuecat sync for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
+    json(res, 200, billingAccess(user));
+  }
+};
+
+/* ---------- growth: creator codes and the app's own events ---------- */
+const TRACK_BUDGET = createWindow({ max: 120, windowMs: 3600000 });
+const growthRoutes = {
+  // Whether a creator code is real, and what it gives — for the sign-up screen to say
+  // "code LUCIA: one month extra" before anyone commits to anything. Who the creator is stays
+  // with the operator.
+  'GET /api/code': async (req, res) => {
+    const code = activeCode(text(new URL(req.url, 'http://x').searchParams.get('c')).trim().toUpperCase());
+    if (!code) return json(res, 404, { error: 'no such code' });
+    json(res, 200, { code: code.code, days: code.days });
+  },
+
+  // The app's own events (analytics.js CLIENT_EVENTS), forwarded with the profile's attribution.
+  'POST /api/track': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
+    const event = text(body.event);
+    if (!CLIENT_EVENTS.has(event)) return json(res, 400, { error: 'unknown event', code: 'event' });
+    const wait = TRACK_BUDGET.take(user.id);
+    if (wait) return tooMany(res, wait);
+    ANALYTICS.capture(event, user, cleanProps(body.props));
+    json(res, 200, { ok: true });
+  },
+
+  // One row per code: who it is for, what it gives, and what it brought in.
+  'GET /api/admin/codes': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const codes = db.codes.map(c => {
+      const people = db.users.filter(u => u.src?.ref === c.code);
+      return { ...c, signups: people.length, paying: people.filter(u => snapshot(u).paying).length };
+    });
+    json(res, 200, { codes });
+  },
+
+  'POST /api/admin/codes': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const code = text(body.code).trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{2,24}$/.test(code)) return json(res, 400, { error: 'a code is 2 to 24 letters, digits, - or _', code: 'format' });
+    if (db.codes.some(c => c.code === code)) return json(res, 409, { error: 'that code exists already', code: 'taken' });
+    const days = Math.round(+body.days);
+    if (!(days >= 0 && days <= 365)) return json(res, 400, { error: 'days must be 0 to 365', code: 'days' });
+    const row = { code, label: text(body.label).trim().slice(0, 80), days, created: new Date().toISOString(), revoked: false };
+    db.codes.push(row);
+    saveDb();
+    audit(req, 'admin.code.create', { user: admin, msg: code });
+    json(res, 200, { code: row });
+  },
+
+  // Revoked codes stop giving days to new sign-ups; the profiles that used one keep what it gave
+  // and keep counting under it.
+  'POST /api/admin/codes/revoke': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const row = db.codes.find(c => c.code === text(body.code).trim().toUpperCase());
+    if (!row) return json(res, 404, { error: 'no such code' });
+    row.revoked = true;
+    saveDb();
+    audit(req, 'admin.code.revoke', { user: admin, msg: row.code });
+    json(res, 200, { ok: true });
   }
 };
 
@@ -1827,7 +2028,9 @@ const routes = {
       // block is how the app knows this server does not take photos and videos at all.
       ...(MEDIA_ON ? { media: mediaConfig(MEDIA_LIMITS) } : {}),
       // Public as well: the sign-in screen is where "try it free for 30 days" belongs.
-      ...(BILLING.on ? { billing: { trial_days: BILLING.trialDays } } : {}),
+      ...(BILLING.on ? { billing: { trial_days: BILLING.trialDays, card_trial_days: BILLING.cardTrialDays, web: BILLING.stripe.on } } : {}),
+      // Whether the app should report its own events (POST /api/track) at all.
+      ...(ANALYTICS.on ? { analytics: true } : {}),
       ...(readSession(req) ? { coach: coachConfig.publicConfig() } : {})
     });
   },
@@ -1865,7 +2068,7 @@ const routes = {
       authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
       excludeCredentials: []
     });
-    const cid = putChallenge({ kind: 'register', challenge: options.challenge, name, uid, code });
+    const cid = putChallenge({ kind: 'register', challenge: options.challenge, name, uid, code, src: cleanSource(body.src) });
     json(res, 200, { cid, options });
   },
 
@@ -1910,6 +2113,7 @@ const routes = {
     }
     const user = { id: c.uid, name: c.name, created: new Date().toISOString() };
     if (invite) { user.invitedBy = invite.code; invite.usedBy = user.id; invite.usedAt = user.created; }
+    adoptSource(user, c.src);
     db.users.push(user);
     db.creds.push({
       id: credential.id, userId: user.id,
@@ -1921,6 +2125,7 @@ const routes = {
     });
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: invite ? invite.code : null });
+    signedUp(user, 'passkey');
     json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
   },
 
@@ -1991,6 +2196,21 @@ const routes = {
   'POST /api/logout': async (req, res) => {
     const user = readSession(req);
     if (user) audit(req, 'auth.logout', { user });
+    json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
+  },
+
+  // Deleting your own account, from the app — what the App Store requires of any app that lets
+  // people create one. `confirm` must be the profile's own name: one tap on a stray button, or a
+  // forged request that somehow carried the session, cannot do it. The last admin cannot leave
+  // the instance without one.
+  'POST /api/account/delete': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
+    if (text(body.confirm).trim() !== user.name) return json(res, 400, { error: 'type your profile name to confirm', code: 'confirm' });
+    if (isAdmin(user) && db.users.filter(isAdmin).length <= 1) return json(res, 409, { error: 'the last admin cannot delete their own account', code: 'last-admin' });
+    audit(req, 'auth.account.delete', { user });
+    removeProfile(user);
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
   },
 
@@ -2318,23 +2538,7 @@ const routes = {
     if (u.id === admin.id) return json(res, 400, { error: 'you cannot delete your own account' });
     if (isAdmin(u) && db.users.filter(isAdmin).length <= 1) return json(res, 400, { error: 'cannot delete the last admin' });
     const name = u.name;
-    db.users = db.users.filter(x => x.id !== u.id);
-    db.creds = (db.creds || []).filter(c => c.userId !== u.id);
-    db.subs = (db.subs || []).filter(x => x.userId !== u.id);
-    dropDeviceLinks(db, u.id);
-    presence.delete(u.id);
-    // The training history and any Coach credential of theirs, both outside db.json.
-    try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
-    try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
-    // Their photos and videos — the one place a profile's folder under uploads/ is removed.
-    try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
-    // A deleted profile must not go on being charged. Best effort: Stripe being unreachable
-    // does not keep the profile, and the log says which subscription to cancel by hand.
-    if (BILLING.on && isPaying(u.billing) && u.billing.subscription) {
-      stripe(BILLING, 'DELETE', 'subscriptions/' + encodeURIComponent(u.billing.subscription))
-        .catch(e => console.error('billing: could not cancel', u.billing.subscription, 'of deleted profile', u.id, '-', e.message));
-    }
-    saveDb();
+    removeProfile(u);
     // Logged with the name, because the id is about to mean nothing to anyone reading this back.
     audit(req, 'admin.user.delete', { user: admin, msg: name });
     json(res, 200, { ok: true, id: u.id });
@@ -2428,7 +2632,10 @@ const routes = {
   /* ---------- billing ---------- */
   // Absent, like media above, while the instance does not charge: a 404 is what the app reads
   // as "nothing to pay for here".
-  ...(BILLING.on ? billingRoutes : {})
+  ...(BILLING.on ? billingRoutes : {}),
+  ...(BILLING.stripe.on ? stripeRoutes : {}),
+  ...(BILLING.rc.on ? storeRoutes : {}),
+  ...(GROWTH_ON ? growthRoutes : {})
 };
 
 /* ---------- Coach: boot recovery, notifications, scheduled reviews ---------- */

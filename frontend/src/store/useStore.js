@@ -1322,6 +1322,20 @@ export const useStore = create((set, get) => {
       return left.owed ? owedResult(left, { stashed: true }) : { owed: false }
     },
 
+    // After POST /api/account/delete: the account is gone, so nothing is owed to it and nothing
+    // is kept aside for it — this device's copy is wiped the way a sign-out wipes it, and a phone
+    // drops back to local-only like a disconnect.
+    async accountDeleted() {
+      await clearLocalSession()
+      if (MOBILE) {
+        await forgetRemote()
+        pairedBase = null
+        setSync({ server: null })
+        get().setGuest(true)
+        set({ ready: true })
+      }
+    },
+
     // Mobile-only ("connect to my server" onboarding, see App.jsx's needsMobileOnboarding).
     // Picking local — even before there's any data — persists the choice so onboarding never
     // asks again.

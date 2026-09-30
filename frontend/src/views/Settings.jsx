@@ -31,6 +31,7 @@ import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } fro
 import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 import SubscriptionSection from '../components/Subscription.jsx'
+import DeleteAccountSheet from '../components/DeleteAccount.jsx'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -310,6 +311,8 @@ export default function Settings() {
         <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={signOutHere} />
         <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
         <AccountIdRow id={user.id} />
+        <Row icon="trash" iconTint="var(--red)" title={t('Delete account')} subtitle={t('Your profile, workouts and photos are deleted from the server for good.')} danger
+          onClick={() => useUI.getState().openSheet(close => <DeleteAccountSheet name={user.name} close={close} done={() => nav('/home')} />)} />
       </> : webauthnOK() ? <>
         <Row icon="sparkles" iconTint="var(--acc)" title={t('Create passkey profile')} subtitle={t('Keeps your data safe and separate per person.')} accessory="chevron" onClick={registerHere} />
         <Row icon="person" iconTint="var(--blue)" title={t('Sign in with passkey')} accessory="chevron" onClick={passkeySignIn} />
