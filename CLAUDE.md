@@ -117,8 +117,9 @@ WebAuthn passkeys are bound to an exact hostname (`RP_ID`) and require HTTPS (lo
 when neither is available). Read `docs/SELF_HOSTING.md` before touching auth, session, or
 notification code; it documents the exact env-var contract (`RP_ID`, `ORIGIN`, `PORT`,
 `WEB_PORT`, `NGINX_PORT`, `BACKEND`, `SESSION_DAYS`, `ADMIN_UIDS`, `INVITE_ONLY`, `ALLOW_GUEST`,
-`AUDIT_*`, `VAPID_SUBJECT`, and for a hosted instance that charges `STRIPE_SECRET_KEY`,
-`STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `TRIAL_DAYS` — see `api/billing.js`) that real deployments depend on.
+`AUDIT_*`, `VAPID_SUBJECT`, and for a hosted instance that sells access `STRIPE_*`, `TRIAL_DAYS`,
+`REVENUECAT_*`, `POSTHOG_*` — see `api/billing.js`, `api/paywall.js`, `api/analytics.js`) that real
+deployments depend on.
 
 ### Docker / deploy
 

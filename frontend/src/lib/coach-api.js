@@ -60,7 +60,11 @@ const track = r => {
 // 402 `billing`. The server's sentence is English; this one is the person's language and says
 // where to go.
 const unpaid = e => {
-  if (e?.status === 402 && e.data?.code === 'billing') e.message = t('Your free trial has ended. Subscribe in Settings to keep using the AI Coach.')
+  if (e?.status === 402 && e.data?.code === 'billing') {
+    e.message = t('Your free trial has ended. Subscribe in Settings to keep using the AI Coach.')
+    // On the website the paywall opens right here; the phone app sells through its store.
+    import('../components/Paywall.jsx').then(m => m.openPaywall('coach')).catch(() => {})
+  }
   throw e
 }
 export const awaitedJob = () => awaited

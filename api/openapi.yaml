@@ -2449,6 +2449,93 @@ paths:
               example: { on: true, plan: trial, ai: true, trialEnds: '2026-10-31T09:00:00.000Z', trialDaysLeft: 30, status: null, periodEnd: null, endsAt: null, portal: false }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/paywall:
+    get:
+      tags: [billing]
+      operationId: paywall
+      summary: The paywall this profile sees
+      description: |
+        The words of the paywall and of the end-of-trial screen, as the admin last saved them
+        (Admin → Paywall), for this profile's variant and the app's language — a field left
+        empty falls back to built-in words. A profile always gets the same variant for the
+        same `experiment`. `plans` has each plan the website sells, priced as Stripe has it
+        (null when Stripe could not be read). `offering` is the RevenueCat offering the mobile
+        app shows for this variant. The app reports `variant` on its paywall events.
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, example: es }
+      responses:
+        '200':
+          description: The paywall.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  experiment: { type: string }
+                  variant: { type: string }
+                  highlight: { type: string, enum: [monthly, annual] }
+                  offering: { type: ['string', 'null'] }
+                  copy: { type: object, description: 'title, subtitle, bullets[], cta, ctaNoTrial, monthlyLabel, annualLabel, annualBadge, perMonth, perYear, footnote, later, endTitle, endBody, endCta' }
+                  plans:
+                    type: object
+                    additionalProperties:
+                      oneOf:
+                        - type: object
+                          properties:
+                            amount: { type: integer, description: Minor units. }
+                            currency: { type: string }
+                            interval: { type: string }
+                        - type: 'null'
+                  cardTrialDays: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/paywall:
+    get:
+      tags: [admin]
+      operationId: adminPaywall
+      summary: 'Admin: the paywall as saved, and the built-in words'
+      responses:
+        '200':
+          description: The saved paywall (or the built-in one), the built-in words per language, the text fields, and the instance's own Stripe prices.
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin]
+      operationId: adminPaywallSave
+      summary: 'Admin: save the paywall — live on the next screen anyone opens'
+      description: |
+        One to four variants, each with an id, a weight (0–100), the recommended plan, optional
+        Stripe price ids of its own, an optional RevenueCat offering, and its words per
+        language. Anything else is dropped; text is cut to 300 characters. Audited as
+        `admin.paywall.save`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paywall]
+              properties:
+                paywall: { type: object }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: { type: object }
+        '400':
+          description: Not a valid paywall (`code: invalid`); the message names the first problem.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /api/billing/checkout:
     post:
       tags: [billing]
@@ -2666,7 +2753,8 @@ paths:
         Forwarded to PostHog with the profile's id and the attribution recorded at sign-up
         (creator code, UTM tags). Only these events are taken: `import_done`,
         `workout_completed`, `paywall_viewed`, `paywall_dismissed`, `checkout_started`,
-        `onboarding_import_shown`, `onboarding_import_skipped`, `review_prompted`. `signup`,
+        `onboarding_import_shown`, `onboarding_import_picked`, `onboarding_import_skipped`,
+        `review_prompted`. `signup`,
         `trial_started`, `subscribed` and `cancelled` come from the server alone. `props` keeps
         at most 12 short scalar values; anything else is dropped. At most 120 an hour per profile.
       requestBody:

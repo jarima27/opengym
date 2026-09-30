@@ -11,6 +11,22 @@ import { Button, Segmented } from '../components/ui.jsx'
 import { askAddDeviceData } from '../sheets.jsx'
 import { passwordOn, PasswordRegisterForm, openPasswordSignIn } from '../components/PasswordAuth.jsx'
 import { openDeviceLinkRedeem } from '../components/Passkeys.jsx'
+import { pendingCode } from '../lib/attribution.js'
+import { api } from '../lib/api.js'
+
+// A creator's link (?ref=CODE) that opened the app: said on the sign-in screen, so the extra
+// days are a reason to create the profile now. Only a code the server knows is shown.
+function CodeBanner() {
+  const [code, setCode] = useState(null)
+  useEffect(() => {
+    const c = pendingCode()
+    if (c) api('/api/code?c=' + encodeURIComponent(c)).then(setCode).catch(() => {})
+  }, [])
+  if (!code || !code.days) return null
+  return <div className="card small row" style={{ marginBottom: 18, color: 'var(--acc)', fontWeight: 600, gap: 8, justifyContent: 'center' }}>
+    <Icon name="sparkles" /><span>{t('Code {0}: {1} extra days free', code.code, code.days)}</span>
+  </div>
+}
 
 function RegisterSheet({ close }) {
   const { setUser, pushState, pullState, loadConfig } = useStore()
@@ -100,6 +116,7 @@ export default function Login() {
     <div className="narrow" style={wrap}>
       {head}
       <div className="muted" style={{ marginBottom: 34 }}>{t('Your workouts. Your weights. Your profile.')}</div>
+      <CodeBanner />
       {webauthnOK() ? <>
         <Button variant="primary" icon="person" onClick={signIn}>{t('Sign in with passkey')}</Button>
         <div style={{ height: 10 }} />

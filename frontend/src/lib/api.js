@@ -2,6 +2,8 @@
 import { t } from './i18n-core.js'
 import { MOBILE } from './mobile.js'
 import { appBase } from './app-base.js'
+import { attribution, clearAttribution } from './attribution.js'
+import { markWelcome } from './welcome.js'
 
 export const IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)
 export const IS_ANDROID = /Android/.test(navigator.userAgent)
@@ -255,10 +257,13 @@ function credToJSON(cred) {
   }
   return out
 }
+// `src` is where this person came from (lib/attribution.js): sent once, with the sign-up.
 export async function passkeyRegister(name, code) {
-  const { cid, options } = await api('/api/register/options', { method: 'POST', body: JSON.stringify({ name, code: code || '' }) })
+  const { cid, options } = await api('/api/register/options', { method: 'POST', body: JSON.stringify({ name, code: code || '', src: attribution() }) })
   const cred = await navigator.credentials.create({ publicKey: toCreationOptions(options) })
   const res = await api('/api/register/verify', { method: 'POST', body: JSON.stringify({ cid, credential: credToJSON(cred) }) })
+  clearAttribution()
+  markWelcome()
   return res.user
 }
 // One passkey ceremony, not yet sent anywhere: /api/login/verify turns it into a sign-in, and
@@ -297,7 +302,10 @@ export async function passwordLogin(name, password) {
 // `email` is optional, and sent only when there is one: a server from before the field would
 // otherwise ignore it without a word, which is the same thing.
 export async function passwordRegister(name, password, code, email) {
-  return (await post('/api/register/password', { name, password, code: code || '', ...(email ? { email } : {}) })).user
+  const { user } = await post('/api/register/password', { name, password, code: code || '', ...(email ? { email } : {}), src: attribution() })
+  clearAttribution()
+  markWelcome()
+  return user
 }
 export async function passwordResetRedeem(name, code, next) {
   return (await post('/api/login/password-reset', { name, code, next })).user

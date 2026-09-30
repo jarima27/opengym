@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useUI } from '../store/useUI.js'
 import { t } from '../lib/i18n.js'
-import { billingStatus, billingCheckout, billingPortal, billingView } from '../lib/billing.js'
+import { billingStatus, billingPortal, billingView } from '../lib/billing.js'
+import { openPaywall } from './Paywall.jsx'
 import { Section, Row } from './ui.jsx'
 
 // Settings → Subscription, on an instance that charges. Renders nothing anywhere else.
@@ -26,11 +27,14 @@ export default function SubscriptionSection() {
   const view = billingView(a)
   if (!view) return null
 
+  // Subscribing goes through the paywall (the operator's words and both plans); managing an
+  // existing subscription goes straight to Stripe's portal.
   const go = async () => {
+    if (view.action === 'checkout') { openPaywall(a.plan === 'expired' ? 'trial_end' : 'settings'); return }
     if (busy) return
     setBusy(true)
     try {
-      const { url } = await (view.action === 'portal' ? billingPortal() : billingCheckout())
+      const { url } = await billingPortal()
       window.location.assign(url)
     } catch {
       toast(t('Could not open the payment page'))

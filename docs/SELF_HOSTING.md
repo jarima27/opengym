@@ -337,45 +337,67 @@ from Settings → "Pair the mobile app", as with a passkey.
 
 ### Charging for access (optional, hosted instances)
 
-An instance that other people pay to use can put the AI Coach behind a subscription. It is off
-unless `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are both set; on an instance without them the
-billing routes do not exist and nobody is charged.
+An instance that other people pay to use can put the AI Coach behind a subscription, sold on the
+website with Stripe and in the App Store / Google Play through RevenueCat. All of it is off unless
+configured; on an instance without these variables the routes do not exist and nobody is charged.
 
 What is charged for is the AI — the Coach's plans, reviews, debriefs and weekly reviews, which
 cost you money on every call. Logging workouts, the history, the charts and the export never stop
 working when a trial ends or a card fails.
 
-1. In Stripe, create a product with a **recurring price** and copy its id (`price_…`).
-2. Add a webhook endpoint pointing at `https://<your domain>/api/billing/webhook` with the events
-   `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`
-   and `customer.subscription.deleted`. Copy its signing secret (`whsec_…`).
-3. Turn on the **customer portal** (Settings → Billing → Customer portal) so people can change
-   their card and cancel on their own.
-4. Set the variables and restart the api:
+**Website (Stripe).**
+
+1. Create a product with two **recurring prices** (monthly and yearly) and copy their ids.
+2. Add a webhook endpoint at `https://<your domain>/api/billing/webhook` with the events
+   `checkout.session.completed`, `customer.subscription.created`, `.updated` and `.deleted`.
+   Copy its signing secret.
+3. Turn on the **customer portal** so people can change their card and cancel on their own.
+
+**App Store / Google Play (RevenueCat).** Create an entitlement (`pro`), attach both stores'
+products to it, and add a webhook to `https://<your domain>/api/billing/revenuecat` with an
+Authorization header of your choosing — the same string goes in `REVENUECAT_WEBHOOK_AUTH`. The
+app identifies each person to RevenueCat by their profile id. A secret API key
+(`REVENUECAT_SECRET_KEY`) lets the app read a purchase back the moment it is made.
 
 ```bash
 # .env
 STRIPE_SECRET_KEY=sk_live_...
-STRIPE_PRICE_ID=price_...
+STRIPE_PRICE_MONTHLY=price_...
+STRIPE_PRICE_ANNUAL=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-TRIAL_DAYS=30            # default 30
+STRIPE_TRIAL_DAYS=30        # free days of a first web subscription, card up front
+TRIAL_DAYS=0                # open trial without a card (default 30); 0 = card trials only
+REVENUECAT_WEBHOOK_AUTH=Bearer <long random string>
+REVENUECAT_SECRET_KEY=sk_...
+POSTHOG_KEY=phc_...         # optional: product analytics, sent from the server
 ```
 
 How it behaves:
 
-- Every profile gets `TRIAL_DAYS` from its sign-up. Profiles that existed before you turned
-  charging on get theirs from that day instead, so nobody is cut off the moment you switch it on.
-- Settings shows a **Subscription** section with the days left and a Subscribe button (Stripe
-  Checkout). Subscribing during the trial does not charge before the trial ends.
-- After the trial, without a live subscription, a Coach job answers `402` and the app says to
-  subscribe. A failed card (`past_due`) keeps the Coach on while Stripe retries.
-- Admins, and any profile you mark with `"comp": true` in `db.json` (a trainer you work with, a
-  friend), are never charged. The admin dashboard shows each profile's plan.
-- Deleting a profile from the admin dashboard cancels its subscription at Stripe.
-- The subscription state lives on the user in `db.json`, so the backup below already covers it.
-  Stripe stays the record of what was paid.
-
-Only the web app offers the subscription; the mobile app does not show it.
+- **Trials.** `TRIAL_DAYS` is free time from sign-up with no card. `STRIPE_TRIAL_DAYS` (and the
+  stores' introductory offer) is a trial taken out with a card: the first charge comes when it
+  ends, and a person gets it once. Subscribing early never costs a free day — the card trial
+  starts where the open one ends. Profiles that existed before you turned charging on get their
+  open trial from that day.
+- **Paywall.** Settings → Subscription, a Coach request after the trial, and the first screens
+  after sign-up open it. Its words, the recommended plan, each plan's Stripe price and up to four
+  A/B variants are edited in **Admin → Paywall** and are live on the next paywall anyone opens.
+- **End of trial.** When a trial or subscription runs out, the website shows the end-of-trial
+  screen, at most every three days. Coach jobs answer `402` until they subscribe; a failed card
+  (`past_due`) keeps the Coach on while the store or Stripe retries.
+- **Creator codes.** Admin → Creator codes makes a code per creator or trainer. A sign-up
+  through `https://<your domain>/?ref=CODE` gets the extra days on top of the trial, and the card
+  shows how many signed up and how many pay. `utm_*` tags in the link are recorded too.
+- **Analytics.** With `POSTHOG_KEY`, the server sends `signup`, `trial_started`, `subscribed`
+  and `cancelled`, and forwards the app's `import_done`, `workout_completed`, `paywall_viewed`
+  and a few others — each with the creator code and campaign it came from, keyed by profile id.
+  Names and e-mails are never sent. Say so in your privacy policy.
+- **Free profiles.** Admins, and any profile you mark with `"comp": true` in `db.json`, are never
+  charged. The admin dashboard shows each profile's plan.
+- **Deleting.** A person can delete their own account from Settings (the App Store requires it);
+  a web subscription is cancelled with it. A store subscription has to be cancelled in the store.
+- The subscription state lives on the user in `db.json`, and the paywall in `paywall.json`, so
+  the backup below already covers both. Stripe and the stores stay the record of what was paid.
 
 ## 5. Fitting it into an existing stack
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
+import { track } from './lib/track.js'
 import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf, smOf, searchExercises, exOr, isAssisted, betterWeight, beatsWeight } from './lib/exercises.js'
 import { activeProfile, exAvailable, ALL_EQUIPMENT, newProfile } from './lib/equipment.js'
@@ -356,6 +357,7 @@ function ImportSummary({ parsed, close }) {
   const doImport = () => {
     let res
     update(s => { res = mergeImport(s, parsed) })
+    track('import_done', { source: String(parsed.source || 'csv').toLowerCase(), kind: isBW ? 'bodyweight' : 'workouts', count: res.added })
     close()
     toast(isBW
       ? t('{0} weigh-ins imported', res.added)
@@ -520,6 +522,7 @@ function HevyImportSheet({ close }) {
       }
     })
     close()
+    track('import_done', { source: 'hevy_api', count: addedW, routines: addedR, weighins: addedB })
     if (!addedW && !addedR && !addedB) toast(t('Nothing new to import'))
     else toast(parts.join(' · '))
   }
@@ -2682,6 +2685,7 @@ function doFinishWorkout() {
     s.active = null
   })
   useStore.getState().autoBackupNow()
+  track('workout_completed', { count: S().workouts.length, backfill: past })
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
   ui().openSheet(close => <FinishSummary w={shown} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })

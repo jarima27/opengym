@@ -44,17 +44,42 @@ describe('billingView', () => {
   })
 
   it('a subscription says when it renews, or when it ends if cancelled, and opens the portal', () => {
-    const renews = billingView({ ...base, plan: 'active', status: 'active', periodEnd: '2026-11-15T10:00:00.000Z', portal: true })
+    const renews = billingView({ ...base, plan: 'active', via: 'stripe', status: 'active', periodEnd: '2026-11-15T10:00:00.000Z', portal: true })
     expect(renews.title).toBe('Subscription active')
     expect(renews.subtitle).toMatch(/^Renews on .*15/)
     expect(renews.action).toBe('portal')
-    const ends = billingView({ ...base, plan: 'active', status: 'active', periodEnd: '2026-11-15T10:00:00.000Z', endsAt: '2026-11-15T10:00:00.000Z', portal: true })
+    const ends = billingView({ ...base, plan: 'active', via: 'stripe', status: 'active', periodEnd: '2026-11-15T10:00:00.000Z', endsAt: '2026-11-15T10:00:00.000Z', portal: true })
     expect(ends.subtitle).toMatch(/^Ends on /)
   })
 
   it('a failed payment asks for a new card', () => {
-    const v = billingView({ ...base, plan: 'past_due', status: 'past_due', portal: true })
+    const v = billingView({ ...base, plan: 'past_due', via: 'stripe', status: 'past_due', portal: true })
     expect(v.title).toBe('Payment failed')
     expect(v.action).toBe('portal')
+  })
+})
+
+describe('billingView, v2', () => {
+  const base = { on: true, ai: true, trialEnds: '2026-10-31T09:00:00.000Z', trialDaysLeft: 0, status: null, periodEnd: null, endsAt: null, portal: false, via: null, cardTrial: false, cardTrialDays: 30 }
+
+  it('a profile that never had a trial is offered the card trial', () => {
+    const v = billingView({ ...base, plan: 'none', ai: false })
+    expect(v.title).toBe('Try the AI Coach free for 30 days')
+    expect(v.action).toBe('checkout')
+    expect(billingView({ ...base, plan: 'none', ai: false, cardTrialDays: 0 }).title).toBe('The AI Coach comes with the subscription')
+  })
+
+  it('inside a card trial it says when the first charge comes', () => {
+    const v = billingView({ ...base, plan: 'active', via: 'stripe', status: 'trialing', cardTrial: true, periodEnd: '2026-11-15T10:00:00.000Z', portal: true })
+    expect(v.title).toBe('Free trial active')
+    expect(v.subtitle).toMatch(/^First charge on /)
+    expect(v.action).toBe('portal')
+  })
+
+  it('a store subscription says where to manage it, and offers no web portal', () => {
+    const v = billingView({ ...base, plan: 'active', via: 'app_store', periodEnd: '2026-11-15T10:00:00.000Z', portal: true })
+    expect(v.subtitle).toMatch(/· Managed in the App Store$/)
+    expect(v.action).toBe(null)
+    expect(billingView({ ...base, plan: 'active', via: 'play_store' }).subtitle).toBe('Managed in Google Play')
   })
 })

@@ -11,8 +11,11 @@ export async function billingStatus() {
   try { return await api('/api/billing') }
   catch (e) { if (e.status === 404) return null; throw e }
 }
-export const billingCheckout = () => api('/api/billing/checkout', { method: 'POST', body: '{}' })
+export const billingCheckout = plan => api('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: plan || 'monthly' }) })
 export const billingPortal = () => api('/api/billing/portal', { method: 'POST', body: '{}' })
+
+// Where a subscription bought in a store is managed — the web cannot do it for them.
+const STORE_NAME = { app_store: () => t('Managed in the App Store'), mac_app_store: () => t('Managed in the App Store'), play_store: () => t('Managed in Google Play') }
 
 // What Settings says about one profile's access, from GET /api/billing. `action` is the one
 // thing the person can do next: pay, or manage what they pay. null = draw nothing (an instance
@@ -28,19 +31,30 @@ export function billingView(a) {
         subtitle: t('Subscribe now and you won’t be charged until the trial ends.'),
         action: 'checkout'
       }
-    case 'active':
+    case 'active': {
+      const store = a.via && a.via !== 'stripe' ? (STORE_NAME[a.via] || (() => null))() : null
+      const when = a.endsAt ? t('Ends on {0}', date(a.endsAt))
+        : a.periodEnd ? (a.cardTrial ? t('First charge on {0}', date(a.periodEnd)) : t('Renews on {0}', date(a.periodEnd))) : null
       return {
         icon: 'checkCircle', tint: 'var(--green)',
-        title: t('Subscription active'),
-        subtitle: a.endsAt ? t('Ends on {0}', date(a.endsAt)) : a.periodEnd ? t('Renews on {0}', date(a.periodEnd)) : null,
-        action: a.portal ? 'portal' : null
+        title: a.cardTrial ? t('Free trial active') : t('Subscription active'),
+        subtitle: [when, store].filter(Boolean).join(' · ') || null,
+        action: a.via === 'stripe' && a.portal ? 'portal' : null
       }
+    }
     case 'past_due':
       return {
         icon: 'warning', tint: 'var(--orange)',
         title: t('Payment failed'),
         subtitle: t('Update your card to keep the AI Coach.'),
-        action: a.portal ? 'portal' : null
+        action: a.via === 'stripe' && a.portal ? 'portal' : null
+      }
+    case 'none':
+      return {
+        icon: 'sparkles', tint: 'var(--acc)',
+        title: a.cardTrialDays > 0 ? t('Try the AI Coach free for {0} days', a.cardTrialDays) : t('The AI Coach comes with the subscription'),
+        subtitle: null,
+        action: 'checkout'
       }
     default:
       return { icon: 'lock', tint: 'var(--red)', title: t('Your free trial has ended'), subtitle: null, action: 'checkout' }

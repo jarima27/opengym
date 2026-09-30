@@ -8,6 +8,7 @@ import { t } from '../lib/i18n.js'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { askAddDeviceData } from '../sheets.jsx'
+import { markWelcome } from '../lib/welcome.js'
 
 // `again`: a phone whose server stopped accepting it (components/ServerSync.jsx pairAgain) — the
 // address it had is filled in when it still has one, so only the new code is left to type, and
@@ -55,7 +56,7 @@ export default function MobileOnboarding() {
     <div className="narrow" style={wrap}>
       {head}
       <div className="muted" style={{ marginBottom: 34 }}>{t('How do you want to use openGym?')}</div>
-      <Button variant="primary" icon="lock" onClick={() => chooseLocalMode()}>{t('Use on this device')}</Button>
+      <Button variant="primary" icon="lock" onClick={() => { markWelcome(); chooseLocalMode() }}>{t('Use on this device')}</Button>
       <div style={{ height: 10 }} />
       <Button icon="rocket" onClick={() => useUI.getState().openSheet(close => <ConnectSheet close={close} />)}>{t('Connect to my server')}</Button>
       <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>

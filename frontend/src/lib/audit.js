@@ -43,6 +43,8 @@ const LABELS = {
   // Creator and trainer codes (Admin → Creator codes): `msg` is the code.
   'admin.code.create': 'Created a creator code',
   'admin.code.revoke': 'Revoked a creator code',
+  // Admin → Paywall: `msg` is the experiment and each variant's weight.
+  'admin.paywall.save': 'Saved the paywall',
   'auth.account.delete': 'Deleted their own account',
   'auth.email.set': 'Added a sign-in e-mail',
   'auth.email.change': 'Changed their sign-in e-mail',

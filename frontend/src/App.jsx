@@ -38,6 +38,9 @@ import Muscles from './views/Muscles.jsx'
 import StructuralBalance from './views/StructuralBalance.jsx'
 import Settings from './views/Settings.jsx'
 import Admin from './views/Admin.jsx'
+import Welcome from './views/Welcome.jsx'
+import BillingPrompts from './components/BillingPrompts.jsx'
+import { welcomePending } from './lib/welcome.js'
 import CoachChat from './views/CoachChat.jsx'
 import CoachIntake from './views/CoachIntake.jsx'
 import CoachSetup from './views/CoachSetup.jsx'
@@ -175,7 +178,8 @@ function Shell() {
         <ErrorBoundary>
           {!authed ? <Login /> : needsMobileOnboarding ? <MobileOnboarding /> : (
             <Routes>
-              <Route path="/home" element={<Home />} />
+              <Route path="/home" element={welcomePending() ? <Navigate to="/welcome" replace /> : <Home />} />
+              <Route path="/welcome" element={<Welcome />} />
               {/* Gym check-in — switched off in Settings, the route falls through to the
                   catch-all redirect below. */}
               {S.checkIn !== false && <Route path="/checkin" element={<CheckIn />} />}
@@ -208,6 +212,7 @@ function Shell() {
       {/* The chat owns the bottom of the screen: its composer sits where the tabs would be. */}
       {loc.pathname !== '/coach' && <TabBar onStart={startFlow} />}
       <RestTimer />
+      <BillingPrompts />
       <Modals />
       <Toast />
       <TimerFlash />

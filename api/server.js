@@ -36,6 +36,7 @@ import {
   revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber
 } from './billing.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
+import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1834,8 +1835,12 @@ function billingChanged(req, before, users) {
     audit(req, 'billing.change', { user, msg: moved.join(' ') + (after.via || before.get(user.id)?.via ? ' · ' + (after.via || before.get(user.id).via) : '') });
   }
 }
-const PLANS = ['monthly', 'annual'];
-const priceFor = plan => BILLING.stripe.prices[plan] || null;
+/* The paywall's words and prices (paywall.js), as the admin last saved them. */
+const paywallFile = path.join(DATA, 'paywall.json');
+let PAYWALL = loadPaywall(paywallFile);
+// A variant may carry its own Stripe prices (a price test); otherwise the instance's.
+const priceFor = (user, plan) => variantFor(PAYWALL, user.id).prices?.[plan] || BILLING.stripe.prices[plan] || null;
+const priceShown = createPriceCache(id => stripe(BILLING, 'GET', 'prices/' + encodeURIComponent(id)));
 const SYNC_BUDGET = createWindow({ max: 30, windowMs: 3600000 });
 
 const billingRoutes = {
@@ -1844,6 +1849,45 @@ const billingRoutes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     json(res, 200, billingAccess(user));
+  },
+
+  // The paywall this profile sees: its variant's words in the app's language, which plan is
+  // drawn as the recommended one, and — where the website sells — each plan's price as Stripe
+  // has it. The app reports the variant on its paywall events.
+  'GET /api/paywall': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const lang = text(new URL(req.url, 'http://x').searchParams.get('lang')).slice(0, 10);
+    const v = variantFor(PAYWALL, user.id);
+    const plans = {};
+    if (BILLING.stripe.on) {
+      for (const p of PLANS) {
+        const id = priceFor(user, p);
+        if (id) plans[p] = await priceShown(id);
+      }
+    }
+    json(res, 200, {
+      experiment: PAYWALL.experiment, variant: v.id, highlight: v.highlight, offering: v.offering || null,
+      copy: copyFor(v, lang), plans, cardTrialDays: billingAccess(user).cardTrialDays
+    });
+  },
+
+  'GET /api/admin/paywall': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, { paywall: PAYWALL, defaults: DEFAULT_COPY, fields: COPY_FIELDS, envPrices: BILLING.stripe.prices });
+  },
+
+  // Saved, and live on the next paywall anyone opens.
+  'POST /api/admin/paywall': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    let next;
+    try { next = validatePaywall(body.paywall); }
+    catch (e) { if (e instanceof PaywallError) return json(res, 400, { error: e.message, code: 'invalid' }); throw e; }
+    atomicWrite(paywallFile, JSON.stringify(next, null, 2));
+    PAYWALL = next;
+    audit(req, 'admin.paywall.save', { user: admin, msg: next.experiment + ' · ' + next.variants.map(v => v.id + ':' + v.weight).join(' ') });
+    json(res, 200, { paywall: PAYWALL });
   }
 };
 
@@ -1859,7 +1903,7 @@ const stripeRoutes = {
     if (plan === 'free') return json(res, 409, { error: 'this profile is not charged', code: 'free' });
     if (plan === 'active' || plan === 'past_due') return json(res, 409, { error: 'already subscribed — manage it where you subscribed', code: 'subscribed' });
     const which = PLANS.includes(body.plan) ? body.plan : 'monthly';
-    const price = priceFor(which);
+    const price = priceFor(user, which);
     if (!price) return json(res, 400, { error: 'this plan is not offered', code: 'plan' });
     let session;
     try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, price, since: db.billingSince || 0 })); }
