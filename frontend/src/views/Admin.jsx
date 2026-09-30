@@ -32,6 +32,12 @@ const dur = ms => { const m = Math.max(0, Math.floor(ms / 60000)); return m < 60
 
 // The one time the reset code is visible. Locked, so a tap beside the sheet cannot lose it
 // before it has been copied or written down.
+// Only on an instance that charges (api/billing.js). An admin's own row reads "free".
+const PLAN_TONE = { active: ' acc', past_due: ' bad', expired: ' bad' }
+function PlanPill({ plan, style }) {
+  return <span className={'adm-pill' + (PLAN_TONE[plan] || '')} style={style} title="subscription">{plan.replace('_', ' ')}</span>
+}
+
 function ResetCodeSheet({ name, email, code, expires, close }) {
   const toast = useUI(s => s.toast)
   const copy = () => { navigator.clipboard?.writeText(code).catch(() => {}); toast('Copied') }
@@ -95,6 +101,7 @@ function UserDetail({ id, onChanged, close }) {
       {u.disabled && <span className="adm-pill bad">disabled</span>}
       {u.invitedBy && <span className="adm-pill">invite {u.invitedBy}</span>}
       {u.password && <span className="adm-pill">password</span>}
+      {u.plan && <PlanPill plan={u.plan} />}
       {/* The sign-in e-mail (password instances only): shown to admins and nobody else. */}
       {u.email && <span className="adm-pill" title="sign-in e-mail">{u.email}</span>}
       {u.resetUntil && <span className="adm-pill acc">reset code until {new Date(u.resetUntil).toLocaleString()}</span>}
@@ -327,7 +334,7 @@ export default function Admin() {
       <div className="adm-lead">Everyone with a profile on this instance. Tap one to see their activity, to disable the account (nothing is deleted) or to delete it with all their data for good.</div>
       <div className="list">
         {(users || []).map(u => <div key={u.id} className="item" onClick={() => openUser(u.id)} style={u.disabled ? { opacity: .55 } : null}>
-          <div className="grow"><div className="tt">{u.live && <Icon name="dot" style={{ fontSize: 9, color: 'var(--green)', display: 'inline-block', marginInlineEnd: 5 }} />}{u.name} {u.admin && <span className="adm-pill acc" style={{ marginInlineStart: 4 }}>admin</span>}{u.disabled && <span className="adm-pill bad" style={{ marginInlineStart: 4 }}>disabled</span>}</div>
+          <div className="grow"><div className="tt">{u.live && <Icon name="dot" style={{ fontSize: 9, color: 'var(--green)', display: 'inline-block', marginInlineEnd: 5 }} />}{u.name} {u.admin && <span className="adm-pill acc" style={{ marginInlineStart: 4 }}>admin</span>}{u.disabled && <span className="adm-pill bad" style={{ marginInlineStart: 4 }}>disabled</span>}{u.plan && <PlanPill plan={u.plan} style={{ marginInlineStart: 4 }} />}</div>
             <div className="ss">{u.live ? 'training now · ' + u.live.name : u.workouts + ' workouts' + (u.lastWorkout ? ' · last ' + fmtDate(u.lastWorkout) : '') + ' · last sync ' + rel(u.lastSync)}</div>
             {u.email && <div className="ss" title="sign-in e-mail">{u.email}</div>}</div>
           {u.hasPush && <Icon name="bell" title="push notifications on" style={{ fontSize: 15, color: 'var(--label-3)' }} />}<Icon name="chevronRight" className="chev" />

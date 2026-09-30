@@ -31,6 +31,7 @@ import {
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } from './device-link.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
+import { billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe } from './billing.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -101,6 +102,12 @@ db.subs = db.subs || [];
 db.invites = db.invites || [];
 db.deviceLinks = db.deviceLinks || [];   // unused one-time device links, hashed (device-link.js)
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+/* Paid access (billing.js): a trial, then a Stripe subscription for the AI. Off unless the two
+   Stripe variables are set, and then none of the billing routes exist and nobody is charged. */
+const BILLING = billingConfig();
+if (BILLING.on && !db.billingSince) db.billingSince = Date.now();   // saved with the next write
+if (BILLING.on && !BILLING.webhookSecret) console.warn('billing: STRIPE_WEBHOOK_SECRET is not set — no payment will ever be recorded');
+const billingAccess = user => accessOf(user, BILLING, { since: db.billingSince || 0, staff: isAdmin(user) });
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2), 0o600); }
@@ -542,7 +549,9 @@ const clearCookie = COOKIE === LEGACY_COOKIE
 const CSRF_EXEMPT = new Set([
   'POST /api/register/options', 'POST /api/register/verify',
   'POST /api/login/options', 'POST /api/login/verify',
-  'POST /api/pair/redeem'
+  'POST /api/pair/redeem',
+  // Stripe calling in: no browser, no session, and its own signature is the check.
+  'POST /api/billing/webhook'
 ]);
 const originsMatch = (a, b) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 function csrfOk(req, key) {
@@ -617,7 +626,9 @@ function json(res, code, obj, extraHeaders) {
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
-function readBody(req) {
+/* The body as bytes, capped at MAX_BODY. readBody below parses it; the Stripe webhook needs the
+   bytes themselves, because its signature is over them. */
+function readRaw(req) {
   return new Promise((resolve, reject) => {
     let size = 0, over = false; const chunks = [];
     req.on('data', d => {
@@ -641,21 +652,25 @@ function readBody(req) {
     });
     req.on('end', () => {
       if (over) return;
-      if (!chunks.length) return resolve({});
-      let body;
-      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-      catch { return reject(new HttpError(400, 'invalid json')); }
-      // Every handler reads fields off the result, so a JSON `null`, string, number or array is
-      // as much a client mistake as unparseable text — refused once here rather than dereferenced
-      // (and turned into a TypeError) in each route.
-      if (!body || typeof body !== 'object' || Array.isArray(body)) return reject(new HttpError(400, 'invalid json'));
-      resolve(body);
+      resolve(Buffer.concat(chunks));
     });
     // A browser hanging up mid-body — which is what pagehide does to an in-flight sync — is not
     // the caller getting a request wrong, it is nobody being left to answer. Marked so the
     // catch-all at the bottom says one line instead of a stack trace and a 500 into a dead socket.
     req.on('error', e => reject(Object.assign(e, { clientGone: true })));
   });
+}
+async function readBody(req) {
+  const raw = await readRaw(req);
+  if (!raw.length) return {};
+  let body;
+  try { body = JSON.parse(raw.toString('utf8')); }
+  catch { throw new HttpError(400, 'invalid json'); }
+  // Every handler reads fields off the result, so a JSON `null`, string, number or array is
+  // as much a client mistake as unparseable text — refused once here rather than dereferenced
+  // (and turned into a TypeError) in each route.
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'invalid json');
+  return body;
 }
 // A caller-supplied field that is meant to be text. String() alone is not safe on a parsed body:
 // `{"code":{"toString":1}}` is valid JSON and String() throws on it.
@@ -1728,6 +1743,57 @@ const mediaRoutes = {
   }
 };
 
+/* ---------- billing (billing.js) ---------- */
+const PAYMENT_DOWN = { error: 'the payment provider did not answer — try again in a moment', code: 'provider' };
+const billingRoutes = {
+  // Where this profile stands: trial days left, or the subscription's state.
+  'GET /api/billing': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    json(res, 200, billingAccess(user));
+  },
+
+  // A Stripe Checkout page for this profile. The app sends the browser to `url`.
+  'POST /api/billing/checkout': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const { plan } = billingAccess(user);
+    if (plan === 'free') return json(res, 409, { error: 'this profile is not charged', code: 'free' });
+    if (plan === 'active' || plan === 'past_due') return json(res, 409, { error: 'already subscribed — manage it from the billing portal', code: 'subscribed' });
+    let session;
+    try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, since: db.billingSince || 0 })); }
+    catch (e) { console.error('billing: checkout for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
+    audit(req, 'billing.checkout', { user });
+    json(res, 200, { url: session.url });
+  },
+
+  // Stripe's own page for changing the card, reading invoices and cancelling.
+  'POST /api/billing/portal': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!user.billing?.customer) return json(res, 409, { error: 'no subscription yet', code: 'none' });
+    let session;
+    try { session = await stripe(BILLING, 'POST', 'billing_portal/sessions', portalForm(user, { origin: ORIGIN })); }
+    catch (e) { console.error('billing: portal for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
+    json(res, 200, { url: session.url });
+  },
+
+  // Stripe telling us what happened. Anything signed is answered 200, used or not: a non-2xx
+  // makes Stripe retry the same event for three days.
+  'POST /api/billing/webhook': async (req, res) => {
+    const raw = await readRaw(req);
+    const event = verifyWebhook(raw, req.headers['stripe-signature'], BILLING.webhookSecret);
+    if (!event) return json(res, 400, { error: 'signature does not verify' });
+    const changed = applyEvent(db.users, event);
+    if (changed) {
+      saveDb();
+      const { user, was } = changed;
+      if (user.billing.status && user.billing.status !== was) audit(req, 'billing.change', { user, msg: user.billing.status });
+    }
+    json(res, 200, { received: true });
+  }
+};
+
 /* ---------- routes ---------- */
 const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
@@ -1760,6 +1826,8 @@ const routes = {
       // Public like the two flags above: the caps are not a secret, and the absence of the
       // block is how the app knows this server does not take photos and videos at all.
       ...(MEDIA_ON ? { media: mediaConfig(MEDIA_LIMITS) } : {}),
+      // Public as well: the sign-in screen is where "try it free for 30 days" belongs.
+      ...(BILLING.on ? { billing: { trial_days: BILLING.trialDays } } : {}),
       ...(readSession(req) ? { coach: coachConfig.publicConfig() } : {})
     });
   },
@@ -2188,7 +2256,9 @@ const routes = {
         live: livePresence(u.id),
         // The sign-in e-mail is an admin's to see (to hand out a reset code, to tell two
         // profiles apart), and only while the instance takes passwords at all.
-        ...(PASSWORD_LOGIN ? { password: hasPassword(u), email: u.email || null } : {})
+        ...(PASSWORD_LOGIN ? { password: hasPassword(u), email: u.email || null } : {}),
+        // trial / active / past_due / expired / free — who pays, on an instance that charges.
+        ...(BILLING.on ? { plan: billingAccess(u).plan } : {})
       };
     });
     json(res, 200, { users, invite_only: INVITE_ONLY, ...(PASSWORD_LOGIN ? { password_login: true } : {}), now: Date.now() });
@@ -2206,7 +2276,8 @@ const routes = {
         id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null,
         // Only on an instance with password sign-in: whether they have one, and until when an
         // unused reset code is good.
-        ...(PASSWORD_LOGIN ? { password: hasPassword(u), email: u.email || null, resetUntil: u.pwReset?.exp > Date.now() ? u.pwReset.exp : null } : {})
+        ...(PASSWORD_LOGIN ? { password: hasPassword(u), email: u.email || null, resetUntil: u.pwReset?.exp > Date.now() ? u.pwReset.exp : null } : {}),
+        ...(BILLING.on ? { plan: billingAccess(u).plan } : {})
       },
       unit: S.unit || 'kg',
       lastSync: lastSyncOf(u, S),
@@ -2257,6 +2328,12 @@ const routes = {
     try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
     // Their photos and videos — the one place a profile's folder under uploads/ is removed.
     try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
+    // A deleted profile must not go on being charged. Best effort: Stripe being unreachable
+    // does not keep the profile, and the log says which subscription to cancel by hand.
+    if (BILLING.on && isPaying(u.billing) && u.billing.subscription) {
+      stripe(BILLING, 'DELETE', 'subscriptions/' + encodeURIComponent(u.billing.subscription))
+        .catch(e => console.error('billing: could not cancel', u.billing.subscription, 'of deleted profile', u.id, '-', e.message));
+    }
     saveDb();
     // Logged with the name, because the id is about to mean nothing to anyone reading this back.
     audit(req, 'admin.user.delete', { user: admin, msg: name });
@@ -2340,12 +2417,18 @@ const routes = {
   // Routes live in coach/routes.js and are handed the helpers above rather than importing
   // them: they are closures over db and SECRET, and passing them in keeps that module free of
   // a cycle. Every one of them is inert while the feature is unconfigured.
-  ...coachRoutes({ json, readBody, readSession, requireAdmin }),
+  // mayUseAI: on an instance that charges, starting a job is what the subscription pays for.
+  ...coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI: user => billingAccess(user).ai }),
 
   /* ---------- photos & videos ---------- */
   // Absent, not refusing, when MEDIA_UPLOADS=0: a 404 is what a server from before the feature
   // answers, and the client already treats that as "this server does not store them".
-  ...(MEDIA_ON ? mediaRoutes : {})
+  ...(MEDIA_ON ? mediaRoutes : {}),
+
+  /* ---------- billing ---------- */
+  // Absent, like media above, while the instance does not charge: a 404 is what the app reads
+  // as "nothing to pay for here".
+  ...(BILLING.on ? billingRoutes : {})
 };
 
 /* ---------- Coach: boot recovery, notifications, scheduled reviews ---------- */
@@ -2363,7 +2446,8 @@ coachJobs.setProposalHook((uid, pending) => {
     tag: 'coach-proposal', url: '#/coach'
   });
 });
-startCadence({ users: () => db.users, userNow });
+// The weekly review is a job like any other: a profile whose trial has run out is not reviewed.
+startCadence({ users: () => db.users.filter(u => billingAccess(u).ai), userNow });
 startWarmup();
 
 // node's requestTimeout is one number for every route, and it is half an hour (below) for the

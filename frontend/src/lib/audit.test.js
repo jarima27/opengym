@@ -36,9 +36,10 @@ describe('auditCat', () => {
     expect(auditCat(undefined)).toBe('')
   })
   // `media` is the third: the photo and video clean-up and throttle. It has no chip of its own —
-  // those rows show under All, and a throttle under Failed.
-  it('puts every known event in auth, admin or media', () => {
-    expect([...new Set(EVENTS.map(auditCat))].sort()).toEqual(['admin', 'auth', 'media'])
+  // those rows show under All, and a throttle under Failed. `billing` (an instance that charges:
+  // a checkout opened, a subscription changing state) is the fourth, and shows under All too.
+  it('puts every known event in auth, admin, billing or media', () => {
+    expect([...new Set(EVENTS.map(auditCat))].sort()).toEqual(['admin', 'auth', 'billing', 'media'])
   })
 })
 

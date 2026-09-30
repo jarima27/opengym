@@ -26,12 +26,19 @@ const USER_ERROR = {
 };
 const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503 };
 
-export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
+export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI = () => true }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
   const guard = (req, res) => {
     const user = readSession(req);
     if (!user) { json(res, 401, { error: 'not signed in' }); return null; }
     if (!cfgStore.isEnabled() || !cfgStore.isConnected()) { json(res, 503, { error: USER_ERROR.off }); return null; }
+    return user;
+  };
+  /** The routes that start a job. On an instance that charges (billing.js) a job is what the
+      subscription pays for; reading status, the log and the room stays open to everyone. */
+  const guardJob = (req, res) => {
+    const user = guard(req, res); if (!user) return null;
+    if (!mayUseAI(user)) { json(res, 402, { error: 'your free trial has ended — subscribe to keep using the Coach', code: 'billing' }); return null; }
     return user;
   };
   const failEnqueue = (res, e) => {
@@ -65,7 +72,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
     },
 
     'POST /api/coach/plan': async (req, res) => {
-      const user = guard(req, res); if (!user) return;
+      const user = guardJob(req, res); if (!user) return;
       const body = await readBody(req);
       try {
         // The admin's configured length is the real limit; jobs.enqueue is where it is actually
@@ -82,7 +89,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
     },
 
     'POST /api/coach/review': async (req, res) => {
-      const user = guard(req, res); if (!user) return;
+      const user = guardJob(req, res); if (!user) return;
       const body = await readBody(req);
       try {
         const job = jobs.enqueue(user.id, {
@@ -96,7 +103,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
 
     // One workout, read closely. Nothing to apply — the card is kept in the user's log.
     'POST /api/coach/debrief': async (req, res) => {
-      const user = guard(req, res); if (!user) return;
+      const user = guardJob(req, res); if (!user) return;
       const body = await readBody(req);
       try {
         const job = jobs.enqueue(user.id, { kind: 'debrief', lang: body.lang, workoutId: body.workoutId ? String(body.workoutId).slice(0, 40) : null });

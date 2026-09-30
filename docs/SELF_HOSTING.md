@@ -335,6 +335,48 @@ that only has a password cannot sign in.
 The mobile app keeps pairing: someone with a password signs in to the website with it and pairs
 from Settings → "Pair the mobile app", as with a passkey.
 
+### Charging for access (optional, hosted instances)
+
+An instance that other people pay to use can put the AI Coach behind a subscription. It is off
+unless `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are both set; on an instance without them the
+billing routes do not exist and nobody is charged.
+
+What is charged for is the AI — the Coach's plans, reviews, debriefs and weekly reviews, which
+cost you money on every call. Logging workouts, the history, the charts and the export never stop
+working when a trial ends or a card fails.
+
+1. In Stripe, create a product with a **recurring price** and copy its id (`price_…`).
+2. Add a webhook endpoint pointing at `https://<your domain>/api/billing/webhook` with the events
+   `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`
+   and `customer.subscription.deleted`. Copy its signing secret (`whsec_…`).
+3. Turn on the **customer portal** (Settings → Billing → Customer portal) so people can change
+   their card and cancel on their own.
+4. Set the variables and restart the api:
+
+```bash
+# .env
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PRICE_ID=price_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+TRIAL_DAYS=30            # default 30
+```
+
+How it behaves:
+
+- Every profile gets `TRIAL_DAYS` from its sign-up. Profiles that existed before you turned
+  charging on get theirs from that day instead, so nobody is cut off the moment you switch it on.
+- Settings shows a **Subscription** section with the days left and a Subscribe button (Stripe
+  Checkout). Subscribing during the trial does not charge before the trial ends.
+- After the trial, without a live subscription, a Coach job answers `402` and the app says to
+  subscribe. A failed card (`past_due`) keeps the Coach on while Stripe retries.
+- Admins, and any profile you mark with `"comp": true` in `db.json` (a trainer you work with, a
+  friend), are never charged. The admin dashboard shows each profile's plan.
+- Deleting a profile from the admin dashboard cancels its subscription at Stripe.
+- The subscription state lives on the user in `db.json`, so the backup below already covers it.
+  Stripe stays the record of what was paid.
+
+Only the web app offers the subscription; the mobile app does not show it.
+
 ## 5. Fitting it into an existing stack
 
 Running Kubernetes? Example manifests (Deployment, PVCs, Service, Gateway API route) are in

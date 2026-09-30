@@ -1008,6 +1008,22 @@ export const PT_BR_OVERRIDES = {
   'Teal': 'Turquesa',
   'Yellow': 'Amarelo',
   'Enter how long it took — at least 1 minute.': 'Informe quanto tempo levou — pelo menos 1 minuto.',
+  // Settings → Subscription and the Coach's 402, on an instance that charges (lib/billing.js).
+  'Subscription': 'Assinatura',
+  'Free trial — {0} days left': 'Teste grátis — faltam {0} dias',
+  'Free trial — 1 day left': 'Teste grátis — falta 1 dia',
+  'Subscribe now and you won’t be charged until the trial ends.': 'Assine agora e você só será cobrado quando o teste terminar.',
+  'Your free trial has ended': 'Seu teste grátis terminou',
+  'Subscription active': 'Assinatura ativa',
+  'Renews on {0}': 'Renova em {0}',
+  'Ends on {0}': 'Termina em {0}',
+  'Payment failed': 'O pagamento falhou',
+  'Update your card to keep the AI Coach.': 'Atualize seu cartão para continuar com o Treinador IA.',
+  'Subscribe': 'Assinar',
+  'Manage subscription': 'Gerenciar assinatura',
+  'Logging workouts is always free. The subscription pays for the AI Coach.': 'Registrar treinos é sempre grátis. A assinatura paga o Treinador IA.',
+  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Seu teste grátis terminou. Assine em Configurações para continuar usando o Treinador IA.',
+  'Could not open the payment page': 'Não foi possível abrir a página de pagamento',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

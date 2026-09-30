@@ -36,6 +36,10 @@ const LABELS = {
   'auth.password.reset': 'Used a reset code',
   // The e-mail a profile may sign in with instead of its name. `msg` is the proof it was set with
   // and the address masked to two characters ("password · a…@e…") — never the address itself.
+  // Paid access (api/billing.js), on an instance that charges. `msg` on a change is Stripe's
+  // subscription status: active, trialing, past_due, canceled…
+  'billing.checkout': 'Opened the subscription checkout',
+  'billing.change': 'Subscription changed',
   'auth.email.set': 'Added a sign-in e-mail',
   'auth.email.change': 'Changed their sign-in e-mail',
   'auth.email.remove': 'Removed their sign-in e-mail',

@@ -56,18 +56,25 @@ const track = r => {
   if (r?.job?.id) awaited = r.job.id
   return r
 }
+// On an instance that charges (api/billing.js), a profile past its trial is refused a job with
+// 402 `billing`. The server's sentence is English; this one is the person's language and says
+// where to go.
+const unpaid = e => {
+  if (e?.status === 402 && e.data?.code === 'billing') e.message = t('Your free trial has ended. Subscribe in Settings to keep using the AI Coach.')
+  throw e
+}
 export const awaitedJob = () => awaited
 export const settleAwaited = id => { if (!id || awaited === id) awaited = null }
 
 export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
 const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
-export const requestReview = (...a) => _requestReview(...a).then(track)
+export const requestReview = (...a) => _requestReview(...a).then(track, unpaid)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
-export const requestPlan = (...a) => _requestPlan(...a).then(track)
+export const requestPlan = (...a) => _requestPlan(...a).then(track, unpaid)
 const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang() }) })
-export const refinePlan = (...a) => _refinePlan(...a).then(track)
+export const refinePlan = (...a) => _refinePlan(...a).then(track, unpaid)
 const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })
-export const requestDebrief = (...a) => _requestDebrief(...a).then(track)
+export const requestDebrief = (...a) => _requestDebrief(...a).then(track, unpaid)
 // The room: anonymous medians across the profiles on this instance that opted in. Only a
 // server has a room; a phone with its own key and the demo both answer locally.
 export const cohortStats = async () => DEMO ? (await demo()).demoCohort(S()) : LOCAL() ? { ok: false, enabled: false } : api('/api/coach/cohort')

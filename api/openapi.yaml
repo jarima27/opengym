@@ -153,6 +153,12 @@ tags:
     description: >-
       AI Coach — plans, reviews and debriefs. Every route here answers 503 unless the
       instance has the Coach switched on and a provider connected.
+  - name: billing
+    description: >-
+      Paid access on a hosted instance: a free trial (`TRIAL_DAYS`, 30), then a Stripe
+      subscription that pays for the AI Coach's jobs. Logging, history and export are never
+      gated. Every route here is a 404 unless `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are
+      both set.
 
 security:
   - cookieAuth: []
@@ -257,6 +263,14 @@ paths:
                       always wins; a tag the app has no translation for is ignored.
                   media:
                     $ref: '#/components/schemas/MediaConfig'
+                  billing:
+                    type: object
+                    description: >-
+                      Present only when the instance charges (`STRIPE_SECRET_KEY` and
+                      `STRIPE_PRICE_ID` set), for everybody: the sign-in screen is where a
+                      free trial is offered.
+                    properties:
+                      trial_days: { type: integer, example: 30 }
               examples:
                 anonymous: { value: { invite_only: true, allow_guest: false } }
                 signedInNoCoach: { value: { invite_only: true, allow_guest: false, coach: null } }
@@ -2337,6 +2351,149 @@ paths:
   # everything above; they are inert — 503 — while the instance has no Coach enabled
   # and connected.
 
+  /api/billing:
+    get:
+      tags: [billing]
+      operationId: billingStatus
+      summary: Where this profile stands — trial, subscription, or neither
+      description: |
+        `plan` is the one field to switch on:
+
+        - `trial` — inside the free trial; `trialDaysLeft` counts down to `trialEnds`.
+        - `active` — a live subscription (Stripe `active` or `trialing`).
+        - `past_due` — the last charge failed and Stripe is retrying; the AI stays on meanwhile.
+        - `expired` — no trial left and no live subscription; Coach jobs answer 402.
+        - `free` — an admin, or a profile the operator marked `comp`; never charged.
+
+        A profile that existed before the instance started charging gets its trial from that
+        day, not from its sign-up date.
+      responses:
+        '200':
+          description: The profile's access.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  on: { type: boolean, const: true }
+                  plan: { type: string, enum: [trial, active, past_due, expired, free] }
+                  ai: { type: boolean, description: Whether Coach jobs are allowed. }
+                  trialEnds: { type: string, format: date-time }
+                  trialDaysLeft: { type: integer }
+                  status: { type: ['string', 'null'], description: Stripe's subscription status, as last reported. }
+                  periodEnd: { type: ['string', 'null'], format: date-time, description: End of the paid (or Stripe trial) period. }
+                  endsAt: { type: ['string', 'null'], format: date-time, description: When a cancelled subscription stops. }
+                  portal: { type: boolean, description: Whether POST /api/billing/portal has a customer to open. }
+              example: { on: true, plan: trial, ai: true, trialEnds: '2026-10-31T09:00:00.000Z', trialDaysLeft: 30, status: null, periodEnd: null, endsAt: null, portal: false }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/billing/checkout:
+    post:
+      tags: [billing]
+      operationId: billingCheckout
+      summary: Start a Stripe Checkout for this profile
+      description: |
+        Creates a Checkout Session for `STRIPE_PRICE_ID` and answers its `url`; the app sends the
+        browser there, and Stripe sends it back to `/#/settings`. Subscribing during the trial
+        does not cut it short: the first charge is set for the day the trial ends (when that is
+        at least 48 hours away — Stripe's minimum). Audited as `billing.checkout`.
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+            example: {}
+      responses:
+        '200':
+          description: The Checkout page.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: |
+            Nothing to buy: `subscribed` (a live subscription exists — use the portal) or `free`
+            (this profile is not charged).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "already subscribed — manage it from the billing portal", code: subscribed }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`). The detail is logged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/portal:
+    post:
+      tags: [billing]
+      operationId: billingPortal
+      summary: Open Stripe's billing portal — card, invoices, cancel
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+            example: {}
+      responses:
+        '200':
+          description: The portal page.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: This profile has never checked out (`code: none`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/webhook:
+    post:
+      tags: [billing]
+      operationId: billingWebhook
+      summary: Stripe's events — not for the app
+      description: |
+        Point a Stripe webhook endpoint here with the events `checkout.session.completed` and
+        `customer.subscription.created`, `.updated` and `.deleted`, and put its signing secret
+        in `STRIPE_WEBHOOK_SECRET`. The `Stripe-Signature` header must verify over the raw body
+        and be at most five minutes old. A subscription event older than the last one applied
+        to the same subscription is ignored. A status change is audited as `billing.change`.
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Signed, and taken — used or not, so Stripe does not retry it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: boolean, const: true }
+        '400':
+          description: The signature does not verify (or `STRIPE_WEBHOOK_SECRET` is not set).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /api/coach/disclosure:
     get:
       tags: [coach]
@@ -2424,6 +2581,7 @@ paths:
       responses:
         '202': { $ref: '#/components/responses/CoachJobQueued' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/CoachUnpaid' }
         '403': { $ref: '#/components/responses/CoachRefused' }
         '409': { $ref: '#/components/responses/CoachRefused' }
         '429': { $ref: '#/components/responses/CoachRefused' }
@@ -2460,6 +2618,7 @@ paths:
       responses:
         '202': { $ref: '#/components/responses/CoachJobQueued' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/CoachUnpaid' }
         '403': { $ref: '#/components/responses/CoachRefused' }
         '409': { $ref: '#/components/responses/CoachRefused' }
         '429': { $ref: '#/components/responses/CoachRefused' }
@@ -2493,6 +2652,7 @@ paths:
       responses:
         '202': { $ref: '#/components/responses/CoachJobQueued' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/CoachUnpaid' }
         '403': { $ref: '#/components/responses/CoachRefused' }
         '409': { $ref: '#/components/responses/CoachRefused' }
         '429': { $ref: '#/components/responses/CoachRefused' }
@@ -2908,6 +3068,14 @@ components:
                 properties:
                   id: { type: string, description: 16 hex characters. }
           example: { job: { id: "9f1c2d3e4a5b6c7d" } }
+    CoachUnpaid:
+      description: |
+        Only on an instance that charges: this profile's free trial is over and it has no
+        live subscription (`code: billing`). `POST /api/billing/checkout` is the way on.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "your free trial has ended — subscribe to keep using the Coach", code: billing }
     CoachRefused:
       description: |
         The Coach will not take this job, and says which reason in `code`:
@@ -3426,6 +3594,10 @@ components:
         email:
           oneOf: [{ type: string }, { type: 'null' }]
           description: PASSWORD_LOGIN instances only — the e-mail the profile signs in with, if any.
+        plan:
+          type: string
+          enum: [trial, active, past_due, expired, free]
+          description: Instances that charge only (see the billing tag) — who pays.
 
     Presence:
       type: object
@@ -3458,6 +3630,10 @@ components:
             resetUntil:
               oneOf: [{ type: number }, { type: 'null' }]
               description: PASSWORD_LOGIN instances only — expiry (ms) of an unused reset code.
+            plan:
+              type: string
+              enum: [trial, active, past_due, expired, free]
+              description: Instances that charge only — who pays.
         unit: { type: string, enum: [kg, lb] }
         lastSync: { oneOf: [{ type: number }, { type: 'null' }] }
         routines:
