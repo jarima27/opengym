@@ -28,3 +28,13 @@ describe('the remembered link', () => {
     expect(pendingCode()).toBe(null)
   })
 })
+
+describe('the website’s sign-up link', async () => {
+  const { wantsSignup } = await import('../views/Login.jsx')
+  it('opens the sign-up form when the link asks for it, before or after the hash', () => {
+    expect(wantsSignup('https://app.tiza.fit/#/?signup=1')).toBe(true)
+    expect(wantsSignup('https://app.tiza.fit/?utm_source=tiza.fit&signup=1#/')).toBe(true)
+    expect(wantsSignup('https://app.tiza.fit/?ref=LUCIA#/')).toBe(false)
+    expect(wantsSignup('not a url')).toBe(false)
+  })
+})

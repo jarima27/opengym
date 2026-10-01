@@ -81,12 +81,28 @@ function RegisterSheet({ close }) {
   </>
 }
 
+// The website's "Start free" lands here with ?signup=1: the sign-up form opens straight away
+// instead of leaving the person to find it. Once per page load, and never in the demo.
+let signupAsked = false
+export function wantsSignup(href = globalThis.location?.href || '') {
+  try {
+    const u = new URL(href)
+    const q = u.hash.indexOf('?')
+    return u.searchParams.has('signup') || (q >= 0 && new URLSearchParams(u.hash.slice(q + 1)).has('signup'))
+  } catch { return false }
+}
+
 export default function Login() {
   const { setUser, adoptProfile, setGuest } = useStore()
   const config = useStore(s => s.config)
   const canGuest = guestAllowed(config)
   const pwOn = passwordOn(config)
   const register = () => useUI.getState().openSheet(close => <RegisterSheet close={close} />)
+  useEffect(() => {
+    if (DEMO || signupAsked || !wantsSignup()) return
+    signupAsked = true
+    register()
+  }, [])
   const signIn = async () => {
     try { const u = await passkeyLogin(); setUser(u, { adopt: true }); await adoptProfile(askAddDeviceData); useUI.getState().toast(t('Welcome back, {0}', u.name)) }
     catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Sign-in failed')) }

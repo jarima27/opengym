@@ -1,0 +1,26 @@
+{
+  "name": "Tiza",
+  "domain": "https://tiza.fit",
+  "appUrl": "https://app.tiza.fit",
+  "appSignupPath": "/#/?signup=1",
+  "appLoginPath": "/#/",
+  "stores": {
+    "ios": "",
+    "android": ""
+  },
+  "prices": {
+    "currency": "EUR",
+    "monthly": 4.99,
+    "annual": 34.99,
+    "trialDays": 30
+  },
+  "defaultLang": "es",
+  "langs": ["es", "en"],
+  "source": "https://github.com/jarima27/opengym",
+  "upstream": {
+    "name": "openGym",
+    "url": "https://github.com/DuarteSantos8/openGym"
+  },
+  "contactEmail": "",
+  "headHtml": ""
+}

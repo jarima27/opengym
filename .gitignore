@@ -21,3 +21,6 @@ node_modules
 junit.xml
 coverage/
 frontend/bundle-size.json
+
+# The Tiza website build (landing/build.mjs)
+landing/dist/
