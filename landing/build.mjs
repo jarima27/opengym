@@ -160,7 +160,7 @@ ${noindex || !others.length ? '' : `<link rel="alternate" hreflang="x-default" h
 <meta property="og:locale" content="${(LOCALES[page.lang] || page.lang).replace('-', '_')}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0b0d12">
-<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
 <link rel="stylesheet" href="/assets/styles.css?v=${assets.css}">
 ${jsonLd(cfg, page, words, faq)}
@@ -171,7 +171,7 @@ ${cfg.headHtml || ''}
 <div class="code-banner" role="status" hidden></div>
 <header class="top">
   <div class="wrap bar">
-    <a class="brand" href="${home}" aria-label="${escapeHtml(cfg.name)}"><img src="/assets/img/logo.svg" alt="" width="30" height="30"><span>${escapeHtml(cfg.name)}</span></a>
+    <a class="brand" href="${home}" aria-label="${escapeHtml(cfg.name)}"><img src="/assets/img/logo.png" alt="" width="30" height="30"><span>${escapeHtml(cfg.name)}</span></a>
     <nav class="nav" id="nav" aria-label="${t('menu')}">
       <a href="${homeLink(s.anchor_features)}">${t('nav_features')}</a>
       <a href="${homeLink(s.anchor_import)}">${t('nav_import')}</a>
@@ -191,7 +191,7 @@ ${main}
 <footer class="foot">
   <div class="wrap cols">
     <div class="col brand-col">
-      <a class="brand" href="${home}"><img src="/assets/img/logo.svg" alt="" width="28" height="28"><span>${escapeHtml(cfg.name)}</span></a>
+      <a class="brand" href="${home}"><img src="/assets/img/logo.png" alt="" width="28" height="28"><span>${escapeHtml(cfg.name)}</span></a>
       <p class="dim">${escapeHtml(s.footer_tagline || '')}</p>
     </div>
     <div class="col"><h2>${t('footer_product')}</h2>
