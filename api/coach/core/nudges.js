@@ -76,7 +76,8 @@ const routineLabel = rs => {
  *   today      ISO day on their calendar; planning never looks back
  *   days       how many days ahead, today included (server 1, phone a week)
  *   startedOn  ISO day they signed up — what "days since" counts from before the first workout
- *   trial      { endsOn: ISO day, card: bool } while a web trial runs, else null
+ *   trial      { endsOn: ISO day, card: bool, price?: { amount, currency } } while a web trial
+ *              runs, else null — `price` (minor units) makes the card trial's reminder name the charge
  *   lang       overrides S.lang
  *
  * Days ahead are planned as if nothing else gets logged: the phone re-plans on every change,
@@ -111,8 +112,14 @@ export function planNudges(S, { today, days = 1, startedOn = null, trial = null,
     if (prefs.trial && trial && ISO.test(trial.endsOn || '')) {
       for (const n of [3, 1]) {
         if (addDays(trial.endsOn, -n) === date) {
+          // Three days before a card trial turns into a charge, the reminder says what is charged
+          // and when, when the server knows the price: no surprise on the statement.
+          const priced = trial.card && n === 3 && priceText(trial.price, L);
+          const text = priced
+            ? copyOf(L).trial.card3p.map(x => fill(x, { price: priced, date: dateText(trial.endsOn, L) }))
+            : copyOf(L).trial[(trial.card ? 'card' : 'open') + n];
           candidates.push(make('trial', `trial:${trial.endsOn}:${n}`, date, NUDGE_TIMES.trial,
-            copyOf(L).trial[(trial.card ? 'card' : 'open') + n], { url: trial.card ? '/settings' : '/home?paywall=trial' }));
+            text, { url: trial.card ? '/settings' : '/home?paywall=trial' }));
         }
       }
     }
@@ -185,6 +192,13 @@ const localeOf = lang => LOCALES[lang] || 'en-GB';
 const fmtInt = (n, lang) => {
   try { return new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return String(Math.round(n)); }
 };
+const priceText = (price, lang) => {
+  if (!price || !Number.isFinite(price.amount) || !price.currency) return null;
+  try { return new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency: price.currency }).format(price.amount / 100); } catch { return null; }
+};
+const dateText = (iso, lang) => {
+  try { return new Intl.DateTimeFormat(localeOf(lang), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z')); } catch { return iso; }
+};
 function plural(forms, n, lang) {
   let cat = 'other';
   try { cat = new Intl.PluralRules(localeOf(lang)).select(n); } catch { /* old runtime: 'other' */ }
@@ -228,6 +242,7 @@ const COPY = {
       open3: ['3 days of your trial left', 'Choose a plan to keep the AI Coach. Your history stays yours either way.'],
       open1: ['Your trial ends tomorrow', 'Choose a plan today to keep the AI Coach.'],
       card3: ['Your trial ends in 3 days', 'Then your subscription starts. Not for you? Cancel in Settings → Subscription.'],
+      card3p: ['Your Tiza Pro trial ends in 3 days', 'If you do nothing, {price} is charged on {date}. Cancel here in one tap.'],
       card1: ['Your trial ends tomorrow', 'Your subscription starts tomorrow. You can cancel in Settings → Subscription.']
     }
   },
@@ -253,6 +268,7 @@ const COPY = {
       open3: ['Te quedan 3 días de prueba', 'Elige un plan para seguir con el Entrenador IA. Tu historial es tuyo pase lo que pase.'],
       open1: ['Tu prueba termina mañana', 'Elige un plan hoy para no perder el Entrenador IA.'],
       card3: ['Tu prueba termina en 3 días', 'Después empieza tu suscripción. ¿No es para ti? Cancélala en Ajustes → Suscripción.'],
+      card3p: ['Tu prueba de Tiza Pro termina en 3 días', 'Si no haces nada, el {date} se cobra {price}. Cancela aquí en un toque.'],
       card1: ['Tu prueba termina mañana', 'Mañana empieza tu suscripción. Puedes cancelarla en Ajustes → Suscripción.']
     }
   },
@@ -278,6 +294,7 @@ const COPY = {
       open3: ['Noch 3 Tage Testphase', 'Wähle einen Tarif, um den KI-Coach zu behalten. Dein Verlauf bleibt so oder so deiner.'],
       open1: ['Deine Testphase endet morgen', 'Wähle heute einen Tarif, damit du den KI-Coach behältst.'],
       card3: ['Deine Testphase endet in 3 Tagen', 'Danach startet dein Abonnement. Nichts für dich? Kündige unter Einstellungen → Abonnement.'],
+      card3p: ['Deine Tiza-Pro-Testphase endet in 3 Tagen', 'Wenn du nichts tust, werden am {date} {price} abgebucht. Hier mit einem Tipp kündigen.'],
       card1: ['Deine Testphase endet morgen', 'Morgen startet dein Abonnement. Du kannst unter Einstellungen → Abonnement kündigen.']
     }
   },
@@ -303,6 +320,7 @@ const COPY = {
       open3: ['Plus que 3 jours d’essai', 'Choisis une formule pour garder le Coach IA. Ton historique reste à toi quoi qu’il arrive.'],
       open1: ['Ton essai se termine demain', 'Choisis une formule aujourd’hui pour garder le Coach IA.'],
       card3: ['Ton essai se termine dans 3 jours', 'Ensuite, ton abonnement démarre. Pas pour toi ? Résilie dans Réglages → Abonnement.'],
+      card3p: ['Ton essai Tiza Pro se termine dans 3 jours', 'Sans action de ta part, {price} seront prélevés le {date}. Résilie ici en un geste.'],
       card1: ['Ton essai se termine demain', 'Ton abonnement démarre demain. Tu peux résilier dans Réglages → Abonnement.']
     }
   },
@@ -328,6 +346,7 @@ const COPY = {
       open3: ['Ancora 3 giorni di prova', 'Scegli un piano per tenere il Coach IA. Il tuo storico resta tuo in ogni caso.'],
       open1: ['La tua prova finisce domani', 'Scegli un piano oggi per non perdere il Coach IA.'],
       card3: ['La tua prova finisce tra 3 giorni', 'Poi parte il tuo abbonamento. Non fa per te? Annulla in Impostazioni → Abbonamento.'],
+      card3p: ['La tua prova di Tiza Pro finisce tra 3 giorni', 'Se non fai nulla, il {date} verranno addebitati {price}. Annulla qui con un tocco.'],
       card1: ['La tua prova finisce domani', 'Domani parte il tuo abbonamento. Puoi annullarlo in Impostazioni → Abbonamento.']
     }
   },
@@ -353,6 +372,7 @@ const COPY = {
       open3: ['Faltam 3 dias de teste', 'Escolhe um plano para manter o Treinador IA. O teu histórico é teu aconteça o que acontecer.'],
       open1: ['O teu teste termina amanhã', 'Escolhe um plano hoje para não perderes o Treinador IA.'],
       card3: ['O teu teste termina daqui a 3 dias', 'Depois começa a tua subscrição. Não é para ti? Cancela em Definições → Subscrição.'],
+      card3p: ['O teu teste do Tiza Pro termina daqui a 3 dias', 'Se não fizeres nada, a {date} são cobrados {price}. Cancela aqui com um toque.'],
       card1: ['O teu teste termina amanhã', 'A tua subscrição começa amanhã. Podes cancelar em Definições → Subscrição.']
     }
   },
@@ -378,6 +398,7 @@ const COPY = {
       open3: ['Faltam 3 dias de teste', 'Escolha um plano para manter o Treinador IA. Seu histórico é seu de qualquer jeito.'],
       open1: ['Seu teste termina amanhã', 'Escolha um plano hoje para não perder o Treinador IA.'],
       card3: ['Seu teste termina em 3 dias', 'Depois começa sua assinatura. Não é pra você? Cancele em Configurações → Assinatura.'],
+      card3p: ['Seu teste do Tiza Pro termina em 3 dias', 'Se você não fizer nada, em {date} serão cobrados {price}. Cancele aqui com um toque.'],
       card1: ['Seu teste termina amanhã', 'Sua assinatura começa amanhã. Você pode cancelar em Configurações → Assinatura.']
     }
   },
@@ -403,6 +424,7 @@ const COPY = {
       open3: ['Zostały 3 dni okresu próbnego', 'Wybierz subskrypcję, żeby zachować Trenera AI. Twoja historia i tak zostaje Twoja.'],
       open1: ['Okres próbny kończy się jutro', 'Wybierz subskrypcję dziś, żeby nie stracić Trenera AI.'],
       card3: ['Okres próbny kończy się za 3 dni', 'Potem zacznie się Twoja subskrypcja. Nie dla Ciebie? Anuluj w Ustawienia → Subskrypcja.'],
+      card3p: ['Okres próbny Tiza Pro kończy się za 3 dni', 'Jeśli nic nie zrobisz, {date} pobierzemy {price}. Anuluj tutaj jednym dotknięciem.'],
       card1: ['Okres próbny kończy się jutro', 'Jutro zaczyna się Twoja subskrypcja. Możesz ją anulować w Ustawienia → Subskrypcja.']
     }
   },
@@ -428,6 +450,7 @@ const COPY = {
       open3: ['Denemenin bitmesine 3 gün kaldı', 'Yapay Zekâ Koçu’nu korumak için bir plan seç. Geçmişin her durumda senin.'],
       open1: ['Denemen yarın bitiyor', 'Yapay Zekâ Koçu’nu kaybetmemek için bugün bir plan seç.'],
       card3: ['Denemen 3 gün sonra bitiyor', 'Ardından aboneliğin başlar. Sana göre değil mi? Ayarlar → Abonelik’ten iptal et.'],
+      card3p: ['Tiza Pro denemen 3 gün sonra bitiyor', 'Hiçbir şey yapmazsan {date} tarihinde {price} tahsil edilir. Buradan tek dokunuşla iptal et.'],
       card1: ['Denemen yarın bitiyor', 'Aboneliğin yarın başlıyor. Ayarlar → Abonelik’ten iptal edebilirsin.']
     }
   },
@@ -453,6 +476,7 @@ const COPY = {
       open3: ['До конца пробного периода 3 дня', 'Выберите тариф, чтобы сохранить ИИ-тренера. Ваша история в любом случае останется вашей.'],
       open1: ['Пробный период заканчивается завтра', 'Выберите тариф сегодня, чтобы не потерять ИИ-тренера.'],
       card3: ['Пробный период закончится через 3 дня', 'Затем начнётся подписка. Не подходит? Отмените в Настройки → Подписка.'],
+      card3p: ['Пробный период Tiza Pro закончится через 3 дня', 'Если ничего не делать, {date} спишется {price}. Отменить можно здесь в одно касание.'],
       card1: ['Пробный период заканчивается завтра', 'Завтра начнётся ваша подписка. Отменить можно в Настройки → Подписка.']
     }
   },
@@ -478,6 +502,7 @@ const COPY = {
       open3: ['До кінця пробного періоду 3 дні', 'Обери тариф, щоб зберегти ШІ-тренера. Твоя історія за будь-яких умов залишиться твоєю.'],
       open1: ['Пробний період закінчується завтра', 'Обери тариф сьогодні, щоб не втратити ШІ-тренера.'],
       card3: ['Пробний період закінчиться через 3 дні', 'Потім почнеться підписка. Не підходить? Скасуй у Налаштування → Підписка.'],
+      card3p: ['Пробний період Tiza Pro закінчиться через 3 дні', 'Якщо нічого не робити, {date} буде списано {price}. Скасуй тут одним дотиком.'],
       card1: ['Пробний період закінчується завтра', 'Завтра почнеться твоя підписка. Скасувати можна в Налаштування → Підписка.']
     }
   },
@@ -503,6 +528,7 @@ const COPY = {
       open3: ['试用还剩 3 天', '选择一个方案，继续使用 AI 教练。无论如何，你的记录都属于你。'],
       open1: ['你的试用明天结束', '今天选择方案，继续使用 AI 教练。'],
       card3: ['你的试用将在 3 天后结束', '之后订阅开始。不需要？在 设置 → 订阅 中取消。'],
+      card3p: ['你的 Tiza Pro 试用将在 3 天后结束', '如果不做任何操作，{date} 将扣款 {price}。在这里一键取消。'],
       card1: ['你的试用明天结束', '你的订阅明天开始。可在 设置 → 订阅 中取消。']
     }
   },
@@ -528,6 +554,7 @@ const COPY = {
       open3: ['체험 기간이 3일 남았어요', 'AI 코치를 계속 쓰려면 요금제를 선택하세요. 기록은 어떤 경우에도 당신의 것이에요.'],
       open1: ['체험 기간이 내일 끝나요', '오늘 요금제를 선택하고 AI 코치를 계속 사용하세요.'],
       card3: ['체험 기간이 3일 후에 끝나요', '그 후 구독이 시작돼요. 원하지 않으면 설정 → 구독에서 취소하세요.'],
+      card3p: ['Tiza Pro 체험이 3일 후에 끝나요', '아무것도 하지 않으면 {date}에 {price}가 결제돼요. 여기서 한 번에 취소할 수 있어요.'],
       card1: ['체험 기간이 내일 끝나요', '내일 구독이 시작돼요. 설정 → 구독에서 취소할 수 있어요.']
     }
   },
@@ -553,6 +580,7 @@ const COPY = {
       open3: ['ट्रायल के 3 दिन बचे हैं', 'AI कोच जारी रखने के लिए एक प्लान चुनें। आपका इतिहास हर हाल में आपका है।'],
       open1: ['आपका ट्रायल कल खत्म होगा', 'AI कोच न खोने के लिए आज ही प्लान चुनें।'],
       card3: ['आपका ट्रायल 3 दिन में खत्म होगा', 'फिर आपकी सदस्यता शुरू होगी। नहीं चाहिए? सेटिंग्स → सदस्यता में रद्द करें।'],
+      card3p: ['आपका Tiza Pro ट्रायल 3 दिन में खत्म होगा', 'अगर आप कुछ नहीं करते, तो {date} को {price} लिए जाएँगे। यहाँ एक टैप में रद्द करें।'],
       card1: ['आपका ट्रायल कल खत्म होगा', 'कल से आपकी सदस्यता शुरू होगी। आप सेटिंग्स → सदस्यता में रद्द कर सकते हैं।']
     }
   },
@@ -578,6 +606,7 @@ const COPY = {
       open3: ['เหลือเวลาทดลองใช้ 3 วัน', 'เลือกแพ็กเกจเพื่อใช้โค้ช AI ต่อ ประวัติของคุณยังเป็นของคุณเสมอ'],
       open1: ['การทดลองใช้จะสิ้นสุดพรุ่งนี้', 'เลือกแพ็กเกจวันนี้เพื่อไม่ให้เสียโค้ช AI'],
       card3: ['การทดลองใช้จะสิ้นสุดในอีก 3 วัน', 'หลังจากนั้นการสมัครสมาชิกจะเริ่ม ไม่ต้องการหรือ? ยกเลิกได้ที่ ตั้งค่า → การสมัครสมาชิก'],
+      card3p: ['การทดลองใช้ Tiza Pro จะสิ้นสุดในอีก 3 วัน', 'หากคุณไม่ดำเนินการใด ๆ จะมีการเรียกเก็บ {price} ในวันที่ {date} ยกเลิกได้ที่นี่ในแตะเดียว'],
       card1: ['การทดลองใช้จะสิ้นสุดพรุ่งนี้', 'การสมัครสมาชิกจะเริ่มพรุ่งนี้ ยกเลิกได้ที่ ตั้งค่า → การสมัครสมาชิก']
     }
   },
@@ -603,6 +632,7 @@ const COPY = {
       open3: ['Még 3 nap a próbaidőből', 'Válassz csomagot, hogy megtartsd az MI-edzőt. Az előzményeid mindenképp a tieid maradnak.'],
       open1: ['Holnap lejár a próbaidőd', 'Válassz ma csomagot, hogy ne veszítsd el az MI-edzőt.'],
       card3: ['3 nap múlva lejár a próbaidőd', 'Utána indul az előfizetésed. Nem neked való? Mondd le itt: Beállítások → Előfizetés.'],
+      card3p: ['A Tiza Pro próbaidőd 3 nap múlva lejár', 'Ha nem teszel semmit, {date} napján {price} terhelünk. Itt egy koppintással lemondhatod.'],
       card1: ['Holnap lejár a próbaidőd', 'Holnap indul az előfizetésed. Lemondhatod itt: Beállítások → Előfizetés.']
     }
   },
@@ -628,6 +658,7 @@ const COPY = {
       open3: ['تبقّى 3 أيام من الفترة التجريبية', 'اختر خطة للاحتفاظ بمدرب الذكاء الاصطناعي. سجلك ملكك في كل الأحوال.'],
       open1: ['تنتهي فترتك التجريبية غدًا', 'اختر خطة اليوم كي لا تفقد مدرب الذكاء الاصطناعي.'],
       card3: ['تنتهي فترتك التجريبية بعد 3 أيام', 'بعدها يبدأ اشتراكك. لا يناسبك؟ ألغِه من الإعدادات ← الاشتراك.'],
+      card3p: ['تنتهي تجربتك لـ Tiza Pro بعد 3 أيام', 'إن لم تفعل شيئًا، فسيُخصم {price} في {date}. ألغِ هنا بلمسة واحدة.'],
       card1: ['تنتهي فترتك التجريبية غدًا', 'يبدأ اشتراكك غدًا. يمكنك الإلغاء من الإعدادات ← الاشتراك.']
     }
   }

@@ -75,12 +75,15 @@ function Paywall({ reason, context, preview, close }) {
   // The operator's lines with the person's data in them; one whose data is missing is left out.
   const ctx = context || {}
   const subtitle = fillNamed(end ? c.endBody : c.subtitle, ctx)
+  // After a trial: what the Coach did in it, in the person's numbers — left out when there are none.
+  const recap = end ? fillNamed(c.endRecap, ctx) : null
   const bullets = (c.bullets || []).map(b => fillNamed(b, ctx)).filter(Boolean)
   const footnote = fillNamed(c.footnote, ctx)
   const timeline = end ? null : timelineText(c, pw.cardTrialDays)
 
   return <>
     <h3 style={{ marginBottom: 6 }}>{end ? c.endTitle : titleFor(c, reason, ctx)}</h3>
+    {recap && <div className="small" style={{ marginBottom: 10, lineHeight: 1.5 }}>{recap}</div>}
     {subtitle && <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>{subtitle}</div>}
     {!!bullets.length && <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
       {bullets.map((b, i) => <div key={i} className="row" style={{ gap: 10, alignItems: 'flex-start' }}>

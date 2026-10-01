@@ -774,5 +774,10 @@ function CadenceSheet({ update }) {
         onChange={v => patch(c => { c.cadence = { everyWorkouts: v } })}
         options={[3, 4, 5, 6, 8, 10].map(n => ({ value: n, label: t('{0} workouts', n) }))} />}
     </Section>
+    <Section footer={t('A short read of each workout, the moment you finish it.')}>
+      <Row icon="sparkles" iconTint="var(--indigo)" title={t('Read every session')}>
+        <Switch checked={!!coach.autoDebrief} onChange={() => patch(c => { c.autoDebrief = !c.autoDebrief })} />
+      </Row>
+    </Section>
   </>
 }

@@ -207,3 +207,16 @@ test('the Coach’s weekly report: its first line on the morning the app worked 
   // Only the trial outranks it.
   assert.equal(planNudges(S, { today: MON, trial: { endsOn: addDays(MON, 3) } })[0].kind, 'trial');
 });
+
+test('the card trial’s reminder three days out names the charge and its date, in the person’s language', () => {
+  const S = plan({ workouts: [workout(addDays(MON, -1))] });
+  const trial = { endsOn: addDays(MON, 3), card: true, price: { amount: 3499, currency: 'EUR' } };
+  const [es] = planNudges(S, { today: MON, trial });
+  assert.equal(es.title, 'Tu prueba de Tiza Pro termina en 3 días');
+  assert.match(es.body, /^Si no haces nada, el 8 de octubre se cobra 34,99\s€\. Cancela aquí en un toque\.$/);
+  const [en] = planNudges({ ...S, lang: 'en' }, { today: MON, trial });
+  assert.equal(en.body, 'If you do nothing, €34.99 is charged on 8 October. Cancel here in one tap.');
+  // Without a known price, the plain reminder; the day before, the short one.
+  assert.equal(planNudges(S, { today: MON, trial: { ...trial, price: null } })[0].title, 'Tu prueba termina en 3 días');
+  assert.equal(planNudges(S, { today: addDays(MON, 2), trial })[0].title, 'Tu prueba termina mañana');
+});

@@ -23,11 +23,12 @@ export const PLANS = ['monthly', 'annual'];
 // trial's days in the call to action, the price in perMonth / perYear, the reminder's and the
 // first charge's day in the timeline. Named blanks carry the person's own data where the paywall
 // was opened from it: {exercise} and {weeks} (a stalled lift), {missed} (sessions missed last
-// week), {gainKg} (a lift's rise). A line whose blank has no data is left out, never shown half
+// week), {gainKg} (a lift's rise, with its unit), {adjustments} (changes the Coach made during the
+// trial, on the end-of-trial screen). A line whose blank has no data is left out, never shown half
 // empty; a title falls back to the general one.
 export const COPY_FIELDS = [
   'title', 'titleStall', 'titleComeback', 'titleDay7', 'subtitle', 'bullets', 'timeline', 'cta', 'ctaNoTrial',
-  'monthlyLabel', 'annualLabel', 'annualBadge', 'perMonth', 'perYear', 'footnote', 'later', 'endTitle', 'endBody', 'endCta'
+  'monthlyLabel', 'annualLabel', 'annualBadge', 'perMonth', 'perYear', 'footnote', 'later', 'endTitle', 'endRecap', 'endBody', 'endCta'
 ];
 const MAX_TEXT = 300;
 const MAX_BULLETS = 6;
@@ -51,6 +52,7 @@ export const DEFAULT_COPY = {
     footnote: 'Registrar entrenamientos es siempre gratis. La suscripción se renueva sola; cancela cuando quieras.',
     later: 'Ahora no',
     endTitle: 'Tu prueba gratis ha terminado',
+    endRecap: 'Durante tu prueba el Coach te hizo {adjustments} ajustes y subiste {gainKg} en {exercise}. Sigue con él.',
     endBody: 'Tus entrenamientos siguen aquí y puedes seguir registrándolos gratis. Para seguir con el Coach IA, elige un plan.',
     endCta: 'Seguir con el Coach IA'
   },
@@ -72,6 +74,7 @@ export const DEFAULT_COPY = {
     footnote: 'Logging workouts is always free. The subscription renews automatically; cancel anytime.',
     later: 'Not now',
     endTitle: 'Your free trial has ended',
+    endRecap: 'During your trial the Coach made {adjustments} changes to your plan, and your {exercise} went up {gainKg}. Keep it going.',
     endBody: 'Your workouts are all still here, and logging stays free. To keep the AI Coach, pick a plan.',
     endCta: 'Keep the AI Coach'
   }

@@ -64,9 +64,9 @@ const LABELS = {
   timeline: 'Trial timeline ({0} = reminder day, {1} = first charge day)', subtitle: 'Subtitle', bullets: 'Bullet points — one per line', cta: 'Button, when checking out starts a trial ({0} = days)',
   ctaNoTrial: 'Button, without a trial', monthlyLabel: 'Monthly plan name', annualLabel: 'Yearly plan name', annualBadge: 'Badge on the recommended plan',
   perMonth: 'Price per month ({0} = price)', perYear: 'Price per year ({0} = price)', footnote: 'Small print', later: 'Dismiss button',
-  endTitle: 'Trial ended — title', endBody: 'Trial ended — text', endCta: 'Trial ended — button, without a trial'
+  endTitle: 'Trial ended — title', endRecap: 'Trial ended — what the Coach did ({adjustments}, {gainKg}, {exercise})', endBody: 'Trial ended — text', endCta: 'Trial ended — button, without a trial'
 }
-const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody', 'timeline', 'titleDay7'])
+const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody', 'endRecap', 'timeline', 'titleDay7'])
 const clone = o => JSON.parse(JSON.stringify(o))
 
 export function PaywallCard() {
@@ -127,7 +127,8 @@ export function PaywallCard() {
     </div>
     <div className="adm-lead">
       Any line can quote the person’s own data where the paywall opened from it: {'{exercise}'} and {'{weeks}'} (a stalled lift),
-      {' {missed}'} (sessions missed last week), {'{gainKg}'} (a lift’s rise). A line whose data is missing is left out; a title falls back to the general one.
+      {' {missed}'} (sessions missed last week), {'{gainKg}'} (a lift’s rise, with its unit), {'{adjustments}'} (changes the Coach made in the trial).
+      A line whose data is missing is left out; a title falls back to the general one.
     </div>
 
     <label className="small dim">Experiment name — change it to start a new test with fresh groups</label>

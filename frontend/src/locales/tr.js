@@ -1747,4 +1747,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Geçen hafta plandaki {1} seansın {0} tanesi yapılabildi. Koç planı gerçek haftana göre ayarlayabilir.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'Koçtan ilk planın ücretsiz. Hedefini ve günlerini söyle.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'Koçun bu hareket için bir önerisi var',
+  '{0} sessions without going up.': '{0} seanstır artış yok.',
+  'See the proposal': 'Öneriyi gör',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': '{0} hareketimde takıldım: {1} seanstır artış yok. Ne önerirsin?',
+  'What the Coach has done for you': 'Koçun senin için yaptıkları',
+  '1 change to your plan': 'Planında 1 düzenleme',
+  '{0} changes to your plan': 'Planında {0} düzenleme',
+  '1 session analysed': '1 seans analiz edildi',
+  '{0} sessions analysed': '{0} seans analiz edildi',
+  '+{0} on {1}': '{1} hareketinde +{0}',
+  'Your subscription starts on {0}.': 'Aboneliğin {0} tarihinde başlıyor.',
+  'Your trial ends on {0}.': 'Denemen {0} tarihinde bitiyor.',
+  'Keep the Coach': 'Koçla devam et',
+  'Read every session': 'Her seansı analiz et',
+  'A short read of each workout, the moment you finish it.': 'Her antrenmanın kısa bir analizi, bitirir bitirmez.',
 }

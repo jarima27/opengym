@@ -1747,4 +1747,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'На прошлой неделе получилось {0} из {1} тренировок плана. Тренер может подстроить план под вашу реальную неделю.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'Первый план от тренера — бесплатно. Расскажите о цели и днях тренировок.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'У тренера есть предложение по этому упражнению',
+  '{0} sessions without going up.': 'Без роста уже {0} трен.',
+  'See the proposal': 'Посмотреть предложение',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'В упражнении «{0}» застой: {1} трен. без роста. Что предложишь?',
+  'What the Coach has done for you': 'Что тренер сделал для вас',
+  '1 change to your plan': 'Изменений в плане: 1',
+  '{0} changes to your plan': 'Изменений в плане: {0}',
+  '1 session analysed': 'Разобрано тренировок: 1',
+  '{0} sessions analysed': 'Разобрано тренировок: {0}',
+  '+{0} on {1}': '+{0} в упражнении «{1}»',
+  'Your subscription starts on {0}.': 'Ваша подписка начнётся {0}.',
+  'Your trial ends on {0}.': 'Пробный период закончится {0}.',
+  'Keep the Coach': 'Остаться с тренером',
+  'Read every session': 'Разбирать каждую тренировку',
+  'A short read of each workout, the moment you finish it.': 'Короткий разбор каждой тренировки сразу после её окончания.',
 }

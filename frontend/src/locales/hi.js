@@ -1747,4 +1747,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'पिछले हफ़्ते प्लान के {1} में से {0} सेशन हो पाए। कोच प्लान को आपके असली हफ़्ते के हिसाब से ढाल सकता है।',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'कोच का आपका पहला प्लान, मुफ़्त। उसे अपना लक्ष्य और दिन बताएँ।',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'कोच के पास इस एक्सरसाइज़ के लिए एक सुझाव है',
+  '{0} sessions without going up.': '{0} सेशन से कोई बढ़त नहीं।',
+  'See the proposal': 'सुझाव देखें',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'मेरा {0} रुक गया है: {1} सेशन से कोई बढ़त नहीं। आप क्या सुझाते हैं?',
+  'What the Coach has done for you': 'कोच ने आपके लिए क्या किया',
+  '1 change to your plan': 'आपके प्लान में 1 बदलाव',
+  '{0} changes to your plan': 'आपके प्लान में {0} बदलाव',
+  '1 session analysed': '1 सेशन का विश्लेषण',
+  '{0} sessions analysed': '{0} सेशन का विश्लेषण',
+  '+{0} on {1}': '{1} में +{0}',
+  'Your subscription starts on {0}.': 'आपकी सदस्यता {0} को शुरू होगी।',
+  'Your trial ends on {0}.': 'आपका ट्रायल {0} को खत्म होगा।',
+  'Keep the Coach': 'कोच के साथ जारी रखें',
+  'Read every session': 'हर सेशन का विश्लेषण',
+  'A short read of each workout, the moment you finish it.': 'हर वर्कआउट खत्म होते ही उसका छोटा विश्लेषण।',
 }

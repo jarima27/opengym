@@ -1747,4 +1747,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': '지난주 계획된 운동 {1}회 중 {0}회를 했어요. 코치가 실제 한 주에 맞게 계획을 조정해 줄 수 있어요.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': '코치의 첫 계획은 무료예요. 목표와 운동할 요일을 알려 주세요.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': '코치에게 이 운동에 대한 제안이 있어요',
+  '{0} sessions without going up.': '{0}회째 오르지 않았어요.',
+  'See the proposal': '제안 보기',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': '{0}이(가) 정체됐어요: {1}회째 오르지 않아요. 어떻게 하면 좋을까요?',
+  'What the Coach has done for you': '코치가 해 준 것',
+  '1 change to your plan': '계획 조정 1회',
+  '{0} changes to your plan': '계획 조정 {0}회',
+  '1 session analysed': '분석한 운동 1회',
+  '{0} sessions analysed': '분석한 운동 {0}회',
+  '+{0} on {1}': '{1} +{0}',
+  'Your subscription starts on {0}.': '구독이 {0}에 시작돼요.',
+  'Your trial ends on {0}.': '체험 기간이 {0}에 끝나요.',
+  'Keep the Coach': '코치와 계속하기',
+  'Read every session': '모든 운동 분석하기',
+  'A short read of each workout, the moment you finish it.': '운동을 마치는 즉시 짧게 분석해 드려요.',
 }

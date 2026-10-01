@@ -1758,4 +1758,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'สัปดาห์ที่แล้วทำได้ {0} จาก {1} ครั้งตามแผน โค้ชช่วยปรับแผนให้เข้ากับสัปดาห์จริงของคุณได้',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'แผนแรกจากโค้ช ฟรี บอกเป้าหมายและวันที่คุณฝึก',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'โค้ชมีข้อเสนอสำหรับท่านี้',
+  '{0} sessions without going up.': '{0} ครั้งแล้วที่ไม่เพิ่มขึ้น',
+  'See the proposal': 'ดูข้อเสนอ',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': '{0} ของฉันหยุดนิ่ง: {1} ครั้งแล้วที่ไม่เพิ่มขึ้น คุณแนะนำอย่างไร?',
+  'What the Coach has done for you': 'สิ่งที่โค้ชทำให้คุณ',
+  '1 change to your plan': 'ปรับแผน 1 รายการ',
+  '{0} changes to your plan': 'ปรับแผน {0} รายการ',
+  '1 session analysed': 'วิเคราะห์การฝึก 1 ครั้ง',
+  '{0} sessions analysed': 'วิเคราะห์การฝึก {0} ครั้ง',
+  '+{0} on {1}': '{1} +{0}',
+  'Your subscription starts on {0}.': 'การสมัครสมาชิกของคุณเริ่มวันที่ {0}',
+  'Your trial ends on {0}.': 'การทดลองใช้สิ้นสุดวันที่ {0}',
+  'Keep the Coach': 'ใช้โค้ชต่อ',
+  'Read every session': 'วิเคราะห์ทุกการฝึก',
+  'A short read of each workout, the moment you finish it.': 'สรุปสั้น ๆ ของการฝึกแต่ละครั้งทันทีที่จบ',
 }

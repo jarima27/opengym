@@ -1800,4 +1800,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'الأسبوع الماضي تمّت {0} من أصل {1} حصص في الخطة. يمكن للمدرب ملاءمة الخطة مع أسبوعك الفعلي.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'خطتك الأولى من المدرب مجانًا. أخبره بهدفك وأيام تمرينك.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'لدى المدرب اقتراح لهذا التمرين',
+  '{0} sessions without going up.': '{0} حصص دون تقدّم.',
+  'See the proposal': 'عرض الاقتراح',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'تمرين {0} لديّ متوقف: {1} حصص دون تقدّم. ماذا تقترح؟',
+  'What the Coach has done for you': 'ما فعله المدرب من أجلك',
+  '1 change to your plan': 'تعديل واحد على خطتك',
+  '{0} changes to your plan': '{0} تعديلات على خطتك',
+  '1 session analysed': 'حصة واحدة تم تحليلها',
+  '{0} sessions analysed': '{0} حصص تم تحليلها',
+  '+{0} on {1}': '+{0} في {1}',
+  'Your subscription starts on {0}.': 'يبدأ اشتراكك في {0}.',
+  'Your trial ends on {0}.': 'تنتهي تجربتك في {0}.',
+  'Keep the Coach': 'استمر مع المدرب',
+  'Read every session': 'تحليل كل حصة',
+  'A short read of each workout, the moment you finish it.': 'تحليل قصير لكل تمرين فور انتهائك منه.',
 }

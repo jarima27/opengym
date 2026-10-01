@@ -1750,4 +1750,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'A múlt héten {1} tervezett edzésből {0} fért bele. Az edző a valódi hetedhez igazíthatja a tervet.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'Az első edzéstervet ingyen kapod az edzőtől. Mondd el a célodat és a napjaidat.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'Az edzőnek van javaslata erre a gyakorlatra',
+  '{0} sessions without going up.': '{0} edzés óta nincs fejlődés.',
+  'See the proposal': 'Javaslat megtekintése',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'Elakadtam ezzel: {0} — {1} edzés óta nincs fejlődés. Mit javasolsz?',
+  'What the Coach has done for you': 'Amit az edző tett érted',
+  '1 change to your plan': '1 módosítás a tervedben',
+  '{0} changes to your plan': '{0} módosítás a tervedben',
+  '1 session analysed': '1 elemzett edzés',
+  '{0} sessions analysed': '{0} elemzett edzés',
+  '+{0} on {1}': '+{0}: {1}',
+  'Your subscription starts on {0}.': 'Az előfizetésed {0} napján indul.',
+  'Your trial ends on {0}.': 'A próbaidőd {0} napján lejár.',
+  'Keep the Coach': 'Maradok az edzővel',
+  'Read every session': 'Minden edzés elemzése',
+  'A short read of each workout, the moment you finish it.': 'Rövid elemzés minden edzésről, amint végeztél.',
 }

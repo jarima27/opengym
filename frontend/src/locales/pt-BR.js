@@ -1079,6 +1079,18 @@ export const PT_BR_OVERRIDES = {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Na semana passada couberam {0} de {1} treinos do plano. O Treinador pode ajustar o plano à sua semana real.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'Seu primeiro plano do Treinador, grátis. Conte seu objetivo e seus dias.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  '{0} sessions without going up.': '{0} treinos sem subir.',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'Faz {1} treinos que não subo em {0}. O que você propõe?',
+  'What the Coach has done for you': 'O que o Treinador fez por você',
+  '1 change to your plan': '1 ajuste no seu plano',
+  '{0} changes to your plan': '{0} ajustes no seu plano',
+  '1 session analysed': '1 treino analisado',
+  '{0} sessions analysed': '{0} treinos analisados',
+  'Your subscription starts on {0}.': 'Sua assinatura começa em {0}.',
+  'Your trial ends on {0}.': 'Seu teste termina em {0}.',
+  'Read every session': 'Analisar cada treino',
+  'A short read of each workout, the moment you finish it.': 'Uma análise rápida de cada treino, assim que você termina.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

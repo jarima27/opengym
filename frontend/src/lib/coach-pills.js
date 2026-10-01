@@ -382,7 +382,7 @@ function progressPill(S, today, ws) {
     title: t('Going up: {0}', name),
     body: t('{0}: +{1} {2} estimated 1RM in the last 4 weeks. Keep it up.', name, fmtNum(gain), unit),
     exercise: pick.id, window: { from: pick.from, to: pick.to }, data: { gain, pct: round1(pick.pct * 100) },
-    context: { exercise: name, gainKg: fmtNum(gain) }
+    context: { exercise: name, gainKg: `${fmtNum(gain)} ${unit}` }
   }
 }
 

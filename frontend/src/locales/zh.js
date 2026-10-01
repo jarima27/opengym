@@ -1747,4 +1747,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': '上周计划中的 {1} 次训练完成了 {0} 次。教练可以按你的实际一周调整计划。',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': '你的第一份教练计划，免费。告诉它你的目标和训练日。',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': '教练对这个动作有一个建议',
+  '{0} sessions without going up.': '已经 {0} 次训练没有提升。',
+  'See the proposal': '查看建议',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': '我的 {0} 停滞了：{1} 次训练没有提升。你有什么建议？',
+  'What the Coach has done for you': '教练为你做了什么',
+  '1 change to your plan': '计划调整 1 处',
+  '{0} changes to your plan': '计划调整 {0} 处',
+  '1 session analysed': '分析了 1 次训练',
+  '{0} sessions analysed': '分析了 {0} 次训练',
+  '+{0} on {1}': '{1} 提升 +{0}',
+  'Your subscription starts on {0}.': '你的订阅将于 {0} 开始。',
+  'Your trial ends on {0}.': '你的试用将于 {0} 结束。',
+  'Keep the Coach': '继续使用教练',
+  'Read every session': '分析每次训练',
+  'A short read of each workout, the moment you finish it.': '每次训练结束后，立即给出简短分析。',
 }

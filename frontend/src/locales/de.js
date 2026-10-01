@@ -1767,4 +1767,20 @@ export default {
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Letzte Woche passten {0} von {1} geplanten Einheiten. Der Coach kann den Plan an deine echte Woche anpassen.',
   // The Coach's free first plan (spec F4).
   'Your first Coach plan, free. Tell it your goal and your days.': 'Dein erster Plan vom Coach, gratis. Sag ihm dein Ziel und deine Tage.',
+  // The Coach on a stalled lift, the trial's recap and its session reads (spec F3, F7).
+  'The Coach has a proposal for this exercise': 'Der Coach hat einen Vorschlag für diese Übung',
+  '{0} sessions without going up.': '{0} Einheiten ohne Steigerung.',
+  'See the proposal': 'Vorschlag ansehen',
+  'My {0} has stalled: {1} sessions without going up. What do you propose?': 'Bei {0} stagniere ich: {1} Einheiten ohne Steigerung. Was schlägst du vor?',
+  'What the Coach has done for you': 'Was der Coach für dich getan hat',
+  '1 change to your plan': '1 Anpassung an deinem Plan',
+  '{0} changes to your plan': '{0} Anpassungen an deinem Plan',
+  '1 session analysed': '1 Einheit ausgewertet',
+  '{0} sessions analysed': '{0} Einheiten ausgewertet',
+  '+{0} on {1}': '+{0} bei {1}',
+  'Your subscription starts on {0}.': 'Dein Abonnement beginnt am {0}.',
+  'Your trial ends on {0}.': 'Deine Testphase endet am {0}.',
+  'Keep the Coach': 'Mit dem Coach weitermachen',
+  'Read every session': 'Jede Einheit auswerten',
+  'A short read of each workout, the moment you finish it.': 'Eine kurze Auswertung jedes Trainings, direkt nach dem Ende.',
 }

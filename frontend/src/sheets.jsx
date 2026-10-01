@@ -22,6 +22,8 @@ import LineChart from './components/LineChart.jsx'
 import Stepper from './components/Stepper.jsx'
 import Icon from './components/Icon.jsx'
 import NotifyOffer from './components/NotifyOffer.jsx'
+import StallNotice from './components/StallNotice.jsx'
+import { autoDebrief } from './lib/coach-api.js'
 import { Button, Slider, Switch, Segmented, SelectRow, Row, TextField, NumberField, MultiSelectRow } from './components/ui.jsx'
 import { glyphOf, GLYPH_GROUPS, DEFAULT_GLYPH } from './lib/glyphs.js'
 import BodyMap from './components/BodyMap.jsx'
@@ -871,6 +873,7 @@ function ExerciseHistory({ exId }) {
   return <>
     <h3 className={exerciseNameClass(ex)} style={{ marginBottom: 2 }}>{exerciseNameFor(ex)}</h3>
     <div className="muted small" style={{ marginBottom: 10 }}>{t('Exercise history')} · {t(h.total === 1 ? '{0} session' : '{0} sessions', h.total)}</div>
+    <StallNotice exId={exId} />
     {/* Only reps work with a load produces an estimate, so the toggle is absent for the rest. */}
     {h.e1rmPoints.length > 0 && h.metric === 'weight' && <Segmented className="seg-range" value={curve} onChange={setCurve}
       options={[{ value: 'top', label: t('Top set') }, { value: 'e1rm', label: t('Est. 1RM') }]} />}
@@ -2689,6 +2692,9 @@ function doFinishWorkout() {
   })
   useStore.getState().autoBackupNow()
   track('workout_completed', { count: S().workouts.length, backfill: past })
+  // The Coach reads it now when that is switched on (lib/coach-api.js autoDebrief) — a session
+  // logged into the past is history, not today's training.
+  if (!past && shown?.id) autoDebrief(shown.id).catch(() => {})
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
   ui().openSheet(close => <FinishSummary w={shown} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })

@@ -247,6 +247,11 @@ export function applyEvent(users, event) {
     const status = event.type === 'customer.subscription.deleted' ? 'canceled' : String(o.status || '');
     // current_period_end moved onto the subscription items in Stripe's 2025 API versions.
     const periodEnd = toMs(o.current_period_end ?? o.items?.data?.[0]?.current_period_end);
+    // What the first (or next) charge will be: the trial's reminder says it in so many words.
+    const p = o.items?.data?.[0]?.price;
+    const price = p && Number.isFinite(p.unit_amount) && p.currency
+      ? { amount: p.unit_amount, currency: String(p.currency).toUpperCase(), interval: p.recurring?.interval || null }
+      : b.price || null;
     user.billing = {
       ...b,
       customer: typeof o.customer === 'string' ? o.customer : b.customer,
@@ -255,6 +260,7 @@ export function applyEvent(users, event) {
       periodEnd,
       endsAt: o.cancel_at ? toMs(o.cancel_at) : o.cancel_at_period_end ? periodEnd : null,
       trialUsed: b.trialUsed || status === 'trialing' || !!o.trial_end,
+      ...(price ? { price } : {}),
       at
     };
     return user;

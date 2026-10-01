@@ -41,7 +41,7 @@ export const ctaText = (pw, end) => (pw.cardTrialDays > 0 ? fill(pw.copy.cta, pw
 
 // The person's own data a paywall can quote (api/paywall.js COPY_FIELDS): blanks by name, so
 // the operator writes "Stop stalling on {exercise}" and never a number they cannot know.
-export const CONTEXT_KEYS = ['exercise', 'weeks', 'missed', 'gainKg']
+export const CONTEXT_KEYS = ['exercise', 'weeks', 'missed', 'gainKg', 'adjustments']
 
 /** A line with its named blanks filled from `ctx`, or null when one of them has no data — the
     line is then left out rather than shown with a hole in it. Numbered blanks are left alone. */

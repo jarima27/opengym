@@ -139,6 +139,11 @@ test('checkout links the customer; subscription events carry the status', () => 
   // Newer API versions put the period on the item instead.
   applyEvent(users, subEvent('customer.subscription.updated', 3, { status: 'active', items: { data: [{ current_period_end: 3000 }] } }));
   assert.equal(users[0].billing.periodEnd, 3000 * 1000);
+  // The price the subscription charges, for the trial's reminder; kept when an event lacks it.
+  applyEvent(users, subEvent('customer.subscription.updated', 4, { status: 'trialing', items: { data: [{ current_period_end: 4000, price: { unit_amount: 3499, currency: 'eur', recurring: { interval: 'year' } } }] } }));
+  assert.deepEqual(users[0].billing.price, { amount: 3499, currency: 'EUR', interval: 'year' });
+  applyEvent(users, subEvent('customer.subscription.updated', 5, { status: 'trialing', current_period_end: 4000 }));
+  assert.deepEqual(users[0].billing.price, { amount: 3499, currency: 'EUR', interval: 'year' });
 });
 
 test('an event older than the one applied is ignored', () => {

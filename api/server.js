@@ -472,7 +472,7 @@ function trialFor(user, tz) {
   if (!a.on) return null;
   const day = at => (at ? userNow(tz, new Date(at))?.date : null);
   if (a.plan === 'trial' && !a.via) return day(a.trialEnds) ? { endsOn: day(a.trialEnds), card: false } : null;
-  if (a.via === 'stripe' && a.cardTrial && !a.endsAt && day(a.periodEnd)) return { endsOn: day(a.periodEnd), card: true };
+  if (a.via === 'stripe' && a.cardTrial && !a.endsAt && day(a.periodEnd)) return { endsOn: day(a.periodEnd), card: true, price: user.billing?.price || null };
   return null;
 }
 

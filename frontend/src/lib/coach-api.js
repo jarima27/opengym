@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from './api.js'
+import { hasConsent, coachAvailable } from './coach.js'
 import { DEMO } from './demo.js'
 import { MOBILE } from './mobile.js'
 import { t, getLang } from './i18n.js'
@@ -87,6 +88,19 @@ const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL(
 export const refinePlan = (...a) => _refinePlan(...a).then(track, unpaid)
 const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })
 export const requestDebrief = (...a) => _requestDebrief(...a).then(track, unpaid)
+
+// Each finished session read without being asked (S.coach.autoDebrief — switched on when a trial
+// starts, spec F7, and off or on again in the Coach's settings). Only while the Coach is the
+// person's: after a trial nobody paid for, a finished workout must not open a paywall — it is
+// the moment of a record, if anything. Quiet on every failure; the chat shows what came back.
+export async function autoDebrief(workoutId) {
+  const { S, config, user, coachLocal } = useStore.getState()
+  if (DEMO || !workoutId || !S.coach?.autoDebrief || !hasConsent(S)) return
+  if (!coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode: coachLocal?.mode })) return
+  const access = MOBILE ? 'open' : await import('./billing.js').then(m => m.coachAccess()).catch(() => null)
+  if (access !== 'pro' && access !== 'open') return
+  _requestDebrief(workoutId).then(track).catch(() => {})
+}
 // The room: anonymous medians across the profiles on this instance that opted in. Only a
 // server has a room; a phone with its own key and the demo both answer locally.
 export const cohortStats = async () => DEMO ? (await demo()).demoCohort(S()) : LOCAL() ? { ok: false, enabled: false } : api('/api/coach/cohort')
