@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
 vi.mock('./api.js', () => ({ api: apiMock }))
 
-import { billingStatus, billingView } from './billing.js'
+import { billingStatus, billingView, storeManageUrl } from './billing.js'
 
 const fail = (status, message = 'HTTP ' + status) => Object.assign(new Error(message), { status, data: {} })
 
@@ -81,5 +81,22 @@ describe('billingView, v2', () => {
     expect(v.subtitle).toMatch(/· Managed in the App Store$/)
     expect(v.action).toBe(null)
     expect(billingView({ ...base, plan: 'active', via: 'play_store' }).subtitle).toBe('Managed in Google Play')
+  })
+
+  it('a paused subscription says when it comes back, and offers to resume it now', () => {
+    const v = billingView({ ...base, plan: 'paused', ai: false, via: 'stripe', status: 'active', pausedUntil: '2026-11-15T10:00:00.000Z', portal: true })
+    expect(v.title).toBe('Subscription paused')
+    expect(v.subtitle).toMatch(/^Nothing is charged until .+, when it resumes by itself\.$/)
+    expect(v.action).toBe('resume')
+  })
+})
+
+describe('storeManageUrl', () => {
+  it('sends a store subscription to the store’s own page, and nothing else anywhere', () => {
+    expect(storeManageUrl('app_store')).toBe('https://apps.apple.com/account/subscriptions')
+    expect(storeManageUrl('mac_app_store')).toBe('https://apps.apple.com/account/subscriptions')
+    expect(storeManageUrl('play_store')).toBe('https://play.google.com/store/account/subscriptions?package=fit.tiza.app')
+    expect(storeManageUrl('stripe')).toBe(null)
+    expect(storeManageUrl(null)).toBe(null)
   })
 })

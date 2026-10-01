@@ -65,6 +65,8 @@ export function billingConfig(env = process.env) {
     stripe: {
       on: stripeOn, key, prices,
       webhookSecret: str('STRIPE_WEBHOOK_SECRET'),
+      // A coupon offered to someone cancelling a monthly plan, on the annual one (spec F8).
+      saveCoupon: str('STRIPE_SAVE_COUPON'),
       // Only ever changed to point the tests (or stripe-mock) somewhere other than Stripe.
       apiBase: base('STRIPE_API_BASE', 'https://api.stripe.com')
     },
@@ -106,7 +108,9 @@ export function accessOf(user, cfg, { since = 0, now = Date.now(), staff = false
   const onStore = storeActive(s, now);
   const via = onStripe ? 'stripe' : onStore ? (s.store || 'store') : null;
   const hadSomething = openEnds > (Math.max(Date.parse(user?.created) || 0, since)) || !!b.status || !!s;
+  const paused = onStripe && pausedNow(b, now);
   const plan = staff || user?.comp === true ? 'free'
+    : paused ? 'paused'
     : via ? ((onStripe ? b.status === 'past_due' : s.billingIssue) ? 'past_due' : 'active')
       : now < openEnds ? 'trial'
         : hadSomething ? 'expired' : 'none';
@@ -125,6 +129,8 @@ export function accessOf(user, cfg, { since = 0, now = Date.now(), staff = false
     status: b.status || null,
     periodEnd: onStripe ? iso(b.periodEnd) : onStore ? iso(s.expiresAt) : null,
     endsAt: onStripe ? iso(b.endsAt) : onStore && s.willRenew === false ? iso(s.expiresAt) : null,
+    // A paused subscription: when Stripe starts charging (and the Coach comes back) again.
+    pausedUntil: paused ? iso(b.pausedUntil) : null,
     // Whether there is a Stripe customer, i.e. a billing portal to send them to.
     portal: !!b.customer,
     // Whether this server sells on the website at all (the stores are the app's business).
@@ -185,6 +191,63 @@ export function portalForm(user, { origin }) {
   f.set('customer', user.billing.customer);
   f.set('return_url', String(origin || '').replace(/\/+$/, '') + '/#/settings');
   return f;
+}
+
+/* ---------------------------------- Cancelling ---------------------------------- */
+/* Settings → Subscription → Cancel (spec F8): why, then — on the website only — a pause or the
+   annual plan instead, then the cancellation itself. Cancelling ends the subscription when the
+   period that was paid for (or the card trial) ends, never sooner; it can be taken back until
+   then. */
+export const CANCEL_REASONS = ['price', 'unused', 'coach', 'switching', 'other'];
+export const PAUSE_DAYS = 30;
+const pausedNow = (b, now) => !!b?.paused && (b.pausedUntil == null || now < b.pausedUntil);
+
+/** What can be offered instead of cancelling a Stripe subscription. Pure. */
+export function retentionOffers(user, cfg, { now = Date.now(), annualPrice = null } = {}) {
+  const b = user?.billing || {};
+  const live = isPaying(b) && !b.endsAt && !pausedNow(b, now);
+  return {
+    // A month off is for a subscription that has been paid for; a card trial has nothing to pause.
+    pause: live && b.status === 'active',
+    // The annual plan, for someone paying monthly, where the operator sells one.
+    annual: live && b.price?.interval === 'month' && !!annualPrice && annualPrice !== b.priceId
+  };
+}
+
+export function cancelForm() {
+  const f = new URLSearchParams();
+  f.set('cancel_at_period_end', 'true');
+  return f;
+}
+/** Taking a cancellation, or a pause, back. */
+export function resumeForm() {
+  const f = new URLSearchParams();
+  f.set('cancel_at_period_end', 'false');
+  f.set('pause_collection', '');
+  return f;
+}
+/* Invoices that fall due during the pause are voided — nothing is charged — and Stripe starts
+   again by itself after PAUSE_DAYS. */
+export function pauseForm(now = Date.now()) {
+  const f = new URLSearchParams();
+  f.set('pause_collection[behavior]', 'void');
+  f.set('pause_collection[resumes_at]', String(Math.floor((now + PAUSE_DAYS * DAY) / 1000)));
+  return f;
+}
+/* Monthly to annual, charged now with what is left of the month credited. `coupon` is the
+   operator's discount for this moment (STRIPE_SAVE_COUPON), if any. */
+export function annualForm(itemId, price, coupon) {
+  const f = new URLSearchParams();
+  f.set('items[0][id]', itemId);
+  f.set('items[0][price]', price);
+  f.set('proration_behavior', 'always_invoice');
+  f.set('cancel_at_period_end', 'false');
+  if (coupon) f.set('discounts[0][coupon]', coupon);
+  return f;
+}
+/** A subscription object Stripe answered with, recorded as if its webhook had arrived. */
+export function applySubscription(users, sub, now = Date.now()) {
+  return applyEvent(users, { type: 'customer.subscription.updated', created: Math.floor(now / 1000), data: { object: sub } });
 }
 
 /* A webhook body, if and only if Stripe signed it with this secret in the last five minutes.
@@ -252,6 +315,7 @@ export function applyEvent(users, event) {
     const price = p && Number.isFinite(p.unit_amount) && p.currency
       ? { amount: p.unit_amount, currency: String(p.currency).toUpperCase(), interval: p.recurring?.interval || null }
       : b.price || null;
+    const priceId = typeof p?.id === 'string' ? p.id : b.priceId;
     user.billing = {
       ...b,
       customer: typeof o.customer === 'string' ? o.customer : b.customer,
@@ -261,6 +325,10 @@ export function applyEvent(users, event) {
       endsAt: o.cancel_at ? toMs(o.cancel_at) : o.cancel_at_period_end ? periodEnd : null,
       trialUsed: b.trialUsed || status === 'trialing' || !!o.trial_end,
       ...(price ? { price } : {}),
+      ...(priceId ? { priceId } : {}),
+      // A pause (cancel flow, below): no charge and no Coach until Stripe resumes it.
+      paused: !!o.pause_collection,
+      pausedUntil: o.pause_collection ? toMs(o.pause_collection.resumes_at) : null,
       at
     };
     return user;

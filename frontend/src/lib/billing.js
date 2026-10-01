@@ -33,6 +33,30 @@ export const forgetCoachAccess = () => { statusMemo = null }
 
 export const billingCheckout = plan => api('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: plan || 'monthly' }) })
 export const billingPortal = () => api('/api/billing/portal', { method: 'POST', body: '{}' })
+// The cancel flow (components/CancelFlow.jsx): each answers the profile's access afterwards.
+const post = (path, body = {}) => api(path, { method: 'POST', body: JSON.stringify(body) }).finally(forgetCoachAccess)
+export const billingCancel = reason => post('/api/billing/cancel', reason ? { reason } : {})
+export const billingResume = () => post('/api/billing/resume')
+export const billingPause = () => post('/api/billing/pause')
+export const billingAnnual = () => post('/api/billing/annual')
+
+// Why someone cancels, in the order asked (spec F8). The keys are what POST /api/billing/cancel
+// and the cancel_reason event carry.
+export const CANCEL_REASONS = [
+  ['price', () => t('It’s too expensive')],
+  ['unused', () => t('I don’t use it')],
+  ['coach', () => t('The Coach doesn’t convince me')],
+  ['switching', () => t('I’m switching apps')],
+  ['other', () => t('Something else')]
+]
+
+// Where a store subscription is cancelled: the store's own page, never this app.
+const APP_ID = 'fit.tiza.app'
+export function storeManageUrl(via) {
+  if (via === 'app_store' || via === 'mac_app_store') return 'https://apps.apple.com/account/subscriptions'
+  if (via === 'play_store') return 'https://play.google.com/store/account/subscriptions?package=' + APP_ID
+  return null
+}
 
 // Where a subscription bought in a store is managed — the web cannot do it for them.
 const STORE_NAME = { app_store: () => t('Managed in the App Store'), mac_app_store: () => t('Managed in the App Store'), play_store: () => t('Managed in Google Play') }
@@ -68,6 +92,13 @@ export function billingView(a) {
         title: t('Payment failed'),
         subtitle: t('Update your card to keep the AI Coach.'),
         action: a.via === 'stripe' && a.portal ? 'portal' : null
+      }
+    case 'paused':
+      return {
+        icon: 'pause', tint: 'var(--orange)',
+        title: t('Subscription paused'),
+        subtitle: a.pausedUntil ? t('Nothing is charged until {0}, when it resumes by itself.', date(a.pausedUntil)) : null,
+        action: 'resume'
       }
     case 'none':
       return {

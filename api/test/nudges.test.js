@@ -121,7 +121,7 @@ test('the trial: 3 days and 1 day before it ends, worded for a card trial or an 
   const card = planNudges(S, { today: MON, trial: { endsOn: addDays(MON, 1), card: true } })[0];
   assert.equal(card.title, 'Tu prueba termina mañana');
   assert.match(card.body, /Ajustes → Suscripción/);
-  assert.equal(card.url, '/settings?n=trial');
+  assert.equal(card.url, '/settings?cancel=1&n=trial', 'straight to the cancel flow');
   // A day already trained still gets it.
   const trained = plan({ workouts: [workout(MON)] });
   assert.equal(planNudges(trained, { today: MON, trial: { endsOn: addDays(MON, 1) } })[0].kind, 'trial');

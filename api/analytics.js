@@ -26,7 +26,7 @@ export const CLIENT_EVENTS = new Set([
   'pill_shown', 'pill_locked_tapped', 'weekly_report_viewed', 'coach_free_plan_created',
   'trial_recap_viewed', 'cancel_reason'
 ]);
-export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent']);
+export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent', 'subscription_paused', 'plan_switched']);
 
 const MAX_QUEUE = 1000;
 const BATCH = 100;

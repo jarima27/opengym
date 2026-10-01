@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk, freePlanOpen, claimFreePlan, releaseFreePlan } from '../billing.js';
+import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk, freePlanOpen, claimFreePlan, releaseFreePlan, retentionOffers, pauseForm, annualForm, applySubscription, PAUSE_DAYS } from '../billing.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-01T12:00:00Z');
@@ -192,7 +192,7 @@ const mint = uid => {
 };
 
 /** A stand-in for api.stripe.com that records what it was asked. */
-async function fakeStripe(t) {
+async function fakeStripe(t, subs = {}) {
   const calls = [];
   const srv = http.createServer((req, res) => {
     let body = '';
@@ -203,6 +203,18 @@ async function fakeStripe(t) {
       if (req.url === '/v1/checkout/sessions') return res.end(JSON.stringify({ id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }));
       if (req.url === '/v1/billing_portal/sessions') return res.end(JSON.stringify({ id: 'bps_1', url: 'https://billing.stripe.test/p_1' }));
       if (req.method === 'DELETE' && req.url.startsWith('/v1/subscriptions/')) return res.end(JSON.stringify({ id: req.url.split('/').pop(), status: 'canceled' }));
+      // A subscription that changes the way Stripe would for the four fields the cancel flow sets.
+      const sub = req.url.startsWith('/v1/subscriptions/') && subs[decodeURIComponent(req.url.split('/').pop())];
+      if (sub && req.method === 'GET') return res.end(JSON.stringify(sub));
+      if (sub && req.method === 'POST') {
+        const f = new URLSearchParams(body);
+        if (f.has('cancel_at_period_end')) sub.cancel_at_period_end = f.get('cancel_at_period_end') === 'true';
+        if (f.get('pause_collection') === '') sub.pause_collection = null;
+        if (f.has('pause_collection[behavior]')) sub.pause_collection = { behavior: f.get('pause_collection[behavior]'), resumes_at: +f.get('pause_collection[resumes_at]') };
+        if (f.has('items[0][price]')) sub.items.data[0].price = { id: f.get('items[0][price]'), unit_amount: 3499, currency: 'eur', recurring: { interval: 'year' } };
+        return res.end(JSON.stringify(sub));
+      }
+      if (req.url.startsWith('/v1/prices/')) return res.end(JSON.stringify({ id: req.url.split('/').pop(), unit_amount: 3499, currency: 'eur', recurring: { interval: 'year' } }));
       res.statusCode = 404; res.end(JSON.stringify({ error: { message: 'no such route' } }));
     });
   });
@@ -603,4 +615,94 @@ test('the free plan’s mark: taken by one job, given back only by that job', ()
   assert.equal(releaseFreePlan(user, 'job1'), true);
   assert.equal(freePlanOpen(user, cfg), true);
   assert.equal(releaseFreePlan(undefined, 'job1'), false);
+});
+
+/* ------------------------------ cancelling (spec F8) ------------------------------ */
+
+test('what can be offered instead of cancelling', () => {
+  const monthly = { status: 'active', subscription: 'sub', price: { amount: 499, currency: 'EUR', interval: 'month' }, priceId: 'price_m' };
+  const offers = (billing, annualPrice = 'price_y') => retentionOffers({ billing }, ON, { now: NOW, annualPrice });
+  assert.deepEqual(offers(monthly), { pause: true, annual: true });
+  assert.deepEqual(offers(monthly, null), { pause: true, annual: false }, 'no annual price sold, no annual offer');
+  assert.deepEqual(offers({ ...monthly, price: { ...monthly.price, interval: 'year' } }), { pause: true, annual: false }, 'already annual');
+  assert.deepEqual(offers({ ...monthly, status: 'trialing' }), { pause: false, annual: true }, 'a card trial has nothing to pause');
+  assert.deepEqual(offers({ ...monthly, endsAt: NOW + DAY }), { pause: false, annual: false }, 'already cancelled');
+  assert.deepEqual(offers({ ...monthly, paused: true, pausedUntil: NOW + DAY }), { pause: false, annual: false }, 'already paused');
+  assert.deepEqual(offers({ ...monthly, status: 'canceled' }), { pause: false, annual: false });
+
+  const f = pauseForm(NOW);
+  assert.equal(f.get('pause_collection[behavior]'), 'void', 'nothing is charged while paused');
+  assert.equal(+f.get('pause_collection[resumes_at]') * 1000, NOW + PAUSE_DAYS * DAY);
+  assert.equal(annualForm('si_1', 'price_y', '').has('discounts[0][coupon]'), false);
+  assert.equal(annualForm('si_1', 'price_y', 'SAVE20').get('discounts[0][coupon]'), 'SAVE20');
+});
+
+test('a paused subscription charges nothing and has no Coach until it resumes', () => {
+  const user = { id: 'p', created: iso(NOW - 400 * DAY), billing: { customer: 'cus', subscription: 'sub', status: 'active', at: 1 } };
+  const resumes = Math.floor((NOW + 30 * DAY) / 1000);
+  applySubscription([user], { id: 'sub', customer: 'cus', status: 'active', pause_collection: { behavior: 'void', resumes_at: resumes }, current_period_end: resumes }, NOW);
+  const a = accessOf(user, ON, { now: NOW });
+  assert.equal(a.plan, 'paused');
+  assert.equal(a.ai, false);
+  assert.equal(a.pausedUntil, iso(resumes * 1000));
+  assert.equal(accessOf(user, ON, { now: resumes * 1000 + 1 }).plan, 'active', 'and back by itself');
+  // Stored and read back through JSON, as db.json does.
+  assert.equal(accessOf(JSON.parse(JSON.stringify(user)), ON, { now: NOW }).plan, 'paused');
+  // Indefinitely (paused from Stripe's dashboard, no date): paused until resumed.
+  applySubscription([user], { id: 'sub', customer: 'cus', status: 'active', pause_collection: { behavior: 'void' } }, NOW + 1000);
+  assert.equal(accessOf(user, ON, { now: NOW + 365 * DAY }).plan, 'paused');
+  applySubscription([user], { id: 'sub', customer: 'cus', status: 'active', pause_collection: null }, NOW + 2000);
+  assert.equal(accessOf(user, ON, { now: NOW }).plan, 'active');
+});
+
+test('cancel with a reason, take it back, pause, and switch to annual — against Stripe', async t => {
+  const end = Math.floor(Date.now() / 1000) + 20 * 86400;
+  const sub = () => ({ id: 'sub_m', customer: 'cus_m', status: 'active', metadata: {}, cancel_at_period_end: false, pause_collection: null,
+    items: { data: [{ id: 'si_m', current_period_end: end, price: { id: 'price_m', unit_amount: 499, currency: 'eur', recurring: { interval: 'month' } } }] } });
+  const subs = { sub_m: sub() };
+  const stripeApi = await fakeStripe(t, subs);
+  const billing = { customer: 'cus_m', subscription: 'sub_m', status: 'active', periodEnd: end * 1000, price: { amount: 499, currency: 'EUR', interval: 'month' }, priceId: 'price_m', at: 1 };
+  const h = await startServer(t, {
+    env: { ...stripeEnv(stripeApi.base), STRIPE_PRICE_ANNUAL: 'price_y', STRIPE_SAVE_COUPON: 'STAY20' },
+    users: [{ id: 'm', name: 'M', created: LONG_AGO, billing }, { id: 'none', name: 'N', created: LONG_AGO }]
+  });
+  const status = async () => (await h.call('/api/billing', { uid: 'm' })).json();
+  const post = (p, body = {}, uid = 'm') => h.call(p, { uid, method: 'POST', body });
+
+  const before = await status();
+  assert.equal(before.offers.pause, true);
+  assert.deepEqual(before.offers.annual, { price: { amount: 3499, currency: 'EUR', interval: 'year' }, discount: true });
+  assert.equal((await post('/api/billing/cancel', {}, 'none')).status, 409, 'nothing to cancel on the website');
+  assert.equal((await h.call('/api/billing/cancel', { method: 'POST', body: {} })).status, 401);
+
+  // Cancelled: it ends when the paid month ends, and the Coach stays until then.
+  const c = await post('/api/billing/cancel', { reason: 'price' });
+  assert.equal(c.status, 200);
+  const cancelled = await c.json();
+  assert.equal(cancelled.endsAt, iso(end * 1000));
+  assert.equal(cancelled.ai, true);
+  assert.equal(stripeApi.calls.at(-1).form.get('cancel_at_period_end'), 'true');
+  assert.equal((await status()).offers.pause, false, 'nothing more to offer once cancelled');
+  assert.match(fs.readFileSync(path.join(h.dataDir, 'audit.log'), 'utf8'), /billing\.cancel.*price/);
+
+  // Taken back.
+  assert.equal((await (await post('/api/billing/resume')).json()).endsAt, null);
+
+  // Paused: nothing charged for a month, and no Coach meanwhile.
+  const p = await (await post('/api/billing/pause')).json();
+  assert.equal(p.plan, 'paused');
+  assert.equal(p.ai, false);
+  assert.equal(stripeApi.calls.at(-1).form.get('pause_collection[behavior]'), 'void');
+  assert.equal((await post('/api/billing/pause')).status, 409, 'not twice');
+  assert.equal((await (await post('/api/billing/resume')).json()).plan, 'active');
+
+  // To the annual plan, with the operator's coupon.
+  const y = await post('/api/billing/annual');
+  assert.equal(y.status, 200);
+  const sent = stripeApi.calls.at(-1).form;
+  assert.equal(sent.get('items[0][id]'), 'si_m');
+  assert.equal(sent.get('items[0][price]'), 'price_y');
+  assert.equal(sent.get('discounts[0][coupon]'), 'STAY20');
+  assert.equal((await status()).offers.annual, null, 'already annual');
+  assert.equal((await post('/api/billing/annual')).status, 409);
 });

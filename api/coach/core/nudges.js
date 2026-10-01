@@ -119,7 +119,7 @@ export function planNudges(S, { today, days = 1, startedOn = null, trial = null,
             ? copyOf(L).trial.card3p.map(x => fill(x, { price: priced, date: dateText(trial.endsOn, L) }))
             : copyOf(L).trial[(trial.card ? 'card' : 'open') + n];
           candidates.push(make('trial', `trial:${trial.endsOn}:${n}`, date, NUDGE_TIMES.trial,
-            text, { url: trial.card ? '/settings' : '/home?paywall=trial' }));
+            text, { url: trial.card ? '/settings?cancel=1' : '/home?paywall=trial' }));
         }
       }
     }

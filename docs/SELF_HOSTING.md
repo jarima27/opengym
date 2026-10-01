@@ -366,6 +366,7 @@ STRIPE_PRICE_MONTHLY=price_...
 STRIPE_PRICE_ANNUAL=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_TRIAL_DAYS=30        # free days of a first web subscription, card up front
+STRIPE_SAVE_COUPON=         # optional: a Stripe coupon offered with the annual plan to someone cancelling
 TRIAL_DAYS=0                # open trial without a card (default 30); 0 = card trials only
 REVENUECAT_WEBHOOK_AUTH=Bearer <long random string>
 REVENUECAT_SECRET_KEY=sk_...
@@ -394,6 +395,14 @@ How it behaves:
   with a workout running and never right after a record. The paywall's title for each moment
   (and lines quoting the person's data: `{exercise}`, `{weeks}`, `{missed}`, `{gainKg}`) is
   edited in Admin → Paywall, as is the trial timeline shown above the button.
+- **Cancelling.** Settings → Subscription always ends with *Cancel subscription*. It asks why
+  (too expensive, not using it, the Coach doesn't convince, switching apps, something else —
+  reported as `cancel_reason`, never required), then for a website subscription offers a month's
+  pause (nothing charged, no Coach, resumes by itself) or the annual plan (with
+  `STRIPE_SAVE_COUPON` if set) beside the cancel button itself. Cancelling ends the subscription
+  when what was paid for (or the card trial) ends, and can be taken back until then. A store
+  subscription is sent to the App Store's or Google Play's own page. The card trial's last
+  reminder opens this flow directly.
 - **Creator codes.** Admin → Creator codes makes a code per creator or trainer. A sign-up
   through `https://<your domain>/?ref=CODE` gets the extra days on top of the trial, and the card
   shows how many signed up and how many pay. `utm_*` tags in the link are recorded too.

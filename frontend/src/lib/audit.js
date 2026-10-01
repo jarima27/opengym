@@ -40,6 +40,11 @@ const LABELS = {
   // subscription status: active, trialing, past_due, canceled…
   'billing.checkout': 'Opened the subscription checkout',
   'billing.change': 'Subscription changed',
+  // The cancel flow (components/CancelFlow.jsx): on a cancellation `msg` is the reason given, if any.
+  'billing.cancel': 'Cancelled their subscription',
+  'billing.resume': 'Took back a cancellation or a pause',
+  'billing.pause': 'Paused their subscription for a month',
+  'billing.annual': 'Moved to the annual plan',
   // Creator and trainer codes (Admin → Creator codes): `msg` is the code.
   'admin.code.create': 'Created a creator code',
   'admin.code.revoke': 'Revoked a creator code',

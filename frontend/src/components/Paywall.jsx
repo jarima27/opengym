@@ -3,7 +3,8 @@ import { useUI } from '../store/useUI.js'
 import { t, useLang } from '../lib/i18n.js'
 import { dateLocale, getLang } from '../lib/i18n-core.js'
 import { MOBILE } from '../lib/mobile.js'
-import { billingCheckout } from '../lib/billing.js'
+import { billingCheckout, billingCached, billingResume } from '../lib/billing.js'
+import { fmtDate } from '../lib/format.js'
 import { fetchPaywall, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from '../lib/paywall.js'
 import { track } from '../lib/track.js'
 import Icon from './Icon.jsx'
@@ -39,6 +40,9 @@ function Paywall({ reason, context, preview, close }) {
   // language pack would otherwise stay in English. Viewed is reported once.
   const langV = useLang()
   const viewed = useRef(false)
+  // A subscription paused from the cancel flow is not sold again: it is resumed.
+  const [paused, setPaused] = useState(null)
+  useEffect(() => { if (!preview) billingCached().then(a => { if (a?.plan === 'paused') setPaused(a) }).catch(() => {}) }, [])
 
   useEffect(() => {
     let live = true
@@ -53,6 +57,7 @@ function Paywall({ reason, context, preview, close }) {
     return () => { live = false }
   }, [langV])
 
+  if (paused) return <PausedNote a={paused} close={close} />
   if (pw === null) return <div className="muted small" style={{ padding: '24px 0', textAlign: 'center' }}>{t('Loading…')}</div>
   if (pw === false) return <>
     <div className="muted" style={{ marginBottom: 14 }}>{t('Could not open the payment page')}</div>
@@ -119,5 +124,24 @@ function Paywall({ reason, context, preview, close }) {
     {footnote && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>{footnote}</div>}
     <div style={{ height: 8 }} />
     <Button variant="ghost" className="dim" onClick={later}>{c.later}</Button>
+  </>
+}
+
+function PausedNote({ a, close }) {
+  const [busy, setBusy] = useState(false)
+  const toast = useUI(s => s.toast)
+  const resume = async () => {
+    setBusy(true)
+    try { await billingResume(); close(); toast(t('Your subscription is back on.')) }
+    catch { toast(t('Could not reach the payment provider. Try again in a moment.')); setBusy(false) }
+  }
+  return <>
+    <h3 style={{ marginBottom: 6 }}>{t('Subscription paused')}</h3>
+    {a.pausedUntil && <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>
+      {t('Nothing is charged until {0}, when it resumes by itself.', fmtDate(String(a.pausedUntil).slice(0, 10), false, true))}
+    </div>}
+    <Button variant="primary" onClick={resume} disabled={busy}>{t('Resume now')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Not now')}</Button>
   </>
 }

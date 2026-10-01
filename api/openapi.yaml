@@ -2419,6 +2419,8 @@ paths:
         - `expired` — had a trial or a subscription, has neither now; Coach jobs answer 402.
         - `none` — never had either: an instance with no open trial (`TRIAL_DAYS=0`), before the
           first checkout or store purchase. Coach jobs answer 402.
+        - `paused` — a website subscription paused from the cancel flow: nothing is charged and
+          Coach jobs answer 402 until `pausedUntil`, when Stripe resumes it by itself.
         - `free` — an admin, or a profile the operator marked `comp`; never charged.
 
         A profile that existed before the instance started charging gets its trial from that
@@ -2432,7 +2434,7 @@ paths:
                 type: object
                 properties:
                   on: { type: boolean, const: true }
-                  plan: { type: string, enum: [trial, active, past_due, expired, none, free] }
+                  plan: { type: string, enum: [trial, active, past_due, paused, expired, none, free] }
                   ai: { type: boolean, description: Whether Coach jobs are allowed. }
                   via:
                     type: ['string', 'null']
@@ -2446,6 +2448,21 @@ paths:
                   periodEnd: { type: ['string', 'null'], format: date-time, description: End of the paid (or Stripe trial) period. }
                   endsAt: { type: ['string', 'null'], format: date-time, description: When a cancelled subscription stops. }
                   portal: { type: boolean, description: Whether POST /api/billing/portal has a customer to open. }
+                  pausedUntil: { type: ['string', 'null'], format: date-time, description: When a paused subscription resumes. }
+                  offers:
+                    type: ['object', 'null']
+                    description: |
+                      What the cancel flow may offer instead of cancelling a live website
+                      subscription: `pause` (a month off), and `annual` (the annual plan's price
+                      as Stripe has it, and whether the operator's coupon applies). null when
+                      there is no website subscription.
+                    properties:
+                      pause: { type: boolean }
+                      annual:
+                        type: ['object', 'null']
+                        properties:
+                          price: { type: ['object', 'null'] }
+                          discount: { type: boolean }
               example: { on: true, plan: trial, ai: true, trialEnds: '2026-10-31T09:00:00.000Z', trialDaysLeft: 30, status: null, periodEnd: null, endsAt: null, portal: false }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
@@ -2606,6 +2623,105 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
           description: This profile has never checked out (`code: none`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/cancel:
+    post:
+      tags: [billing]
+      operationId: billingCancel
+      summary: Cancel the website subscription at the end of the paid period
+      description: |
+        Sets the subscription to end when the period already paid for (or the card trial) ends;
+        nothing is refunded and nothing more is charged. Can be taken back until then.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, enum: [price, unused, coach, switching, other], description: Why — asked, never required. }
+            example: { reason: price }
+      responses:
+        '200':
+          description: The profile's access afterwards, as GET /api/billing answers it.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: No live website subscription (`code: none`), or the offer does not apply to it (`code: offer`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/resume:
+    post:
+      tags: [billing]
+      operationId: billingResume
+      summary: Take back a cancellation or a pause
+      description: |
+        The subscription carries on as before: it renews, or starts charging again.
+      responses:
+        '200':
+          description: The profile's access afterwards, as GET /api/billing answers it.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: No live website subscription (`code: none`), or the offer does not apply to it (`code: offer`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/pause:
+    post:
+      tags: [billing]
+      operationId: billingPause
+      summary: Pause the website subscription for a month
+      description: |
+        Instead of cancelling: invoices falling due in the next 30 days are voided and the Coach
+        is off (`plan: paused`); Stripe resumes the subscription by itself afterwards.
+      responses:
+        '200':
+          description: The profile's access afterwards, as GET /api/billing answers it.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: No live website subscription (`code: none`), or the offer does not apply to it (`code: offer`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: Stripe did not answer, or refused (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/billing/annual:
+    post:
+      tags: [billing]
+      operationId: billingAnnual
+      summary: Move a monthly website subscription to the annual plan
+      description: |
+        Instead of cancelling: charged now, with what is left of the month credited, and with
+        the operator's coupon (`STRIPE_SAVE_COUPON`) when one is set.
+      responses:
+        '200':
+          description: The profile's access afterwards, as GET /api/billing answers it.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: No live website subscription (`code: none`), or the offer does not apply to it (`code: offer`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

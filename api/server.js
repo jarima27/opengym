@@ -35,7 +35,8 @@ import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from 
 import {
   billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
   revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber,
-  freePlanOpen, claimFreePlan, releaseFreePlan
+  freePlanOpen, claimFreePlan, releaseFreePlan,
+  CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
@@ -1917,7 +1918,7 @@ const billingRoutes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const a = billingAccess(user);
-    json(res, 200, { ...a, freePlan: !a.ai && FREE_PLAN.open(user), freePlanAt: user.freePlanUsedAt || null });
+    json(res, 200, { ...a, freePlan: !a.ai && FREE_PLAN.open(user), freePlanAt: user.freePlanUsedAt || null, offers: await saveOffers(user) });
   },
 
   // The paywall this profile sees: its variant's words in the app's language, which plan is
@@ -1960,6 +1961,36 @@ const billingRoutes = {
   }
 };
 
+/* What the cancel flow may offer this profile instead (billing.js retentionOffers): a month's
+   pause, and the annual plan with its price as Stripe has it. null where it is not on Stripe. */
+async function saveOffers(user) {
+  if (!BILLING.stripe.on || !isPaying(user.billing) || !user.billing.subscription) return null;
+  const annualPrice = priceFor(user, 'annual');
+  const o = retentionOffers(user, BILLING, { annualPrice });
+  return {
+    pause: o.pause,
+    annual: o.annual ? { price: await priceShown(annualPrice), discount: !!BILLING.stripe.saveCoupon } : null
+  };
+}
+/* One change to this profile's own subscription at Stripe, recorded at once from Stripe's answer
+   (the webhook that follows says the same thing again). */
+async function changeSubscription(req, res, user, form, what) {
+  const sub = user.billing?.subscription;
+  const before = new Map([[user.id, snapshot(user)]]);
+  let next;
+  try { next = await stripe(BILLING, 'POST', 'subscriptions/' + encodeURIComponent(sub), form); }
+  catch (e) { console.error('billing:', what, 'for', user.id, '-', e.message); json(res, 502, PAYMENT_DOWN); return false; }
+  if (applySubscription(db.users, { ...next, metadata: { ...(next.metadata || {}), uid: user.id } })) { saveDb(); billingChanged(req, before, [user]); }
+  return true;
+}
+/** The signed-in profile with a live Stripe subscription, or an answer saying why not. */
+function subscriber(req, res) {
+  const user = readSession(req);
+  if (!user) { json(res, 401, { error: 'not signed in' }); return null; }
+  if (!isPaying(user.billing) || !user.billing.subscription) { json(res, 409, { error: 'no subscription on the website', code: 'none' }); return null; }
+  return user;
+}
+
 // Selling on the website: Stripe Checkout, the customer portal, and Stripe's webhook.
 const stripeRoutes = {
   // A Stripe Checkout page for this profile and the plan it picked (`monthly` or `annual`). The
@@ -1970,7 +2001,7 @@ const stripeRoutes = {
     const body = await readBody(req);
     const { plan } = billingAccess(user);
     if (plan === 'free') return json(res, 409, { error: 'this profile is not charged', code: 'free' });
-    if (plan === 'active' || plan === 'past_due') return json(res, 409, { error: 'already subscribed — manage it where you subscribed', code: 'subscribed' });
+    if (plan === 'active' || plan === 'past_due' || plan === 'paused') return json(res, 409, { error: 'already subscribed — manage it where you subscribed', code: 'subscribed' });
     const which = PLANS.includes(body.plan) ? body.plan : 'monthly';
     const price = priceFor(user, which);
     if (!price) return json(res, 400, { error: 'this plan is not offered', code: 'plan' });
@@ -1991,6 +2022,51 @@ const stripeRoutes = {
     try { session = await stripe(BILLING, 'POST', 'billing_portal/sessions', portalForm(user, { origin: ORIGIN })); }
     catch (e) { console.error('billing: portal for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
     json(res, 200, { url: session.url });
+  },
+
+  // Cancel (spec F8): at the end of what was paid for — or of the card trial — never sooner.
+  // `reason` is one of CANCEL_REASONS, or nothing: it is asked, never required.
+  'POST /api/billing/cancel': async (req, res) => {
+    const user = subscriber(req, res); if (!user) return;
+    const body = await readBody(req);
+    const reason = CANCEL_REASONS.includes(body.reason) ? body.reason : null;
+    if (!await changeSubscription(req, res, user, cancelForm(), 'cancel')) return;
+    audit(req, 'billing.cancel', { user, msg: reason || '' });
+    json(res, 200, billingAccess(user));
+  },
+
+  // Taking a cancellation or a pause back, while the subscription still runs.
+  'POST /api/billing/resume': async (req, res) => {
+    const user = subscriber(req, res); if (!user) return;
+    if (!await changeSubscription(req, res, user, resumeForm(), 'resume')) return;
+    audit(req, 'billing.resume', { user });
+    json(res, 200, billingAccess(user));
+  },
+
+  // Instead of cancelling: a month with nothing charged (and no Coach), then back by itself.
+  'POST /api/billing/pause': async (req, res) => {
+    const user = subscriber(req, res); if (!user) return;
+    if (!retentionOffers(user, BILLING).pause) return json(res, 409, { error: 'this subscription cannot be paused', code: 'offer' });
+    if (!await changeSubscription(req, res, user, pauseForm(), 'pause')) return;
+    audit(req, 'billing.pause', { user });
+    ANALYTICS.capture('subscription_paused', user, { via: 'stripe' });
+    json(res, 200, billingAccess(user));
+  },
+
+  // Instead of cancelling: the annual plan, with the operator's coupon for this moment if any.
+  'POST /api/billing/annual': async (req, res) => {
+    const user = subscriber(req, res); if (!user) return;
+    const price = priceFor(user, 'annual');
+    if (!retentionOffers(user, BILLING, { annualPrice: price }).annual) return json(res, 409, { error: 'the annual plan is not offered here', code: 'offer' });
+    let sub;
+    try { sub = await stripe(BILLING, 'GET', 'subscriptions/' + encodeURIComponent(user.billing.subscription)); }
+    catch (e) { console.error('billing: annual for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
+    const item = sub.items?.data?.[0]?.id;
+    if (!item) return json(res, 502, PAYMENT_DOWN);
+    if (!await changeSubscription(req, res, user, annualForm(item, price, BILLING.stripe.saveCoupon), 'annual')) return;
+    audit(req, 'billing.annual', { user });
+    ANALYTICS.capture('plan_switched', user, { plan: 'annual', via: 'stripe' });
+    json(res, 200, billingAccess(user));
   },
 
   // Stripe telling us what happened. Anything signed is answered 200, used or not: a non-2xx

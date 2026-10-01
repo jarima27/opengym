@@ -48,7 +48,8 @@ export default function BillingPrompts() {
     let live = true
     const offer = takeTrialOffer()
     billingCached().then(a => {
-      if (!live || !a) return
+      // Paused from the cancel flow: already a subscriber, who asked for a month off — nothing to offer.
+      if (!live || !a || a.plan === 'paused') return
       if (offer && a.plan === 'none') { markOffer('onboarding'); openPaywall('onboarding'); return }
       const { S, config } = useStore.getState()
       const now = Date.now()
