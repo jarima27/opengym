@@ -1,7 +1,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoachChat from './CoachChat.jsx'
 
 // The demo Coach's failure state, end to end. Every other CoachChat test mocks lib/coach-api.js;
@@ -79,6 +79,12 @@ const state = () => ({
     log: [], snapshots: [], chat: [{ id: 'c1', role: 'user', kind: 'intake', at: 1 }], timings: []
   },
 })
+
+// coach-api.js loads the demo Coach with a dynamic import, and the steps below give it only
+// microtasks to settle in. Loaded once here, the import is a cache hit that settles in time; left
+// to the first click, it raced the module graph's own loading (which grew with the pills and the
+// billing helpers) and the request was still pending when the test looked.
+beforeAll(async () => { await import('../lib/coach-demo.js') })
 
 beforeEach(() => {
   vi.clearAllMocks()

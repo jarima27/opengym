@@ -23,6 +23,8 @@ on:
       - 'api/coach/prompts/**'
       - '.github/workflows/test.yml'
   workflow_dispatch:
+  # The release workflow (release.yml) runs these first, on the exact tagged code.
+  workflow_call:
 
 permissions:
   contents: read
@@ -117,7 +119,7 @@ jobs:
 
       - run: docker build --target default -t opengym-api:default ./api
       - run: docker build --target coach   -t opengym-api:coach   ./api
-      # No --target, exactly like docker-publish.yml. That workflow names no stage, so what it
+      # No --target, exactly like release.yml's images job. That job names no stage, so what it
       # ships is whatever Dockerfile stage happens to be last -- and that untargeted artifact,
       # not opengym-api:default above, is the image every self-hoster pulls as :latest. Build it
       # the same way here so the assertion below is about the thing we actually publish.

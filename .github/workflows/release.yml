@@ -1,0 +1,205 @@
+# Builds a release from its public code — runs in the PUBLIC MIRROR only (docs/RELEASING.md).
+#
+# The private repository publishes each version here as one commit and a vX.Y.Z tag
+# (publish-mirror.yml). That tag runs this: the tests, then the server images, the Android app
+# bundle and — when its secrets are there — the iPhone build, all from exactly the code anyone can
+# read here. That is the point of building here: what runs on the hosted service and in the stores
+# is the published source, as the AGPL asks.
+#
+# Switched on by the repository variable TIZA_RELEASES = true (set on the mirror only).
+#
+# Server images: ghcr.io/<owner>/tiza-api and tiza-web, tagged with the version and `latest`.
+#
+# Android (Google Play app bundle), secrets:
+#   ANDROID_UPLOAD_KEYSTORE_B64   the upload keystore, base64
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#   Without them the bundle is built unsigned (a check, not something to upload).
+#
+# iPhone (App Store Connect upload), only when the variable TIZA_IOS = true, secrets:
+#   APPLE_TEAM_ID                 the developer team
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8   an App Store Connect API key (App Manager), whose
+#                                 .p8 contents go in ASC_KEY_P8; Xcode signs with it (cloud-managed
+#                                 certificates) and uploads the build to TestFlight.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: vars.TIZA_RELEASES == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.v.outputs.name }}
+      code: ${{ steps.v.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        name: The version, from the tag and the app
+        run: |
+          v="$(node -p "require('./frontend/package.json').version")"
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              if [ "refs/tags/v$v" != "$GITHUB_REF" ]; then echo "::error::tag $GITHUB_REF, frontend/package.json $v"; exit 1; fi ;;
+          esac
+          IFS=. read -r major minor patch <<< "$v"
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          # Google Play needs a number that only ever goes up: 1.4.0 → 10400.
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: version
+    uses: ./.github/workflows/test.yml
+
+  images:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: tiza-api
+            context: ./api
+            file: ./api/Dockerfile
+          - image: tiza-web
+            context: .
+            file: ./web/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+      - id: owner
+        run: echo "lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ needs.version.outputs.name }}
+            VCS_REF=${{ github.sha }}
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ needs.version.outputs.name }}
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.version.outputs.name }}
+
+  android:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+        working-directory: frontend
+      # The store build: frontend/.env.mobile (public values only), no dataset media.
+      - run: npm run build:mobile
+        working-directory: frontend
+      - name: Upload keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No ANDROID_UPLOAD_KEYSTORE_B64: the bundle is unsigned."
+          fi
+      - name: App bundle
+        working-directory: frontend/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease -PtizaVersionName=${{ needs.version.outputs.name }} -PtizaVersionCode=${{ needs.version.outputs.code }}
+      - run: rm -f "$RUNNER_TEMP/upload.jks"
+        if: always()
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tiza-android-${{ needs.version.outputs.name }}
+          path: frontend/android/app/build/outputs/bundle/release/*.aab
+
+  ios:
+    needs: [version, test]
+    if: vars.TIZA_IOS == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # cap sync runs `pod install` on macOS.
+      - run: npm run build:mobile
+        working-directory: frontend
+      - name: Archive, sign and upload to App Store Connect
+        working-directory: frontend/ios/App
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -eu
+          KEY="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
+          printf '%s' "$KEY_P8" > "$KEY"
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID $KEY_ID -authenticationKeyIssuerID $ISSUER"
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Tiza.xcarchive" DEVELOPMENT_TEAM="$TEAM" \
+            MARKETING_VERSION=${{ needs.version.outputs.name }} CURRENT_PROJECT_VERSION=${{ needs.version.outputs.code }} \
+            $AUTH archive
+          sed "s/TEAM_ID/$TEAM/" ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Tiza.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" $AUTH
+          rm -f "$KEY"
+
+  github-release:
+    needs: [version, images, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tiza-android-${{ needs.version.outputs.name }}
+          path: dist
+      - name: The release page, with the Android bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Tiza $TAG" --notes "The code of Tiza $TAG, as released to the hosted service and the app stores. Server images: ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/tiza-api and tiza-web, tag ${TAG#v}."
+          gh release upload "$TAG" dist/*.aab --repo "$GITHUB_REPOSITORY" --clobber

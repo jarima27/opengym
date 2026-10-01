@@ -1,0 +1,75 @@
+# Publishes a release's code to the public mirror — runs in the PRIVATE working repository only.
+#
+# Tiza is developed in a private repository; what runs on the hosted service and ships to the
+# stores is published, version by version, in a public one (the AGPL asks for that; see
+# docs/RELEASING.md). Pushing a tag vX.Y.Z here copies the tree of that tag onto the mirror's
+# main as one commit, "Tiza vX.Y.Z", and tags it there. The mirror's own workflow
+# (release.yml) then tests and builds that exact code. The working history — branches, half-done
+# commits — never leaves this repository.
+#
+# Needs, in this repository:
+#   variable MIRROR_REPO   owner/name of the public mirror (e.g. jarima27/opengym)
+#   secret   MIRROR_TOKEN  a fine-grained token for that one repository with
+#                          Contents: read and write, and Workflows: read and write
+#                          (the snapshot carries .github/workflows)
+# Without MIRROR_REPO the job does not run; on the mirror itself it never runs.
+name: Publish to the public mirror
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to publish (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mirror
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: vars.MIRROR_REPO != '' && github.repository != vars.MIRROR_REPO
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      MIRROR: ${{ vars.MIRROR_REPO }}
+    steps:
+      - name: The tag names a version
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::$TAG is not a vX.Y.Z tag"; exit 1 ;; esac
+
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          path: src
+
+      - name: The tag matches the app's version
+        run: |
+          v="$(node -p "require('./src/frontend/package.json').version")"
+          [ "v$v" = "$TAG" ] || { echo "::error::frontend/package.json says $v, the tag says $TAG"; exit 1; }
+
+      - name: Copy the tagged tree onto the mirror, as one commit
+        env:
+          TOKEN: ${{ secrets.MIRROR_TOKEN }}
+        run: |
+          set -eu
+          [ -n "$TOKEN" ] || { echo "::error::MIRROR_TOKEN is not set"; exit 1; }
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${MIRROR}.git" mirror
+          if git -C mirror ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG is already published on $MIRROR"; exit 1
+          fi
+          rsync -a --delete --exclude .git src/ mirror/
+          cd mirror
+          git config user.name "Tiza releases"
+          git config user.email "releases@users.noreply.github.com"
+          git add -A
+          git commit --allow-empty -m "Tiza $TAG" -m "The code of Tiza $TAG, as released to the hosted service and the app stores."
+          git tag -a "$TAG" -m "Tiza $TAG"
+          git push origin HEAD:refs/heads/main "refs/tags/$TAG"
+          echo "Published $TAG to https://github.com/$MIRROR/tree/$TAG" >> "$GITHUB_STEP_SUMMARY"

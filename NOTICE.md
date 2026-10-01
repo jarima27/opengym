@@ -2,8 +2,9 @@
 
 **Tiza is a modified version of openGym.** Tiza's changes — Copyright (C) 2026 Jaime Ripoll Martínez —
 are licensed, like the code they modify, under the **GNU AGPL v3.0** (see [LICENSE](LICENSE)). The
-complete source of Tiza, including what runs the hosted service, is published at
-<https://github.com/jarima27/opengym>.
+complete source of every released version of Tiza — what runs the hosted service and what ships
+in the app stores — is published at <https://github.com/jarima27/opengym>, and built from there
+(docs/RELEASING.md).
 
 openGym — Copyright (C) 2026 Duarte Santos, <https://github.com/DuarteSantos8/openGym>.
 openGym's own code is licensed under the **GNU AGPL v3.0** (see [LICENSE](LICENSE)). "openGym", its
