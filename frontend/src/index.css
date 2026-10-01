@@ -795,6 +795,23 @@ body.chips-dragging *{cursor:inherit}
 .exmedia.studio,.exmedia.studio:has(> video){background:#fff}
 .exmedia.studio video,.exmedia.studio img,.thumb.studio{filter:grayscale(1) contrast(1.05)}
 .exmedia.studio video{background:#fff}
+/* The clip is 9:16; "contain" in the 320px box left a narrow figure between two white bands.
+   So the box is portrait, 3:4 across the full width, and the clip fills it: the centre 3:4 of the
+   frame is YMove's own crop (its default still, our poster), framed to hold the whole lift. A
+   short screen caps the height and trims a little more off the top and bottom, never the sides;
+   a wide one gets a portrait card in the middle instead of a crop. */
+.exmedia.studio{aspect-ratio:3/4;width:100%;max-width:420px;max-height:62vh;margin-inline:auto}
+.exmedia.studio > video,.exmedia.studio > img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* A superset's two cards and a minimised clip: a strip across the frame would show a torso, so
+   it is a small portrait tile at the start of the row, with its control beside it. */
+.exmedia.studio.compact,.exmedia.studio.mini{aspect-ratio:auto;max-width:none;max-height:none;margin-inline:0;
+  background:none;overflow:visible;display:flex;align-items:center;gap:12px}
+.exmedia.studio.compact > video,.exmedia.studio.compact > img,.exmedia.studio.mini > video,.exmedia.studio.mini > img{
+  position:static;flex:none;width:90px;height:120px;border-radius:var(--r);background:#fff}
+.exmedia.studio.mini > video,.exmedia.studio.mini > img{width:63px;height:84px}
+.exmedia.studio.compact .giftoggle,.exmedia.studio.mini .giftoggle{position:static;background:var(--surface-2);color:var(--label);
+  -webkit-backdrop-filter:none;backdrop-filter:none}
+.exmedia.studio.compact .gifhint{display:none}
 
 /* the link to a video or a guide (#246): a quiet action tile under the picture, or in its place.
    A <button>, so the reset of the browser's button look comes first. */
