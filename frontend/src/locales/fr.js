@@ -1794,4 +1794,6 @@ export default {
   'Resume now': 'Reprendre maintenant',
   'Resume subscription': 'Reprendre l’abonnement',
   'Your subscription is back on.': 'Ton abonnement est de nouveau actif.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Vidéos des exercices',
 }

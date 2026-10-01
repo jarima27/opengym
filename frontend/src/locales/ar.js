@@ -1847,4 +1847,6 @@ export default {
   'Resume now': 'استئناف الآن',
   'Resume subscription': 'استئناف الاشتراك',
   'Your subscription is back on.': 'اشتراكك نشط من جديد.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'مقاطع فيديو التمارين',
 }

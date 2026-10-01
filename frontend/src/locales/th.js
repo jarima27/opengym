@@ -1805,4 +1805,6 @@ export default {
   'Resume now': 'ดำเนินต่อตอนนี้',
   'Resume subscription': 'ดำเนินการสมัครสมาชิกต่อ',
   'Your subscription is back on.': 'การสมัครสมาชิกของคุณกลับมาใช้งานแล้ว',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'วิดีโอท่าออกกำลังกาย',
 }

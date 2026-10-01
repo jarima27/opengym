@@ -1794,4 +1794,6 @@ export default {
   'Resume now': 'Возобновить сейчас',
   'Resume subscription': 'Возобновить подписку',
   'Your subscription is back on.': 'Ваша подписка снова активна.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Видео упражнений',
 }

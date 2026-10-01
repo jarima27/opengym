@@ -70,6 +70,9 @@ ENV BASE_PATH=""
 # Above the API's own video cap (MEDIA_VIDEO_MAX_MB, 40 by default) so the API, which says why,
 # is the one that refuses a file — raise both together.
 ENV MEDIA_UPLOAD_MAX=48m
+# The exercise dataset's images and animations (img/, gif/, © Gym visual). "off" on the hosted,
+# paid version, which may not serve them: every request for one answers 404.
+ENV DATASET_MEDIA=on
 
 # Probe the port nginx was actually told to listen on (NGINX_PORT is configurable, so a
 # hardcoded http://localhost/ breaks on any instance that changed it), and address it as

@@ -1794,4 +1794,6 @@ export default {
   'Resume now': 'Wznów teraz',
   'Resume subscription': 'Wznów subskrypcję',
   'Your subscription is back on.': 'Twoja subskrypcja znów działa.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Filmy ćwiczeń',
 }

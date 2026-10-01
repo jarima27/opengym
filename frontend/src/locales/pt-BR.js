@@ -1116,6 +1116,7 @@ export const PT_BR_OVERRIDES = {
   'Your workouts and your history stay yours, and logging stays free.': 'Seus treinos e seu histórico continuam seus, e registrar continua grátis.',
   'Resume subscription': 'Retomar assinatura',
   'Your subscription is back on.': 'Sua assinatura está ativa de novo.',
+  // Exercise videos (hosted version, spec F10)
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

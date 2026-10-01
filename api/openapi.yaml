@@ -207,6 +207,12 @@ paths:
         caps are not a secret, and its absence is how the app knows this server does not
         store photos and videos at all.
 
+        `exercise_media` says which exercise media the app may show, and is absent where the
+        dataset's images and animations are shown as they always were: `dataset` false on the
+        hosted, paid version (it never shows them), `video` true where YMove's studio videos
+        are served (`GET /api/media/video/{exerciseId}`); `video` false there means switched
+        off, and the app drops the stills it kept.
+
         A caller with a valid session also gets a `coach` key: the block when the
         instance has the AI Coach switched on **and** a provider connected, and `null`
         when it has not. A caller with no session gets no key at all — the block names
@@ -252,6 +258,12 @@ paths:
                       community:
                         type: boolean
                         description: Whether "compare with others" is offered on this instance.
+                  exercise_media:
+                    type: object
+                    description: Absent where the dataset's media is shown as always.
+                    properties:
+                      dataset: { type: boolean, description: Whether the dataset's images and animations may be shown. }
+                      video: { type: boolean, description: Whether YMove's studio videos are served here. }
                   password_login:
                     type: boolean
                     const: true
@@ -1732,6 +1744,81 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: "the server is running out of disk space", code: "storage-full" }
+
+  /api/media/video/{exerciseId}:
+    parameters:
+      - name: exerciseId
+        in: path
+        required: true
+        description: A catalogue exercise id, four digits.
+        schema: { type: string, pattern: '^[0-9]{4}$' }
+    get:
+      tags: [media]
+      operationId: exerciseVideo
+      summary: An exercise's studio video (hosted instance, YMove)
+      description: |
+        Only where the instance serves YMove's videos (`YMOVE_API_KEY`); absent elsewhere. The
+        studio take (white background), as a URL YMove has signed — good for at least a day —
+        and a still to show while it loads. One URL per exercise is shared by everybody and
+        renewed every 24 hours; the API key never leaves the server. `refresh=1` asks for a new
+        URL after one failed to load (at most every ten minutes per exercise).
+
+        `url` is null when only the still can be given right now (YMove's monthly cap, or YMove
+        unreachable). Each profile may make the server ask YMove for at most 60 exercises an
+        hour that nobody has opened in the last day; anything already cached is free.
+      parameters:
+        - name: refresh
+          in: query
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: The video and its still.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: ['string', 'null'], format: uri }
+                  poster: { type: ['string', 'null'], format: uri }
+              example: { url: 'https://vz-x.b-cdn.net/v/play_720p.mp4?token=…', poster: 'https://ymove.app/api/v2/thumbnail/v?crop=default' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No video for this exercise (`code: none`); the app shows its text.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '410':
+          description: Videos are switched off here (`YMOVE_VIDEOS=off`, `code: off`); the app drops the stills it kept.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: YMove did not answer and nothing cached can stand in (`code: busy`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/media/posters:
+    get:
+      tags: [media]
+      operationId: exercisePosters
+      summary: The stills of exercise videos opened so far (hosted instance, YMove)
+      description: |
+        Square stills by catalogue id, for every exercise whose video anybody on this instance
+        has opened — the app's lists show them instead of an empty tile. Free: YMove's stills
+        never count against its limits.
+      responses:
+        '200':
+          description: Stills by exercise id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posters: { type: object, additionalProperties: { type: string, format: uri } }
+              example: { posters: { '0025': 'https://ymove.app/api/v2/thumbnail/v?crop=square' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/media/missing:
     post:

@@ -1794,4 +1794,6 @@ export default {
   'Resume now': '지금 다시 시작',
   'Resume subscription': '구독 다시 시작',
   'Your subscription is back on.': '구독이 다시 활성화됐어요.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': '운동 영상',
 }

@@ -32,4 +32,6 @@ test('every root-level module server.js needs is on the Dockerfile COPY line', (
   const missing = [...needed].filter(f => !copied.has(f));
   assert.deepEqual(missing, [], `add ${missing.join(', ')} to the COPY line in api/Dockerfile`);
   for (const f of copied) assert.ok(fs.existsSync(path.join(API, f)), `${f} is copied but does not exist`);
+  // Read with fs rather than imported, so the walk above cannot see it: the exercise-video table.
+  assert.ok(copied.has('ymove-map.json'), 'ymove.js reads ymove-map.json next to it');
 });

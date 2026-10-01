@@ -115,6 +115,21 @@ server {
         add_header Content-Security-Policy "frame-ancestors 'none'" always;
     }
 
+    # The exercise dataset's images and animations (mounted from ./media). They are © Gym visual
+    # and the hosted, paid version may not serve them (NOTICE.md): DATASET_MEDIA=off answers 404
+    # for every one of them, whatever is mounted. First among the regex locations, so it wins.
+    location ~ ^${BASE_PATH}/(img|gif)/ {
+        set $dataset_media "${DATASET_MEDIA}";
+        if ($dataset_media = "off") { return 404; }
+        rewrite ^${BASE_PATH}/(.*)$ /$1 break;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "same-origin" always;
+        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+    }
+
     # Exercise images/GIFs never change → cache hard
     location ~* \.(png|jpg|jpeg|gif|ico|svg|woff|woff2|webp|avif)$ {
         # A regex location wins over the prefix block above, so it never saw its rewrite and

@@ -1794,4 +1794,6 @@ export default {
   'Resume now': 'अभी फिर शुरू करें',
   'Resume subscription': 'सब्सक्रिप्शन फिर शुरू करें',
   'Your subscription is back on.': 'आपका सब्सक्रिप्शन फिर से चालू है।',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'एक्सरसाइज़ वीडियो',
 }

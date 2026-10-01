@@ -1797,4 +1797,6 @@ export default {
   'Resume now': 'Folytatás most',
   'Resume subscription': 'Előfizetés folytatása',
   'Your subscription is back on.': 'Az előfizetésed újra aktív.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Gyakorlatvideók',
 }

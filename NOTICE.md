@@ -116,11 +116,17 @@ notice will be updated once the provenance is settled.
 
 **openGym does not redistribute it.** It is not in this repository, not in its history, and not in
 the published container images or the Android APK. A self-hosted instance downloads it from the
-upstream source on first `docker compose up`; the mobile and demo builds load it from a CDN at
-runtime.
+upstream source on first `docker compose up`; the demo build loads it from a CDN at runtime.
 
 If you want to reuse the media — in openGym or anywhere else, commercially or not — **clear it with
 the rights holder first**, and keep any attribution that accompanies it intact.
+
+**Tiza's hosted service and its store app do not use this media at all.** They show exercise
+videos from [YMove](https://ymove.app/exercise-api), licensed by the operator of the hosted
+service under YMove's API terms; the videos are streamed from YMove's CDN through URLs the
+server obtains with its own key and are neither in this repository nor redistributed by it.
+Switching them off (`YMOVE_VIDEOS=off`) makes the apps delete the stills they kept. See
+docs/SELF_HOSTING.md → "Exercise videos".
 
 Brazilian Portuguese exercise instructions under
 `scripts/instruction-sources/pt-BR.json` and exercise names under

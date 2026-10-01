@@ -121,10 +121,11 @@ describe('prefetchMedia', () => {
 })
 
 describe('startMediaPrefetch', () => {
-  function setup({ controller = {}, S = { routines: [{ ex: [{ id: bench.id }] }] }, win = fakeWindow({ standalone: true }) } = {}) {
+  // `config`: what a self-hosted server answers — nothing about exercise media, the dataset as always.
+  function setup({ controller = {}, S = { routines: [{ ex: [{ id: bench.id }] }] }, win = fakeWindow({ standalone: true }), config = {} } = {}) {
     const listeners = new Set()
-    const store = { state: { S }, getState: () => store.state, subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn) } }
-    store.set = S => { store.state = { S }; listeners.forEach(fn => fn(store.state)) }
+    const store = { state: { S, config }, getState: () => store.state, subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn) } }
+    store.set = S => { store.state = { S, config }; listeners.forEach(fn => fn(store.state)) }
     const cached = []
     const cachesApi = { open: vi.fn(async () => cacheWith(cached)) }
     // The window's own navigator, as in a browser: iOS's `standalone` lives there.
@@ -206,6 +207,18 @@ describe('startMediaPrefetch', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
     expect(cachesApi.open).not.toHaveBeenCalled()
     stop()
+  })
+
+  it('the hosted version never fetches the dataset’s media, and nothing before the server has said', async () => {
+    vi.useFakeTimers()
+    for (const config of [{ exercise_media: { dataset: false, video: true } }, null]) {
+      const { store, cachesApi, nav, fetchImpl, win } = setup({ config })
+      const stop = startMediaPrefetch(store, { win, nav, cachesApi })
+      await vi.advanceTimersByTimeAsync(PREFETCH_DELAY_MS)
+      await flush()
+      expect(fetchImpl).not.toHaveBeenCalled()
+      stop()
+    }
   })
 
   it('the installed app on iOS fetches ahead, and so does a tab once it is moved into the app window', async () => {

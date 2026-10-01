@@ -8,6 +8,7 @@ import { bestWeightFor } from '../lib/history.js'
 import { fmtNum, exCount } from '../lib/format.js'
 import { t, exerciseNameFor, exerciseNameClass } from '../lib/i18n.js'
 import { Thumb } from '../components/Media.jsx'
+import { exerciseMediaMode } from '../lib/exercise-media.js'
 import { exerciseDetailSheet, addToRoutineSheet, customExSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -17,6 +18,8 @@ import { isFav, sortFavouritesFirst } from '../lib/favourites.js'
 export default function Library() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
+  // "with animations" only where they are shown (not on the hosted version: lib/exercise-media.js).
+  const animated = exerciseMediaMode(useStore(s => s.config)).dataset
   const [q, setQ] = useState('')
   const [bp, setBp] = useState('')
   const [eq, setEq] = useState('')
@@ -38,7 +41,7 @@ export default function Library() {
   const narrowed = !!(q.trim() || bp || eqOn)
 
   return <>
-    <div className="hdr"><div><h1>{t('Exercises')}</h1><div className="sub">{t('{0} exercises with animations', EXDB.length)}</div></div>
+    <div className="hdr"><div><h1>{t('Exercises')}</h1><div className="sub">{animated ? t('{0} exercises with animations', EXDB.length) : t('{0} exercises', EXDB.length)}</div></div>
       <Button size="sm" variant="tinted" icon="target" onClick={() => nav('/muscles')}>{t('By muscle')}</Button>
     </div>
     <div className={'search' + (narrowed ? ' has-count' : '')} style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>

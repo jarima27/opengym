@@ -790,6 +790,11 @@ body.chips-dragging *{cursor:inherit}
 .exmedia.compact video{height:120px}
 .exmedia.mini video{height:84px}
 .exmedia:has(> video){background:#000}
+/* YMove's studio take (spec F10): white background, shown in black and white so every clip
+   matches and the only colour on screen is the app's own. The file itself is untouched. */
+.exmedia.studio,.exmedia.studio:has(> video){background:#fff}
+.exmedia.studio video,.exmedia.studio img,.thumb.studio{filter:grayscale(1) contrast(1.05)}
+.exmedia.studio video{background:#fff}
 
 /* the link to a video or a guide (#246): a quiet action tile under the picture, or in its place.
    A <button>, so the reset of the browser's button look comes first. */

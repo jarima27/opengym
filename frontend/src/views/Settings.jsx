@@ -34,6 +34,7 @@ import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 import SubscriptionSection from '../components/Subscription.jsx'
 import DeleteAccountSheet from '../components/DeleteAccount.jsx'
+import { exerciseMediaMode } from '../lib/exercise-media.js'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -465,7 +466,7 @@ export default function Settings() {
       {/* 'full'/'mini' is also what the tap-toggle on the workout animation writes; 'off' hides
           workout media entirely (library, detail sheet and picker thumbs are unaffected).
           Legacy/unknown values read as 'full'. */}
-      <Row icon="figureRun" iconTint="var(--green)" title={t('Exercise animations')}>
+      <Row icon="figureRun" iconTint="var(--green)" title={exerciseMediaMode(config).dataset ? t('Exercise animations') : t('Exercise videos')}>
         <Segmented className="seg-inline"
           options={[{ value: 'full', label: t('Full') }, { value: 'mini', label: t('Small') }, { value: 'off', label: t('Hidden') }]}
           value={S.gifSize === 'mini' || S.gifSize === 'off' ? S.gifSize : 'full'}

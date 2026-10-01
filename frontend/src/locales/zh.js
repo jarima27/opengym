@@ -1794,4 +1794,6 @@ export default {
   'Resume now': '立即恢复',
   'Resume subscription': '恢复订阅',
   'Your subscription is back on.': '你的订阅已恢复。',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': '动作视频',
 }

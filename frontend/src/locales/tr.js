@@ -1794,4 +1794,6 @@ export default {
   'Resume now': 'Şimdi devam et',
   'Resume subscription': 'Aboneliği sürdür',
   'Your subscription is back on.': 'Aboneliğin yeniden etkin.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Egzersiz videoları',
 }

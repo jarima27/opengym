@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => {
   const state = { S: { gifSize: 'full' } }
   state.snapshot = () => ({
     S: state.S,
+    // A self-hosted server that has answered /api/config: the dataset's media, as always.
+    config: {},
     update: mut => {
       const next = structuredClone(state.S)
       mut(next)

@@ -17,8 +17,9 @@
 // 2G-class one. Safari and Firefox say nothing about the connection, and there it runs; the set is
 // bounded by the plan (a few MB for a typical one) and each file goes once.
 //
-// Not in the phone app: it has no service worker, and its media comes from the CDN.
+// Not in the phone app: it has no service worker (and the store app never shows the dataset's media).
 import { EXIDX, imgSrc, gifSrc } from './exercises.js'
+import { exerciseMediaMode } from './exercise-media.js'
 
 // The worker's media cache, public/sw.js MEDIA. Duplicated because the worker is not bundled;
 // sw-media.test.js pins the two together.
@@ -122,6 +123,8 @@ export function startMediaPrefetch(store, { delay = PREFETCH_DELAY_MS, win = glo
     timer = null
     // Only through a worker that is in charge of this page: without one nothing would be kept.
     if (running || !sw.controller || !allowed()) return
+    // Where the dataset's media is not shown (the hosted version), none of it is fetched either.
+    if (!exerciseMediaMode(store.getState().config).dataset) return
     const urls = planMediaUrls(store.getState().S)
     const key = urls.join('\n')
     if (!urls.length || key === done) return

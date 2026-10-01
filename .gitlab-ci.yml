@@ -530,7 +530,7 @@ build:apk:
       cd frontend
       npm ci
       # VITE_MOBILE build + `cap sync` into android/. The mobile flavor talks to no
-      # backend at all: no sign-in, no sync, media straight from the CDN.
+      # backend until it is paired, and never shows the dataset's media (VITE_DATASET_MEDIA=0).
       npm run build:mobile
       VER="$(node -p "require('./package.json').version")"
       cd android

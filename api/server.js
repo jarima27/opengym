@@ -38,6 +38,7 @@ import {
   freePlanOpen, claimFreePlan, releaseFreePlan,
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
+import { ymoveConfig, exerciseMediaConfig, createVideoStore, loadMap, YmoveDown } from './ymove.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
 
@@ -1692,6 +1693,56 @@ const passkeyRoutes = {
   }
 };
 
+/* ---------- exercise videos (api/ymove.js, spec F10) ---------- */
+// The hosted version's studio videos from YMove, in place of the dataset's animations. Nothing
+// here exists on an instance without YMOVE_API_KEY.
+const EXMEDIA = ymoveConfig(process.env, { selling: BILLING.on });
+const ymoveCacheFile = path.join(DATA, 'ymove-cache.json');
+// Switched off (or the key taken away): what was kept goes too, as the licence asks.
+if (!EXMEDIA.video) { try { fs.rmSync(ymoveCacheFile, { force: true }); } catch { /* nothing kept */ } }
+const VIDEOS = EXMEDIA.video ? createVideoStore({
+  cfg: EXMEDIA,
+  map: loadMap(EXMEDIA.mapFile),
+  saved: (() => { try { return JSON.parse(fs.readFileSync(ymoveCacheFile, 'utf8')); } catch { return null; } })(),
+  persist: obj => atomicWrite(ymoveCacheFile, JSON.stringify(obj))
+}) : null;
+// What one profile may make the server ask YMove for, per hour: exercises nobody has opened in
+// the last day. Everything already in the shared cache is free. Generous for anyone browsing the
+// library, and a cap on anyone walking it to spend the monthly allowance.
+const VIDEO_MISSES = createWindow({ max: 60, windowMs: 3600000 });
+setInterval(() => VIDEO_MISSES.sweep(), 600000).unref();
+const videoRoutes = {
+  // { url, poster } of one exercise's studio video. `url` null: only the still for now (the
+  // monthly cap, or YMove unreachable). 404 code none: no video for this exercise — the app
+  // shows its text. 410 code off: switched off — the app drops what it kept.
+  'GET /api/media/video/{exerciseId}': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!VIDEOS) return json(res, 410, { error: 'exercise videos are switched off here', code: 'off' });
+    const id = req.exerciseId;
+    const refresh = new URL(req.url, 'http://x').searchParams.get('refresh') === '1';
+    if (VIDEOS.needsFetch(id, { refresh })) {
+      const wait = VIDEO_MISSES.take(user.id);
+      if (wait) return tooMany(res, wait);
+    }
+    let v;
+    try { v = await VIDEOS.get(id, { refresh }); }
+    catch (e) {
+      if (!(e instanceof YmoveDown)) throw e;
+      console.warn('ymove:', id, '-', e.message);
+      return json(res, 503, { error: 'the video service did not answer — try again in a moment', code: 'busy' }, { 'Retry-After': '30' });
+    }
+    if (!v) return json(res, 404, { error: 'no video for this exercise', code: 'none' });
+    json(res, 200, v, { 'Cache-Control': 'private, max-age=3600' });
+  },
+  // The stills of every exercise anybody has opened, square, for the app's lists. Free: YMove's
+  // stills never count against anything.
+  'GET /api/media/posters': async (req, res) => {
+    if (!readSession(req)) return json(res, 401, { error: 'not signed in' });
+    json(res, 200, { posters: VIDEOS ? VIDEOS.thumbs() : {} }, { 'Cache-Control': 'private, max-age=600' });
+  }
+};
+
 /* ---------- photos & videos of custom exercises (api/media.js) ---------- */
 // One photo, GIF or short video per custom exercise, stored per profile and named by its sha256.
 // The state only ever carries a small ref; the bytes arrive and leave through the routes below.
@@ -2216,6 +2267,9 @@ const routes = {
       // Public like the two flags above: the caps are not a secret, and the absence of the
       // block is how the app knows this server does not take photos and videos at all.
       ...(MEDIA_ON ? { media: mediaConfig(MEDIA_LIMITS) } : {}),
+      // Public: which exercise media the app may show here (api/ymove.js). Absent on an instance
+      // that shows the dataset's animations as it always has.
+      ...(exerciseMediaConfig(EXMEDIA) ? { exercise_media: exerciseMediaConfig(EXMEDIA) } : {}),
       // Public as well: the sign-in screen is where "try it free for 30 days" belongs.
       ...(BILLING.on ? { billing: { trial_days: BILLING.trialDays, card_trial_days: BILLING.cardTrialDays, web: BILLING.stripe.on } } : {}),
       // Whether the app should report its own events (POST /api/track) at all.
@@ -2817,6 +2871,8 @@ const routes = {
   // Absent, not refusing, when MEDIA_UPLOADS=0: a 404 is what a server from before the feature
   // answers, and the client already treats that as "this server does not store them".
   ...(MEDIA_ON ? mediaRoutes : {}),
+  // Absent without YMOVE_API_KEY; present but answering 410 while YMOVE_VIDEOS=off.
+  ...(EXMEDIA.on ? videoRoutes : {}),
 
   /* ---------- billing ---------- */
   // Absent, like media above, while the instance does not charge: a 404 is what the app reads
@@ -2889,10 +2945,13 @@ const server = http.createServer(async (req, res) => {
   try { url = new URL(req.url, 'http://x'); }
   catch { return json(res, 400, { error: 'bad request' }); }
   let key = req.method + ' ' + url.pathname;
-  // The one route with a parameter in its path. Mapped onto its template key here so the table
+  // The routes with a parameter in their path. Mapped onto their template key here so the table
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.
   const mm = /^\/api\/media\/([0-9a-f]{64})$/.exec(url.pathname);
   if (mm) { key = req.method + ' /api/media/{hash}'; req.mediaHash = mm[1]; }
+  // And one more: an exercise's video, by its catalogue id.
+  const mv = /^\/api\/media\/video\/(\d{4})$/.exec(url.pathname);
+  if (mv) { key = req.method + ' /api/media/video/{exerciseId}'; req.exerciseId = mv[1]; }
   const handler = routes[key];
   if (!handler) return json(res, 404, { error: 'not found' });
   if (!csrfOk(req, key)) {

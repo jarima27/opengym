@@ -417,6 +417,41 @@ How it behaves:
 - The subscription state lives on the user in `db.json`, and the paywall in `paywall.json`, so
   the backup below already covers both. Stripe and the stores stay the record of what was paid.
 
+### Exercise videos (optional, hosted instances)
+
+The exercise dataset's images and animations are © Gym visual and may not be used in a paid
+service (NOTICE.md). **An instance that charges stops showing them on its own** — the app shows
+the exercise's text instead — and can show [YMove](https://ymove.app/exercise-api/docs)'s studio
+videos in their place: one take per exercise, white background, played in black and white.
+
+```bash
+# .env
+YMOVE_API_KEY=ym_...     # stays on the server: the app never sees it
+DATASET_MEDIA=off        # the web container answers 404 for img/ and gif/; `media` downloads nothing
+# YMOVE_VIDEOS=off       # the switch, below
+```
+
+- **How it works.** The app asks `GET /api/media/video/{exerciseId}` and gets a URL YMove has
+  signed, plus a still. One URL per exercise is shared by everybody and renewed every 24 hours
+  (YMove's last 48); the cache is `data/ymove-cache.json`. YMove's monthly cap counts distinct
+  exercises, so asking again costs nothing; each profile may make the server fetch at most 60
+  exercises an hour that nobody has opened in the last day.
+- **Which exercises.** `api/ymove-map.json` maps our catalogue to YMove's. Regenerate it with
+  `YMOVE_API_KEY=… node scripts/build-ymove-map.mjs --report review.md`: it reads YMove's
+  catalogue in browse mode (no quota spent), matches conservatively — a missing video rather
+  than a wrong one — and writes a review sheet for the ~50 most used lifts; decisions made by
+  hand go in `REVIEWED` in the script and win over everything. An exercise without a video
+  shows its text, never an empty box; when YMove has no video to give (the monthly cap, an
+  outage) the app shows the still.
+- **The switch.** `YMOVE_VIDEOS=off` (and a restart): the server deletes its cache, answers the
+  app `410`, and the app stops asking and deletes the stills it kept. It is what YMove's licence
+  asks for the day the subscription ends. Removing the key does the same.
+- **Self-hosted instances** are untouched: no key, no `exercise_media` in `/api/config`, the
+  dataset's media exactly as before (`DATASET_MEDIA` defaults to on unless the instance charges
+  or has a YMove key).
+- The store app (`npm run build:mobile`) never shows the dataset's media either; it shows the
+  videos of the server it is signed in to.
+
 ## 5. Fitting it into an existing stack
 
 Running Kubernetes? Example manifests (Deployment, PVCs, Service, Gateway API route) are in

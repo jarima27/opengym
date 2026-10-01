@@ -1814,4 +1814,6 @@ export default {
   'Resume now': 'Jetzt fortsetzen',
   'Resume subscription': 'Abo fortsetzen',
   'Your subscription is back on.': 'Dein Abo läuft wieder.',
+  // Exercise videos (hosted version, spec F10)
+  'Exercise videos': 'Übungsvideos',
 }
