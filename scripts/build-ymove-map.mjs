@@ -32,6 +32,83 @@ const API = (process.env.YMOVE_API_BASE || 'https://exercise-api.ymove.app/api/v
 /* Decided by hand: our id → YMove slug (or id), or null when YMove has nothing that is the same
    lift. Final — the automatic matching never overrides these. Fill from the report. */
 export const REVIEWED = {
+  // Reviewed against YMove's catalogue, October 2026. Its studio takes have almost no cable or
+  // machine exercises, so those lifts have no video (null) rather than a free-weight stand-in.
+  // Presses
+  '0025': 'barbell-bench-press-122b71',            // barbell bench press
+  '0047': 'incline-barbell-press',                 // barbell incline bench press
+  '0030': 'close-grip-bench-barbell',              // barbell close-grip bench press
+  '1719': null,                                    // incline close-grip: no such take
+  '0289': 'dumbbell-bench-press',                  // dumbbell bench press
+  '0314': 'dumbbell-bench-press-incline-e51818',   // dumbbell incline bench press
+  '3545': null,                                    // incline *alternate* press: not filmed
+  '0091': 'seated-barbell-military-press',         // barbell seated overhead press
+  '0086': null,                                    // behind-the-neck press: a different lift
+  '1456': null, '1457': null,                      // close / wide grip military press: not filmed
+  '0426': 'dumbbell-overhead-press',               // dumbbell standing overhead press
+  '0405': 'seated-dumbbell-press',                 // dumbbell seated shoulder press
+  '0404': null,                                    // parallel grip: not filmed
+  '0361': 'dumbbell-one-arm-shoulder-press-r',     // dumbbell one arm shoulder press
+  '0360': 'dumbbell-one-arm-shoulder-press-r',     // the same, v. 2
+  '2137': 'dumbbell-arnold-press-4db2d1',          // dumbbell arnold press
+  '0577': null,                                    // lever chest press: machine
+  '0662': 'push-ups',                              // push-up
+  '0251': 'dips',                                  // chest dip
+  '0814': 'dips',                                  // triceps dip (parallel bars)
+  // Squats, hinges, lunges
+  '0043': 'barbell-full-squat',                    // barbell full squat
+  '1461': 'barbell-full-squat',                    // the same, filmed from behind
+  '1436': 'barbell-back-squat',                    // barbell high bar squat
+  '0042': 'front-barbell-squat',                   // barbell front squat
+  '1760': 'dumbbell-goblet-squat-202e4f',          // dumbbell goblet squat
+  '0032': 'barbell-deadlift',                      // barbell deadlift
+  '0085': 'barbell-romanian-deadlift-5c76c6',      // barbell romanian deadlift
+  '0117': 'sumo-deadlift-925b68',                  // barbell sumo deadlift
+  '0648': null,                                    // power clean: YMove's is a full clean
+  '0090': 'seated-good-morning',                   // barbell seated good morning
+  '1409': 'barbell-glute-bridge',                  // barbell glute bridge
+  '0336': 'dumbbell-lunge',                        // dumbbell lunge
+  '0054': 'barbell-lunge',                         // barbell lunge
+  '1460': 'walking-lunges',                        // walking lunge
+  '0410': 'bulgarian-split-squat-with-dumbbells',  // dumbbell single leg (Bulgarian) split squat
+  '0431': 'dumbbell-step-ups-62cf41',              // dumbbell step-up
+  '0114': null,                                    // barbell step-up: not filmed
+  '3193': null,                                    // glute-ham raise: not filmed
+  // Pulls
+  '0027': 'bent-over-barbell-row',                 // barbell bent over row
+  '0292': 'single-arm-dumbbell-bent-over-row',     // dumbbell one arm bent-over row
+  '0652': 'pull-up-overhand-95eeae',               // pull-up
+  '0841': 'pull-up-overhand-95eeae',               // weighted pull-up: the same movement
+  '1326': null,                                    // chin-up: not filmed
+  '0095': 'barbell-shrug',                         // barbell shrug
+  '0378': 'bent-over-dumbbell-reverse-fly',        // dumbbell rear fly
+  // Arms and shoulders
+  '0334': 'dumbbell-lateral-raise-27a4de',         // dumbbell lateral raise
+  '0031': 'barbell-curls',                         // barbell curl
+  '0294': 'dumbbell-curl',                         // dumbbell biceps curl
+  '0313': 'hammer-curls',                          // dumbbell hammer curl
+  '0060': 'barbell-skull-crushers-f97e8d',         // barbell skull crusher
+  '0061': 'barbell-skull-crushers-f97e8d',         // barbell lying triceps extension
+  '0070': null,                                    // preacher curl: no bench take
+  // Core
+  '0274': 'crunches',                              // crunch floor
+  '0472': 'ring-hanging-leg-raise',                // hanging leg raise (rings, same movement)
+  // Matched automatically but not the same exercise, on review: no video rather than a wrong one.
+  '0028': null,   // barbell clean and press ≠ Barbell Clean (no press)
+  '0065': null,   // barbell one arm floor press ≠ Floor Press (two hands)
+  '0475': null,   // hanging straight leg raise ≠ Straight Leg Raise (lying on a mat)
+  '0624': null,   // march sit (wall) ≠ Wall Sit (no marching)
+  '0717': null,   // side push-up ≠ Side to side push up
+  '1022': null,   // band standing rear delt row ≠ Standing Band Row
+  '3542': null,   // dumbbell incline t-raise ≠ T Raises (standing)
+  '3313': null,   // weighted straight bar dip ≠ Weighted Dip (parallel bars)
+  '0526': null,   // kettlebell double alternating hang clean ≠ Double Kettlebell Clean
+  '0529': null,   // kettlebell double snatch ≠ Kettlebell Snatch (one bell)
+  '0539': null,   // kettlebell one arm military press to the side ≠ One-Arm Kettlebell Military Press
+  // Cables and machines: no studio take exists
+  '0241': null, '2330': null, '1323': null, '0861': null, '0227': null, '0203': null,
+  '0194': null, '0739': null, '0585': null, '0586': null, '0605': null, '0596': null,
+  '0599': null, '0743': null, '0573': null
 }
 
 /* The ~50 most used lifts, reviewed by hand: everything in the starter plans and the structural
