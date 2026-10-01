@@ -44,6 +44,7 @@ export default function Settings() {
   const coachLocal = useStore(s => s.coachLocal)
   // Name-and-password sign-in, where the instance offers it (#118).
   const config = useStore(s => s.config)
+  const media = exerciseMediaMode(config)
   const pwOn = passwordOn(config)
   // What the app is showing, which for a profile that never picked a language is worked out on
   // this device rather than stored (#303).
@@ -607,10 +608,13 @@ export default function Settings() {
         address bar and no about box, so without this there is no way to tell which build you
         are running, or whether an update actually installed. */}
     <div className="dim small" style={{ textAlign: 'center', marginTop: 4, lineHeight: 1.6 }}>
-      {NAME} v{__APP_VERSION__} · {t('free & open source (AGPL v3)')}<br />
+      {/* The licence notice, the source and the credit to openGym are required (AGPL), and stay;
+          the media credit names whichever media this build actually shows. */}
+      {NAME} v{__APP_VERSION__} · {t('licensed under the AGPL v3')}<br />
       <a href={SOURCE} target="_blank" rel="noopener">source code</a> · based on <a href={UPSTREAM} target="_blank" rel="noopener">{UPSTREAM_NAME}</a> by Duarte Santos<br />
-      exercise data: hasaneyldrm/exercises-dataset (MIT)<br />
-      exercise images and animations © <a href="https://gymvisual.com/" target="_blank" rel="noopener">Gym visual</a>
+      exercise data: hasaneyldrm/exercises-dataset (MIT)
+      {media.dataset && <><br />exercise images and animations © <a href="https://gymvisual.com/" target="_blank" rel="noopener">Gym visual</a></>}
+      {media.video && <><br />exercise videos: <a href="https://ymove.app/" target="_blank" rel="noopener">YMove</a></>}
     </div>
   </div>
 }

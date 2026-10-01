@@ -23,7 +23,7 @@ Strong is fast and simple for logging sets. So is Tiza, and it also works out ea
 - **Real automatic progression**: hit your reps and it goes up; miss and you repeat; miss three times and it deloads. Linear, Greyskull LP, double progression or timed.
 - **Your whole history**: Strong's CSV brings workouts, sets, weights, notes, duration and RPE.
 - **An AI Coach**: a plan made for you, a weekly review and a read of every session, in Tiza Pro.
-- **No ads**, your data exportable, and the code open source.
+- **No ads**, and your data exportable.
 
 ::: steps
 ## Switch in a minute

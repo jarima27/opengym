@@ -24,5 +24,4 @@ footer_tagline: The gym app that knows what to lift today.
 footer_product: Product
 footer_guides: Guides
 footer_source: Source code
-footer_credit: Tiza is a modified version of [openGym]({{upstream_url}}) by Duarte Santos, licensed under the AGPL-3.0. Tiza's [source code]({{source}}) is public.
 ---

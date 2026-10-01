@@ -24,10 +24,10 @@ Registrar entrenos es gratis para siempre · Coach IA: {{trial_days}} días grat
 :::
 
 ::: strip
-- **1.324 ejercicios** con demostración animada
+- **1.324 ejercicios** con instrucciones paso a paso
 - **Importa** desde Strong, Hevy y FitNotes
 - **Sin anuncios** y sin vender tus datos
-- **Código abierto**
+- **Funciona sin cobertura** en el gimnasio
 :::
 
 ::: split image=sets id=funciones alt=Series_marcadas_y_la_regla_de_progresión
@@ -162,7 +162,7 @@ Sí. Exporta el CSV desde Strong, Hevy o FitNotes y súbelo al crear tu cuenta. 
 Te propone un plan a partir de tus respuestas, revisa tu semana y analiza cada sesión con tus datos. Nunca cambia nada sin tu permiso y puedes deshacer cada cambio. El peso de cada día lo sigue calculando el motor de progresión, que siempre explica el porqué.
 
 ### ¿Mis datos son míos?
-Sí. Puedes exportarlo todo cuando quieras y borrar tu cuenta desde la propia app. No hay anuncios y no vendemos tus datos. El código es abierto: cualquiera puede comprobar qué hace.
+Sí. Puedes exportarlo todo cuando quieras y borrar tu cuenta desde la propia app. No hay anuncios y no vendemos tus datos.
 
 ### ¿Funciona sin conexión?
 Sí. Todo se guarda en tu móvil mientras entrenas y se sincroniza cuando vuelve la conexión.

@@ -26,7 +26,7 @@ Strong es rápida y sencilla para apuntar series. Tiza también, y además calcu
 - **Progresión automática de verdad**: completa las repeticiones y sube; falla y repite; falla tres veces y descarga. Lineal, Greyskull LP, doble progresión o por tiempo.
 - **Tu historial entero**: el CSV de Strong trae entrenos, series, pesos, notas, duración y RPE.
 - **Coach IA**: un plan hecho para ti, revisión semanal y análisis de cada sesión, en Tiza Pro.
-- **Sin anuncios**, con tus datos exportables y el código abierto.
+- **Sin anuncios** y con tus datos exportables.
 
 ::: steps
 ## Cambiarte en un minuto

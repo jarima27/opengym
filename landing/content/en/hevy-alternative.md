@@ -23,7 +23,7 @@ Hevy is a great app for logging workouts. Tiza also works out what you should li
 - **Automatic progression**: linear, Greyskull LP, double progression or timed. Tiza raises, repeats or deloads the load from your last session, and tells you why.
 - **An AI Coach with nothing to set up**: a plan made for you, a weekly review and a read of every session. Nothing changes without your say-so.
 - **Your history comes with you**: import Hevy's CSV, or with Hevy Pro use your API key to bring routines and body weight too.
-- **Real privacy**: no ads, export everything whenever you like, and the code is open source.
+- **Real privacy**: no ads, and export everything whenever you like.
 
 ## What you bring from Hevy
 

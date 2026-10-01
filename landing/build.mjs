@@ -206,7 +206,7 @@ ${main}
       ${cfg.contactEmail ? `<a href="mailto:${escapeHtml(cfg.contactEmail)}">${escapeHtml(cfg.contactEmail)}</a>` : ''}
     </div>
   </div>
-  <div class="wrap credit dim">${inline(fill(s.footer_credit || '', words, 'footer', []), ctx)}</div>
+  ${s.footer_credit ? `<div class="wrap credit dim">${inline(fill(s.footer_credit, words, 'footer', []), ctx)}</div>` : ''}
 </footer>
 <div class="sticky-cta"><a class="btn btn-primary" href="${signup}" data-app>${t('cta')}</a><span>${escapeHtml(fill(s.sticky_note || '', words, 'sticky', []))}</span></div>
 <script src="/assets/site.js?v=${assets.js}" defer></script>

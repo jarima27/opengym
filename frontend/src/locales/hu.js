@@ -1827,4 +1827,6 @@ export default {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'Fiók nélkül minden ezen a telefonon marad. Fiókkal biztonságban van a Tizában, minden eszközödön, és vele jár az edző.',
   'Your purchase is restored.': 'A vásárlásod visszaállt.',
   'Your training, and a Coach that reads it.': 'Az edzésed, és egy edző, aki elolvassa.',
+  // Settings footer: the licence notice
+  'licensed under the AGPL v3': 'AGPL v3 licenc alatt',
 }

@@ -1877,4 +1877,6 @@ export default {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'بدون حساب يبقى كل شيء على هذا الهاتف. ومع حساب يُحفظ بأمان في Tiza، على كل أجهزتك، ويأتي معه المدرب.',
   'Your purchase is restored.': 'تمت استعادة مشترياتك.',
   'Your training, and a Coach that reads it.': 'تمرينك، ومدرب يقرؤه.',
+  // Settings footer: the licence notice
+  'licensed under the AGPL v3': 'مرخّص بموجب AGPL v3',
 }

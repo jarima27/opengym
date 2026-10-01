@@ -1136,6 +1136,7 @@ export const PT_BR_OVERRIDES = {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'Sem conta, tudo fica neste celular. Com conta fica guardado no Tiza, em todos os seus dispositivos, e vem com o Treinador.',
   'Your purchase is restored.': 'Sua compra foi restaurada.',
   'Your training, and a Coach that reads it.': 'Seu treino, e um Treinador que o lê.',
+  // Settings footer: the licence notice
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

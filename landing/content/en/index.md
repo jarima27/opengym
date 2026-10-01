@@ -17,10 +17,10 @@ Logging is free forever · AI Coach: {{trial_days}} days free · No ads {.fine}
 :::
 
 ::: strip
-- **1,324 exercises** with animated demos
+- **1,324 exercises** with step-by-step instructions
 - **Import** from Strong, Hevy and FitNotes
 - **No ads**, and your data is never sold
-- **Open source**
+- **Works without signal** in the gym
 :::
 
 ::: split image=sets id=features alt=Sets_ticked_off_and_the_progression_rule
@@ -155,7 +155,7 @@ Yes. Export the CSV from Strong, Hevy or FitNotes and upload it when you create 
 It proposes a plan from your answers, reviews your week and reads each session with your data. It never changes anything without your say-so, and every change can be undone. Each day's weight is still worked out by the progression engine, which always explains why.
 
 ### Is my data mine?
-Yes. Export everything whenever you like and delete your account from the app itself. No ads, and we don't sell your data. The code is open source: anyone can check what it does.
+Yes. Export everything whenever you like and delete your account from the app itself. No ads, and we don't sell your data.
 
 ### Does it work offline?
 Yes. Everything is saved on your phone while you train and syncs when you're back online.

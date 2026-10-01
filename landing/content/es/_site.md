@@ -24,5 +24,4 @@ footer_tagline: La app de gimnasio que sabe qué peso toca hoy.
 footer_product: Producto
 footer_guides: Guías
 footer_source: Código fuente
-footer_credit: Tiza es una versión modificada de [openGym]({{upstream_url}}), de Duarte Santos, con licencia AGPL-3.0. El [código fuente]({{source}}) de Tiza es público.
 ---

@@ -2,7 +2,6 @@
 title: Tiza for developers · open source and self-hostable
 description: Tiza is open source (AGPL-3.0), a modified version of openGym. Read the code, audit it, or run your own server.
 nav_title: For developers
-footer: tech
 translation: /para-tecnicos/
 cta: false
 ---

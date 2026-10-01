@@ -1824,4 +1824,6 @@ export default {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'Hesap olmadan her şey bu telefonda kalır. Hesapla Tiza’da güvende olur, tüm cihazlarında, ve Koç da gelir.',
   'Your purchase is restored.': 'Satın alımın geri yüklendi.',
   'Your training, and a Coach that reads it.': 'Antrenmanın ve onu okuyan bir Koç.',
+  // Settings footer: the licence notice
+  'licensed under the AGPL v3': 'AGPL v3 lisanslı',
 }

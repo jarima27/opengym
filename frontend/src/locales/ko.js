@@ -1824,4 +1824,6 @@ export default {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': '계정이 없으면 모든 것이 이 휴대폰에만 남아요. 계정이 있으면 모든 기기에서 Tiza에 안전하게 보관되고 코치도 함께해요.',
   'Your purchase is restored.': '구매가 복원됐어요.',
   'Your training, and a Coach that reads it.': '당신의 운동, 그리고 그것을 읽는 코치.',
+  // Settings footer: the licence notice
+  'licensed under the AGPL v3': 'AGPL v3 라이선스',
 }

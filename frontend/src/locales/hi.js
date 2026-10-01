@@ -1824,4 +1824,6 @@ export default {
   'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'बिना खाते के सब कुछ इसी फ़ोन पर रहता है। खाते के साथ यह Tiza में सुरक्षित रहता है, आपके सभी डिवाइस पर, और कोच साथ आता है।',
   'Your purchase is restored.': 'आपकी खरीदारी बहाल हो गई।',
   'Your training, and a Coach that reads it.': 'आपकी ट्रेनिंग, और उसे पढ़ने वाला कोच।',
+  // Settings footer: the licence notice
+  'licensed under the AGPL v3': 'AGPL v3 के तहत लाइसेंस प्राप्त',
 }

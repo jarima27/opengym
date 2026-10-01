@@ -2,7 +2,6 @@
 title: Tiza para técnicos · código abierto y autoalojable
 description: Tiza es código abierto (AGPL-3.0), una versión modificada de openGym. Puedes leer el código, auditarlo o montar tu propio servidor.
 nav_title: Para técnicos
-footer: tech
 translation: /en/for-developers/
 cta: false
 ---
