@@ -61,14 +61,22 @@ describe('CoachReportCard', () => {
     expect(text()).toContain('Going up: barbell bench press')
     expect(text()).toContain('1 more observation from the Coach about your week')
     const locked = host.querySelector('.pill-locked')
-    expect(locked.textContent).toContain('Missed sessions last week')
+    expect(locked.textContent).toContain('The Coach can rework your week')
     expect(locked.querySelector('.blurred').getAttribute('aria-hidden')).toBe('true')
     act(() => locked.click())
-    expect(mocks.paywall).toHaveBeenCalledWith('pill:missed')
+    expect(mocks.paywall).toHaveBeenCalledWith('pill:missed', { missed: 2 })
     expect(mocks.track).toHaveBeenCalledWith('pill_locked_tapped', { kind: 'missed' })
     expect(mocks.track).toHaveBeenCalledWith('weekly_report_viewed', { kind: 'stall' })
     expect(mocks.track).toHaveBeenCalledWith('pill_shown', { kind: 'missed', locked: true })
     expect(text()).not.toContain('Open the Coach’s review')
+  })
+
+  it('records what the week showed, so the same pills stay away for three weeks', async () => {
+    await mount()
+    const log = useStore.getState().S.pillLog
+    expect(Object.keys(log)).toEqual(['2026-10-05'])
+    expect(log['2026-10-05'][0]).toBe('stall:0043')
+    expect(log['2026-10-05']).toContain('missed')
   })
 
   it('counts each pill once a week, and stays put away once hidden', async () => {
@@ -87,7 +95,7 @@ describe('CoachReportCard', () => {
     mocks.access = 'pro'
     await mount()
     expect(host.querySelector('.pill-locked')).toBe(null)
-    expect(text()).toContain('Missed sessions last week')
+    expect(text()).toContain('The Coach can rework your week')
     expect(text()).toContain('Open the Coach’s review')
   })
 

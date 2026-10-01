@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reportDay, coachReportFor, sameReport } from './coach-report.js'
+import { reportDay, coachReportFor, sameReport, logReport } from './coach-report.js'
 import { pillsFor, addDays } from './coach-pills.js'
 
 const MON = '2026-10-05'
@@ -42,5 +42,16 @@ describe('coachReportFor', () => {
     expect(sameReport(coachReportFor(S(), MON), coachReportFor(S(), MON))).toBe(true)
     expect(sameReport(null, undefined)).toBe(true)
     expect(sameReport(coachReportFor(S(), MON), null)).toBe(false)
+  })
+})
+
+describe('logReport', () => {
+  it('a report for a week to come is that week’s lead, replaced while it is recomputed; on its own day the card records', () => {
+    const r = coachReportFor(S(), addDays(MON, -5))
+    expect(r.id).toBe(pillsFor(S(), MON)[0].id)
+    expect(logReport({}, r, addDays(MON, -5))).toEqual({ [MON]: [r.id] })
+    expect(logReport({ [MON]: ['old'] }, r, addDays(MON, -5))).toEqual({ [MON]: [r.id] })
+    expect(logReport({ x: 1 }, r, MON)).toEqual({ x: 1 })
+    expect(logReport(undefined, null, MON)).toEqual({})
   })
 })

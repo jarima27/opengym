@@ -6,8 +6,8 @@ import { todayISO, weekKey, weekStartOf } from '../lib/format.js'
 import { MOBILE } from '../lib/mobile.js'
 import { DEMO } from '../lib/demo.js'
 import { coachAccess } from '../lib/billing.js'
-import { pillsFor, reportView } from '../lib/coach-pills.js'
-import { coachReportFor, sameReport } from '../lib/coach-report.js'
+import { pillsFor, reportView, logPills, samePillLog } from '../lib/coach-pills.js'
+import { coachReportFor, sameReport, logReport } from '../lib/coach-report.js'
 import { track } from '../lib/track.js'
 import { openPaywall } from './Paywall.jsx'
 import Icon from './Icon.jsx'
@@ -31,7 +31,7 @@ export function useCoachAccess() {
 }
 
 // What the training says, recomputed when the training does: the parts of S the pills read.
-const pillDeps = S => [S.workouts, S.routines, S.week, S.dayPlan, S.balanceTemplate, S.unit, S.weekStart, S.customEx]
+const pillDeps = S => [S.workouts, S.routines, S.week, S.dayPlan, S.balanceTemplate, S.unit, S.weekStart, S.customEx, S.pillLog]
 
 /**
  * Keeps S.coachReport — the report the next first-morning-of-the-week push carries
@@ -48,8 +48,14 @@ export function CoachReportSync() {
     // After the change has settled: a finished workout, an import, a plan edit.
     const tm = setTimeout(() => {
       const cur = useStore.getState().S
-      const next = coachReportFor(cur, todayISO(), { push: access !== 'pro' })
-      if (!sameReport(next, cur.coachReport || null)) update(s => { if (next) s.coachReport = next; else delete s.coachReport })
+      const today = todayISO()
+      const next = coachReportFor(cur, today, { push: access !== 'pro' })
+      const log = logReport(cur.pillLog, next, today)
+      if (sameReport(next, cur.coachReport || null) && samePillLog(log, cur.pillLog)) return
+      update(s => {
+        if (next) s.coachReport = next; else delete s.coachReport
+        s.pillLog = log
+      })
     }, 1500)
     return () => clearTimeout(tm)
   }, [ready, access, langV, ...pillDeps(S)])
@@ -79,6 +85,17 @@ export default function CoachReportCard() {
   const pills = useMemo(() => pillsFor(S, today), [today, langV, ...pillDeps(S)])
   const view = reportView(pills, access !== 'free')
 
+  // What this week showed goes into the profile, so the same pill does not come back for three
+  // weeks on any device (lib/coach-pills.js no-repeat rule). Only once the card is drawn.
+  const update = useStore(s => s.update)
+  const shownIds = [...view.shown, ...view.locked].map(p => p.id)
+  useEffect(() => {
+    if (!access || hidden || !shownIds.length) return
+    const cur = useStore.getState().S.pillLog
+    const next = logPills(cur, week, shownIds)
+    if (!samePillLog(next, cur)) update(s => { s.pillLog = logPills(s.pillLog, week, shownIds) })
+  }, [access, hidden, week, shownIds.join()])
+
   // Counted once per pill and week on this device, not on every visit to Home.
   useEffect(() => {
     if (!access || hidden || !pills.length) return
@@ -97,7 +114,7 @@ export default function CoachReportCard() {
 
   if (!access || hidden || !pills.length) return null
   const hide = () => { writeKey(HIDDEN, week); setHidden(true) }
-  const locked = p => { track('pill_locked_tapped', { kind: p.kind }); openPaywall('pill:' + p.kind) }
+  const locked = p => { track('pill_locked_tapped', { kind: p.kind }); openPaywall('pill:' + p.kind, p.context) }
   const n = view.locked.length
 
   return (
@@ -128,7 +145,7 @@ export default function CoachReportCard() {
             <div className="small pill-body blurred" aria-hidden="true">{p.body}</div>
           </button>
         ))}
-        <Button variant="primary" style={{ width: '100%', marginTop: 10 }} onClick={() => { track('pill_locked_tapped', { kind: 'report' }); openPaywall('pill:report') }}>
+        <Button variant="primary" style={{ width: '100%', marginTop: 10 }} onClick={() => { track('pill_locked_tapped', { kind: 'report' }); openPaywall('pill:report', pills[0].context) }}>
           {t('See the full report')}
         </Button>
       </>}
