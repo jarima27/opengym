@@ -22,6 +22,7 @@ import LineChart from './components/LineChart.jsx'
 import Stepper from './components/Stepper.jsx'
 import Icon from './components/Icon.jsx'
 import NotifyOffer from './components/NotifyOffer.jsx'
+import { maybeAskForReview } from './lib/review-prompt.js'
 import StallNotice from './components/StallNotice.jsx'
 import { autoDebrief } from './lib/coach-api.js'
 import { Button, Slider, Switch, Segmented, SelectRow, Row, TextField, NumberField, MultiSelectRow } from './components/ui.jsx'
@@ -2608,7 +2609,7 @@ export function exitWorkoutEdit(onExit = () => nav('/history')) {
   </>, { kind: 'center' })
 }
 
-function FinishSummary({ w, prs, e1prs = [], close }) {
+function FinishSummary({ w, prs, e1prs = [], close, past = false }) {
   const st = useStore(s => s.S)
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
@@ -2631,7 +2632,8 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
     {/* The moment for a progress photo or the clip of a set: the workout is already saved, so
         what is added here goes straight onto its record. */}
     <div style={{ textAlign: 'start' }}><WorkoutMediaSection w={w} hint /></div>
-    <Button variant="primary" onClick={() => { close(); nav('/home') }}>{t('Nice!')}</Button>
+    {/* The third finished workout is the moment the store app asks for a review (once). */}
+    <Button variant="primary" onClick={() => { close(); nav('/home'); if (!past) maybeAskForReview(st.workouts.filter(x => x.end).length) }}>{t('Nice!')}</Button>
   </div>
 }
 export function finishWorkout() {
@@ -2697,5 +2699,5 @@ function doFinishWorkout() {
   if (!past && shown?.id) autoDebrief(shown.id).catch(() => {})
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
-  ui().openSheet(close => <FinishSummary w={shown} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+  ui().openSheet(close => <FinishSummary w={shown} prs={prs} e1prs={e1prs} past={past} close={close} />, { kind: 'center', locked: true })
 }

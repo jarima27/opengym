@@ -16,7 +16,8 @@ Last updated: [RELLENAR: date]
 
 The controller is [RELLENAR: name or company], tax ID [RELLENAR], [RELLENAR: address], contact [RELLENAR: email].
 
-- **Your account**: your profile name and, if you give it, your e-mail. Passwords are stored as one-way hashes; for passkeys we only keep the public key.
+- **Your account**: your profile name and, if you give it, your e-mail. Passwords are stored as one-way hashes; for passkeys we only keep the public key. If you sign in with Apple or Google, we keep only the identifier that service gives your account (not your e-mail) and, if you share it, your name.
+- **Exercise videos**: in the app, videos load from YMove's servers, which see your IP address as with any download. We send them nothing about you.
 - **Your training and body weight**, and the photos and videos you add, to provide and sync the service. These may be health data: we process them with your explicit consent, which you can withdraw by deleting your account.
 - **The AI Coach** (if you use it): your plan, the training it reviews, your body weight and what you write to it are sent to [RELLENAR: AI provider] to produce the answer, only when you ask and after you agree on the Coach screen.
 - **Payments**: handled by Stripe on the web, and by Apple or Google in the app, with RevenueCat confirming your subscription's status. We never see your card.

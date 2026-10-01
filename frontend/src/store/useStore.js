@@ -17,7 +17,7 @@ import { countChanges, syncFingerprint } from '../lib/sync-changes.js'
 import { saveWorkoutEdit, deleteEditedWorkout } from '../lib/session-edit.js'
 import { appBase } from '../lib/app-base.js'
 import { linkTokenFromSearch, stripLinkFromUrl } from '../lib/device-link.js'
-import { loadRemote, chooseLocal, forgetRemote, connect, normalizeServerUrl, renewToken } from '../lib/remote.js'
+import { loadRemote, chooseLocal, forgetRemote, connect, keepSession, normalizeServerUrl, renewToken } from '../lib/remote.js'
 import { loadCoachDevice, saveCoachDevice, coachDeviceSettings } from '../lib/coach-device.js'
 import { RTL_LANGS } from '../lib/i18n-core.js'
 import { DEFAULT_TEMPLATE_ID } from '../lib/structuralBalanceTemplates.js'
@@ -630,6 +630,8 @@ export const useStore = create((set, get) => {
   const clearLocalSession = () => {
     const hadMedia = referencedHashes(get().S).size > 0
     get().setUser(null)
+    // The store app: the next person on this phone is somebody else to the store's billing too.
+    if (MOBILE) import('../lib/store-purchases.js').then(m => m.forgetStoreUser()).catch(() => {})
     localStorage.removeItem('gym_guest')
     forgetSync()
     releaseAdopt()   // the copy it was about is gone
@@ -1349,11 +1351,20 @@ export const useStore = create((set, get) => {
     // account pairing again merges what the phone kept (adoptProfile).
     async connectToServer(url, code, ask) {
       const user = await connect(url, code)   // throws on a bad URL/expired code — caller shows it
+      await get().settleConnection(user, normalizeServerUrl(url), ask)
+    },
+    // The store app signed in (or up) by itself — Apple, Google, e-mail (lib/app-account.js):
+    // the session it got is kept like a pairing, and the rest is the same.
+    async connectAccount(session, ask) {
+      const user = await keepSession(session)
+      await get().settleConnection(user, session.base, ask)
+    },
+    async settleConnection(user, base, ask) {
       // The account first, the address after: a copy another account still owed is kept aside
       // for it under the server it belongs to, not the one being paired.
       get().setUser(user, { adopt: true })
       if (keeping) { await keeping; keeping = null }
-      pairedBase = normalizeServerUrl(url)
+      pairedBase = base
       setSync({ server: pairedBase })
       await get().refreshConfig()   // what this server offers (the Coach, guest mode) — see boot()
       await get().adoptProfile(ask)

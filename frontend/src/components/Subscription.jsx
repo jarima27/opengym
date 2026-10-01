@@ -5,6 +5,8 @@ import { t } from '../lib/i18n.js'
 import { billingStatus, billingPortal, billingView, billingResume, storeManageUrl } from '../lib/billing.js'
 import { openPaywall } from './Paywall.jsx'
 import { openCancelFlow } from './CancelFlow.jsx'
+import { MOBILE } from '../lib/mobile.js'
+import { useStore } from '../store/useStore.js'
 import { Section, Row } from './ui.jsx'
 
 // Settings → Subscription, on an instance that charges. Renders nothing anywhere else.
@@ -65,13 +67,26 @@ export default function SubscriptionSection() {
       setBusy(false)
     }
   }
+  // The store app: what this store account bought before — a new phone, a reinstall.
+  const restore = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await (await import('../lib/store-purchases.js')).restore(useStore.getState().user?.id)
+      toast(r.active ? t('Your purchase is restored.') : t('There is nothing to restore on this store account.'))
+      await reload.current()
+    } catch { toast(t('Could not reach the store. Try again in a moment.')) }
+    setBusy(false)
+  }
   const keep = async () => {
     if (busy) return
     setBusy(true)
     try { await billingResume(); await reload.current() } catch { toast(t('Could not reach the payment provider. Try again in a moment.')) }
     setBusy(false)
   }
-  const action = view.action
+  // In the store app nothing leads to the website's payment pages (the stores do not allow it):
+  // a web subscription is shown, and cancelled in the app, but managed on the website.
+  const action = MOBILE && view.action === 'portal' ? null : view.action
   const ACTION = {
     portal: ['gear', () => t('Manage subscription')],
     resume: ['play', () => t('Resume subscription')],
@@ -82,6 +97,7 @@ export default function SubscriptionSection() {
     <Row icon={view.icon} iconTint={view.tint} title={view.title} subtitle={view.subtitle} />
     {action && <Row icon={ACTION[action][0]} iconTint="var(--acc)" accessory="chevron" title={ACTION[action][1]()} onClick={go} />}
     {keepable && <Row icon="reset" iconTint="var(--acc)" accessory="chevron" title={t('Keep my subscription')} onClick={keep} />}
+    {MOBILE && <Row icon="reset" iconTint="var(--acc)" accessory="chevron" title={t('Restore purchases')} onClick={restore} />}
     {cancellable && <Row icon="xmark" iconTint="var(--red)" danger accessory="chevron" title={t('Cancel subscription')} onClick={cancel} />}
   </Section>
 }

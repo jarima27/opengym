@@ -258,6 +258,10 @@ paths:
                       community:
                         type: boolean
                         description: Whether "compare with others" is offered on this instance.
+                  social:
+                    type: array
+                    items: { type: string, enum: [apple, google] }
+                    description: The "continue with" sign-ins offered (`POST /api/login/social`); absent when none.
                   exercise_media:
                     type: object
                     description: Absent where the dataset's media is shown as always.
@@ -684,6 +688,70 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: "invalid or expired code" }
 
+  /api/login/social:
+    post:
+      tags: [password]
+      operationId: loginSocial
+      summary: Sign in with Apple or Google (the store app)
+      description: |
+        Only where `APPLE_CLIENT_IDS` / `GOOGLE_CLIENT_IDS` are set; `/api/config` lists the
+        providers under `social`. The app does the provider's sign-in natively and sends the
+        ID token it got. The server checks its RS256 signature against the provider's
+        published keys, its issuer, that its audience is one of the configured client ids, and
+        its expiry; then signs in to the profile that provider account opened, or opens one
+        (`created: true`). A provider account is found by its subject, never by e-mail: an
+        address on this server is an identifier nobody has proven, so it cannot be trusted to
+        say whose profile a Google account should open. The address is not stored. Same invite
+        rules as the other sign-ups (`code`). **Not** CSRF-exempt.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, idToken]
+              properties:
+                provider: { type: string, enum: [apple, google] }
+                idToken: { type: string, description: The provider's ID token (a JWT). }
+                name: { type: string, description: A display name for a new profile (Apple gives it to the app only once). }
+                code: { type: string, description: An invite code, on an invite-only instance. }
+                src: { type: object, description: Attribution, as at the other sign-ups. }
+                token: { type: boolean, description: Also answer the session as `token` (native HTTP only). }
+            example: { provider: apple, idToken: 'eyJraWQiOi…', name: Ada, token: true }
+      responses:
+        '200':
+          description: Signed in (or signed up). The session cookie is set; `token` when asked for over native HTTP.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { type: object }
+                  created: { type: boolean }
+                  token: { type: string }
+        '400':
+          description: This provider is not offered here (`code: provider`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: The ID token did not verify (`code: bad-token`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The account is disabled (`code: disabled`), or an invite is required (`code: invite`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '502':
+          description: The provider's keys could not be read (`code: provider-down`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /api/login/password:
     post:
       tags: [password]
@@ -717,6 +785,12 @@ paths:
                 name: { type: string, description: 'The original field: a profile name, or an e-mail address.' }
                 email: { type: string, description: An e-mail address only. }
                 password: { type: string, maxLength: 256 }
+                token:
+                  type: boolean
+                  description: >-
+                    The store app, signing in over native HTTP: the answer also carries the
+                    session as `token`, to send as `Authorization: Bearer`. Ignored for a request
+                    a browser sent (one with an Origin or Sec-Fetch-Site header).
             examples:
               byName: { value: { identifier: "Ada", password: "correct horse battery staple" } }
               byEmail: { value: { identifier: "ada@example.com", password: "correct horse battery staple" } }
@@ -785,6 +859,7 @@ paths:
                 password: { type: string, minLength: 10, maxLength: 256 }
                 code: { type: string, description: Invite code (INVITE_ONLY only). }
                 email: { type: string, maxLength: 254, description: Optional sign-in e-mail. }
+                token: { type: boolean, description: 'The store app over native HTTP: also answer the session as `token` (see /api/login/password).' }
             example: { name: "Ada", password: "correct horse battery staple", code: "3F9C21A07B54D688" }
       responses:
         '200':

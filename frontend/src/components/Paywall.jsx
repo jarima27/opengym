@@ -4,6 +4,8 @@ import { t, useLang } from '../lib/i18n.js'
 import { dateLocale, getLang } from '../lib/i18n-core.js'
 import { MOBILE } from '../lib/mobile.js'
 import { billingCheckout, billingCached, billingResume } from '../lib/billing.js'
+import { useStore } from '../store/useStore.js'
+import { DEFAULT_SERVER } from '../lib/app-account.js'
 import { fmtDate } from '../lib/format.js'
 import { fetchPaywall, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from '../lib/paywall.js'
 import { track } from '../lib/track.js'
@@ -14,14 +16,22 @@ import { Button } from './ui.jsx'
 // (Admin → Paywall), for this profile's variant — which is why the variant rides on its events.
 // The recommended plan comes first and is picked already.
 //
-// The phone app sells through the App Store and Google Play instead, and never opens this: a
-// store app may not send people to a web checkout.
+// The store app shows the same screen and the same words, but sells through the App Store and
+// Google Play (lib/store-purchases.js, RevenueCat): a store app may not send anyone to a web
+// checkout. Its prices are the store's, and the store's own sheet confirms the purchase.
+// Any other mobile build sells nothing and never opens this.
 const ORDER = ['annual', 'monthly']
+const STORE = MOBILE && !!DEFAULT_SERVER
+const storeLib = () => import('../lib/store-purchases.js')
+const ENV = import.meta.env || {}
+const TERMS_URL = ENV.VITE_TERMS_URL || 'https://tiza.fit/terminos/'
+const PRIVACY_URL = ENV.VITE_PRIVACY_URL || 'https://tiza.fit/privacidad/'
 
 // `context` is the person's own data behind the moment it opens on — { exercise, weeks, missed,
 // gainKg } — which the operator's words can quote by name (lib/paywall.js fillNamed).
 export function openPaywall(reason, context = null) {
-  if (MOBILE) return false
+  // On a phone, buying needs the account the purchase unlocks: without one there is nothing to sell.
+  if (MOBILE && !(STORE && useStore.getState().user)) return false
   useUI.getState().openSheet(close => <Paywall reason={reason} context={context} close={close} />)
   return true
 }
@@ -46,9 +56,15 @@ function Paywall({ reason, context, preview, close }) {
 
   useEffect(() => {
     let live = true
-    fetchPaywall(getLang()).then(real => {
+    fetchPaywall(getLang()).then(async real => {
       if (!live) return
-      const p = preview ? { ...real, ...preview } : real
+      let p = preview ? { ...real, ...preview } : real
+      // The store app: the operator's offering for this variant, priced by the store.
+      if (STORE && !preview) {
+        const so = await (await storeLib()).storeOffer(useStore.getState().user?.id, p.offering)
+        p = { ...p, plans: so.plans, cardTrialDays: so.trialDays, packages: so.packages }
+        if (!live) return
+      }
       const offered = ORDER.filter(k => p.plans && k in p.plans)
       setPw(p)
       setPlan(cur => cur && offered.includes(cur) ? cur : offered.includes(p.highlight) ? p.highlight : offered[0] || null)
@@ -72,8 +88,26 @@ function Paywall({ reason, context, preview, close }) {
   const go = async () => {
     if (preview) { toast('Preview — nothing is charged'); return }
     setBusy(true)
+    if (STORE) {
+      track('checkout_started', { plan, via: 'store', variant: pw.variant, reason })
+      try {
+        const r = await (await storeLib()).buy(useStore.getState().user?.id, pw.packages[plan])
+        if (r.cancelled) { setBusy(false); return }
+        close()
+        toast(t('Welcome to Tiza Pro'))
+      } catch { toast(t('The purchase did not go through. Nothing was charged.')); setBusy(false) }
+      return
+    }
     try { const { url } = await billingCheckout(plan); window.location.assign(url) }
     catch { toast(t('Could not open the payment page')); setBusy(false) }
+  }
+  const restore = async () => {
+    setBusy(true)
+    try {
+      const r = await (await storeLib()).restore(useStore.getState().user?.id)
+      if (r.active) { close(); toast(t('Your purchase is restored.')) }
+      else { toast(t('There is nothing to restore on this store account.')); setBusy(false) }
+    } catch { toast(t('Could not reach the store. Try again in a moment.')); setBusy(false) }
   }
   const later = () => { if (!preview) track('paywall_dismissed', { variant: pw.variant, reason }); close() }
 
@@ -113,7 +147,7 @@ function Paywall({ reason, context, preview, close }) {
           {lines.sub && <div className="dim small">{lines.sub}</div>}
         </button>
       })}
-    </div> : <div className="card small muted" style={{ marginBottom: 14 }}>{t('Subscriptions are sold in the iPhone and Android app.')}</div>}
+    </div> : <div className="card small muted" style={{ marginBottom: 14 }}>{STORE ? t('The plans could not be loaded from the store. Try again in a moment.') : t('Subscriptions are sold in the iPhone and Android app.')}</div>}
 
     {/* What the trial does and when, before the button that starts it: no surprise on day 30. */}
     {!!offered.length && timeline && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12, lineHeight: 1.45 }}>
@@ -122,8 +156,14 @@ function Paywall({ reason, context, preview, close }) {
     </div>}
     {!!offered.length && <Button variant="primary" onClick={go} disabled={busy || !plan}>{ctaText(pw, end)}</Button>}
     {footnote && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>{footnote}</div>}
+    {/* What the stores ask every subscription screen to say, and where the terms are. */}
+    {STORE && !!offered.length && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>
+      {t('Charged to your store account. It renews automatically unless you cancel at least 24 hours before the end of the period; manage or cancel it in your store account settings.')}
+      {' '}<a href={TERMS_URL} target="_blank" rel="noopener">{t('Terms')}</a> · <a href={PRIVACY_URL} target="_blank" rel="noopener">{t('Privacy')}</a>
+    </div>}
     <div style={{ height: 8 }} />
     <Button variant="ghost" className="dim" onClick={later}>{c.later}</Button>
+    {STORE && !preview && <Button variant="ghost" className="dim" onClick={restore} disabled={busy}>{t('Restore purchases')}</Button>}
   </>
 }
 

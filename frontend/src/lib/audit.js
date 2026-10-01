@@ -38,6 +38,9 @@ const LABELS = {
   // and the address masked to two characters ("password · a…@e…") — never the address itself.
   // Paid access (api/billing.js), on an instance that charges. `msg` on a change is Stripe's
   // subscription status: active, trialing, past_due, canceled…
+  // Sign in with Apple / Google from the store app (api/social.js): `msg` is the provider.
+  'auth.social.ok': 'Signed in with Apple or Google',
+  'auth.social.fail': 'A sign-in with Apple or Google did not verify',
   'billing.checkout': 'Opened the subscription checkout',
   'billing.change': 'Subscription changed',
   // The cancel flow (components/CancelFlow.jsx): on a cancellation `msg` is the reason given, if any.

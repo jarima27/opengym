@@ -93,7 +93,12 @@ signed Android APK, and deploys the demo/docs site. The Gitea and GitHub workflo
   instruction text; `locales/` is the i18n string catalogue (`lib/i18n.js` / `i18n-core.js`).
 - Mobile: `@capacitor/*` wraps the same web build into native shells under `frontend/android` and
   `frontend/ios` (see `docs/MOBILE.md`); `mobile.js` in `lib/` gates native-only behavior (file
-  persistence, local notifications, wake lock) behind a `MOBILE` flag.
+  persistence, local notifications, wake lock) behind a `MOBILE` flag. The store app
+  (`build:mobile`, `frontend/.env.mobile`) has a default server: `views/AppWelcome.jsx` +
+  `lib/app-account.js` sign in with Apple/Google/e-mail over native HTTP (bearer token, see
+  `api/social.js`), `lib/store-purchases.js` sells through RevenueCat, `lib/review-prompt.js`
+  asks for a review after the third workout. Native plugins are only ever `import()`ed behind
+  `MOBILE`.
 
 ### API (`api/server.js`)
 

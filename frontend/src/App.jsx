@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
@@ -26,6 +26,10 @@ import TimerFlash from './components/TimerFlash.jsx'
 import { openDeviceLinkRedeem } from './components/Passkeys.jsx'
 import Login from './views/Login.jsx'
 import MobileOnboarding from './views/MobileOnboarding.jsx'
+import { DEFAULT_SERVER } from './lib/app-account.js'
+// The store app's first screen (an account with Apple, Google or an e-mail). Only that build
+// has a default server, so only it ever loads this.
+const AppWelcome = lazy(() => import('./views/AppWelcome.jsx'))
 import Home from './views/Home.jsx'
 import CheckIn from './views/CheckIn.jsx'
 import Plan from './views/Plan.jsx'
@@ -191,7 +195,7 @@ function Shell() {
           re-mounts the boundary, so the tab bar is always a way out */}
       <div id="app" className="vfade" key={loc.pathname}>
         <ErrorBoundary>
-          {!authed ? <Login /> : needsMobileOnboarding ? <MobileOnboarding /> : (
+          {!authed ? <Login /> : needsMobileOnboarding ? (DEFAULT_SERVER ? <Suspense fallback={null}><AppWelcome /></Suspense> : <MobileOnboarding />) : (
             <Routes>
               <Route path="/home" element={welcomePending() ? <Navigate to="/welcome" replace /> : <Home />} />
               <Route path="/welcome" element={<Welcome />} />

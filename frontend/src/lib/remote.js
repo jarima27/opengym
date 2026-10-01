@@ -45,6 +45,14 @@ export async function renewToken(remote, token) {
   await saveRemoteFile({ ...remote, token })
 }
 
+// A session the store app got by signing in itself (lib/app-account.js): kept exactly like a
+// pairing, so everything after it — boot, renewal, sign-out — is the same.
+export async function keepSession({ base, token, user }) {
+  setRemoteAuth(base, token)
+  await saveRemoteFile({ mode: 'remote', base, token, user })
+  return user
+}
+
 // Redeems the pairing code, wires api.js at the resolved base, and persists the connection so
 // boot() can restore it on the next launch.
 export async function connect(rawUrl, code) {

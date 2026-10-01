@@ -26,7 +26,8 @@ cta: false
 
 ## Qué datos tratamos y para qué
 
-- **Tu cuenta**: el nombre de perfil, y si lo das, tu correo electrónico. Tu contraseña se guarda cifrada con un algoritmo de un solo sentido; si usas passkeys, solo guardamos su clave pública. Para darte acceso y mantener tu sesión.
+- **Tu cuenta**: el nombre de perfil, y si lo das, tu correo electrónico. Tu contraseña se guarda cifrada con un algoritmo de un solo sentido; si usas passkeys, solo guardamos su clave pública. Si entras con Apple o con Google, guardamos solo el identificador que ese servicio da a tu cuenta (no tu correo) y, si lo compartes, tu nombre. Para darte acceso y mantener tu sesión.
+- **Vídeos de los ejercicios**: en la app, los vídeos se cargan desde los servidores de YMove, que reciben tu dirección IP como en cualquier descarga. No les enviamos ningún dato tuyo.
 - **Tus entrenos y tu peso corporal**: lo que registras en la app, las fotos y vídeos que añadas a tus ejercicios. Para prestarte el servicio y sincronizarlo entre tus dispositivos. El peso corporal y los datos de entrenamiento pueden considerarse datos de salud: los tratamos con tu consentimiento explícito, que das al registrarte y puedes retirar borrando tu cuenta.
 - **El Coach IA** (si lo usas): tu plan, tus entrenos del periodo que revisa, tu peso corporal y lo que le escribes se envían a [RELLENAR: proveedor de IA, p. ej. Anthropic] para generar la respuesta. Solo cuando tú lo pides y después de aceptarlo en la pantalla del Coach.
 - **Pagos**: si te suscribes en la web, el pago lo gestiona Stripe; nosotros no vemos ni guardamos tu tarjeta. Si te suscribes en la app, lo gestionan Apple o Google, y RevenueCat nos confirma el estado de tu suscripción.
@@ -37,7 +38,7 @@ No vendemos tus datos ni mostramos anuncios.
 
 ## Con quién los compartimos
 
-Solo con quienes nos ayudan a prestar el servicio, con contrato de encargado del tratamiento: [RELLENAR: proveedor de servidores y país], Stripe (pagos web), Apple y Google (pagos en la app), RevenueCat (estado de suscripciones), [RELLENAR: proveedor de IA] (Coach IA) y [RELLENAR: PostHog] (estadística). Si alguno trata datos fuera del Espacio Económico Europeo, lo hace con las garantías del RGPD (cláusulas contractuales tipo o decisión de adecuación).
+Solo con quienes nos ayudan a prestar el servicio, con contrato de encargado del tratamiento: [RELLENAR: proveedor de servidores y país], Stripe (pagos web), Apple y Google (pagos en la app e inicio de sesión con ellos), RevenueCat (estado de suscripciones), YMove (vídeos de los ejercicios), [RELLENAR: proveedor de IA] (Coach IA) y [RELLENAR: PostHog] (estadística). Si alguno trata datos fuera del Espacio Económico Europeo, lo hace con las garantías del RGPD (cláusulas contractuales tipo o decisión de adecuación).
 
 ## Cuánto tiempo los guardamos
 

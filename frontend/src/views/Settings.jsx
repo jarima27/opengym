@@ -35,6 +35,7 @@ import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '.
 import SubscriptionSection from '../components/Subscription.jsx'
 import DeleteAccountSheet from '../components/DeleteAccount.jsx'
 import { exerciseMediaMode } from '../lib/exercise-media.js'
+import { DEFAULT_SERVER } from '../lib/app-account.js'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -334,7 +335,7 @@ export default function Settings() {
     {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
 
     {/* ---------- subscription: only on an instance that charges (api/billing.js) ---------- */}
-    {user && !DEMO && !MOBILE && <SubscriptionSection />}
+    {user && !DEMO && (!MOBILE || DEFAULT_SERVER) && <SubscriptionSection />}
 
     {/* ---------- the Coach on a phone: through the paired server, or with the user's own key ---------- */}
     {MOBILE && <Section title={t('AI Coach')}>

@@ -161,7 +161,49 @@ npx @capacitor/assets generate --iconBackgroundColor '#0c0e12' --splashBackgroun
 (If the generator won't take the SVG directly, export it to `resources/icon.png` at
 1024×1024 first — any image tool can do it.)
 
-## Distribution — deliberately no app stores
+## The Tiza store app (App Store and Google Play)
+
+`npm run build:mobile` builds the store app: `vite --mode mobile` reads `frontend/.env.mobile`,
+whose values are public by design (they ship in the app). On first launch it offers an account on
+the hosted Tiza (`VITE_DEFAULT_SERVER`) — Sign in with Apple (iPhone only), Google, or an e-mail
+and a password — or no account at all, everything on the phone as before. A server of one's own
+can still be paired ("I have my own Tiza server").
+
+What has to exist outside this repository before a store build is any use:
+
+| Where | What | Then |
+|---|---|---|
+| Apple Developer | App ID `fit.tiza.app` with *Sign in with Apple* and *In-App Purchase* | the entitlement is already in `ios/App/App/App.entitlements` |
+| Google Cloud | OAuth client ids: Web (used by Android) and iOS | `.env.mobile` → `VITE_GOOGLE_WEB_CLIENT_ID`, `VITE_GOOGLE_IOS_CLIENT_ID`; add the iOS id reversed as a URL scheme in `ios/App/App/Info.plist` |
+| App Store Connect / Play Console | Monthly and annual subscriptions (with the free trial as an introductory offer) | — |
+| RevenueCat | The two stores, entitlement `pro`, an offering with *Monthly* and *Annual* packages, webhook to `/api/billing/revenuecat` | `.env.mobile` → `VITE_RC_IOS_KEY`, `VITE_RC_ANDROID_KEY` (public SDK keys) |
+| The hosted server | `PASSWORD_LOGIN=1`, `APPLE_CLIENT_IDS=fit.tiza.app`, `GOOGLE_CLIENT_IDS=<web id>,<iOS id>`, `REVENUECAT_*` | see SELF_HOSTING.md |
+| tiza.fit | the privacy policy and terms published (`landing/content/*/privacidad.md`, `terminos.md` are drafts) | their URLs in `.env.mobile` and in both stores' listings |
+
+How the pieces fit:
+
+- **Signing in.** The provider's own sheet runs natively (`@capgo/capacitor-social-login`, with
+  Facebook and Twitter left out of the build in `capacitor.config.json`); the ID token it returns
+  goes to `POST /api/login/social`, which checks its signature against the provider's keys. The
+  sign-in calls go over native HTTP (no Origin header), which is what lets the server answer with
+  a bearer token without opening the sign-in routes to other websites (login CSRF). A provider
+  account opens the same profile every time and is never matched to a profile by e-mail.
+- **Buying.** The paywall is the same screen as on the website, with the operator's words; its
+  prices come from the store (`@revenuecat/purchases-capacitor`), the purchase is the store's own
+  sheet, and the server reads RevenueCat back at once (`POST /api/billing/sync`). RevenueCat knows
+  each person by their profile id, so what is bought on the phone unlocks the Coach everywhere.
+  "Restore purchases" is on the paywall and in Settings → Subscription. Nothing in the app links
+  to the website's payment pages.
+- **Review.** After the third finished workout the app asks the OS for the store's review sheet,
+  once (`@capacitor-community/in-app-review`); whether it shows is the OS's call.
+- **Exercise media.** The store app never shows the exercise dataset's images and animations; an
+  exercise shows its studio video from the account's server, or its text (SELF_HOSTING.md →
+  "Exercise videos").
+
+Still to do before a submission: Apple asks apps that offer Sign in with Apple to revoke the
+Apple token when an account is deleted (REST API, needs the team's private key) — not done yet.
+
+## Distribution of openGym's own app — deliberately no app stores
 
 openGym's mobile app is not on the Play Store or App Store, and that's a choice: no store
 accounts, no store rules, no yearly fees between you and an open-source app.

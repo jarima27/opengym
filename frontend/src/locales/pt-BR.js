@@ -1117,6 +1117,25 @@ export const PT_BR_OVERRIDES = {
   'Resume subscription': 'Retomar assinatura',
   'Your subscription is back on.': 'Sua assinatura está ativa de novo.',
   // Exercise videos (hosted version, spec F10)
+  // The store app: its account, purchases and review (views/AppWelcome.jsx, lib/store-purchases.js)
+  'Charged to your store account. It renews automatically unless you cancel at least 24 hours before the end of the period; manage or cancel it in your store account settings.': 'Cobrado na sua conta da loja. Renova automaticamente, a menos que você cancele pelo menos 24 horas antes do fim do período; gerencie ou cancele nas configurações da sua conta da loja.',
+  'Continue with Google': 'Continuar com o Google',
+  'Continue with e-mail': 'Continuar com e-mail',
+  'Could not reach the server. Check your connection.': 'Não foi possível falar com o servidor. Verifique sua conexão.',
+  'Could not reach the store. Try again in a moment.': 'Não foi possível falar com a loja. Tente de novo em instantes.',
+  'Could not sign in with {0}.': 'Não foi possível entrar com {0}.',
+  'Create an account instead': 'Prefiro criar uma conta',
+  'Create your account': 'Crie sua conta',
+  'Creating your account…': 'Criando sua conta…',
+  'E-mail': 'E-mail',
+  'Enter your e-mail.': 'Digite seu e-mail.',
+  'I have my own Tiza server': 'Tenho meu próprio servidor Tiza',
+  'Signing in…': 'Entrando…',
+  'The plans could not be loaded from the store. Try again in a moment.': 'Não foi possível carregar os planos da loja. Tente de novo em instantes.',
+  'Welcome to Tiza Pro': 'Boas-vindas ao Tiza Pro',
+  'Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.': 'Sem conta, tudo fica neste celular. Com conta fica guardado no Tiza, em todos os seus dispositivos, e vem com o Treinador.',
+  'Your purchase is restored.': 'Sua compra foi restaurada.',
+  'Your training, and a Coach that reads it.': 'Seu treino, e um Treinador que o lê.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

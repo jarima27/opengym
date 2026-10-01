@@ -417,6 +417,23 @@ How it behaves:
 - The subscription state lives on the user in `db.json`, and the paywall in `paywall.json`, so
   the backup below already covers both. Stripe and the stores stay the record of what was paid.
 
+### Sign in with Apple and Google (optional, for the store app)
+
+The store app offers "Continue with Apple / Google" when the server accepts them. Set the
+audiences their ID tokens must name — the app's bundle id for Apple, the OAuth client ids for
+Google — and `/api/config` lists the providers as `social`:
+
+```bash
+APPLE_CLIENT_IDS=fit.tiza.app
+GOOGLE_CLIENT_IDS=123-web.apps.googleusercontent.com,123-ios.apps.googleusercontent.com
+```
+
+The server checks each token's RS256 signature against the provider's published keys (cached for
+a few hours, no dependency), its issuer, audience and expiry. A provider account opens the same
+profile every time; it is never matched to an existing profile by e-mail, because addresses here
+are unproven identifiers and that would let someone take over an account by typing its address
+first. Such a profile has no password or passkey, so it signs in through the app.
+
 ### Exercise videos (optional, hosted instances)
 
 The exercise dataset's images and animations are © Gym visual and may not be used in a paid

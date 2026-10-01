@@ -39,6 +39,7 @@ import {
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
 import { ymoveConfig, exerciseMediaConfig, createVideoStore, loadMap, YmoveDown } from './ymove.js';
+import { PROVIDERS, socialConfig, createKeySet, verifyIdToken, SocialError, nameFor } from './social.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
 
@@ -595,6 +596,11 @@ function sessionCookie(user) {
   // (or a shadowing copy of it) alongside the new session.
   return COOKIE === LEGACY_COOKIE ? [fresh] : [fresh, expireCookie(LEGACY_COOKIE)];
 }
+// The store app signs in over native HTTP (no Origin header: no browser sent it) and has no cookie
+// jar the API's origin can use, so it asks for the session as a bearer token in the answer
+// (`token: true`), which it then sends in an Authorization header like a paired phone. A browser
+// never gets one: it has the HttpOnly cookie, which page scripts cannot read.
+const appToken = (req, body, user) => (body?.token === true && !req.headers.origin && !req.headers['sec-fetch-site'] ? { token: makeSession(user) } : {});
 const clearCookie = COOKIE === LEGACY_COOKIE
   ? [expireCookie(LEGACY_COOKIE)]
   : [expireCookie(COOKIE), expireCookie(LEGACY_COOKIE)];
@@ -905,6 +911,8 @@ setInterval(() => { AUTH_BURST.sweep(); ADDR_FAILS.sweep(); ACCOUNT_FAILS.sweep(
 const THROTTLED = {
   'POST /api/login/password': 'password', 'POST /api/login/password-reset': 'password',
   'POST /api/register/password': 'signup',
+  // A failed one is a provider token that did not verify, not a guessed secret: the burst only.
+  'POST /api/login/social': null,
   'POST /api/account/password': 'password', 'DELETE /api/account/password': null,
   // Setting an e-mail only spends the budget and asks the address's e-mail pause; an address
   // already in use counts against it (see POST /api/account/email).
@@ -1176,6 +1184,55 @@ async function removeEmail(req, res, user, body) {
   json(res, 200, { ok: true, email: null });
 }
 
+/* ---------- Sign in with Apple / Google (api/social.js) ---------- */
+// Only where APPLE_CLIENT_IDS / GOOGLE_CLIENT_IDS are set; the store app is what uses them.
+const SOCIAL = socialConfig();
+// <PROVIDER>_JWKS_URL moves where the keys are read from — only ever for the tests.
+const SOCIAL_KEYS = Object.fromEntries(Object.keys(SOCIAL).map(p => [p, createKeySet(process.env[p.toUpperCase() + '_JWKS_URL'] || PROVIDERS[p].jwks)]));
+const socialRoutes = {
+  // { provider: 'apple' | 'google', idToken, name?, code?, src?, token? } → the profile that
+  // provider account opened, or a new one. Not exempt from the origin check: a page elsewhere must
+  // not be able to sign a visitor in to an account of its choosing.
+  'POST /api/login/social': async (req, res) => {
+    const body = await readBody(req);
+    const provider = text(body.provider);
+    if (!SOCIAL[provider]) return json(res, 400, { error: 'this sign-in is not offered here', code: 'provider' });
+    let claims;
+    try { claims = await verifyIdToken(body.idToken, { provider, audiences: SOCIAL[provider], key: SOCIAL_KEYS[provider] }); }
+    catch (e) {
+      if (!(e instanceof SocialError)) throw e;
+      if (e.code === 'keys') { console.error('social:', e.message); return json(res, 502, { error: 'the sign-in provider did not answer — try again in a moment', code: 'provider-down' }); }
+      audit(req, 'auth.social.fail', { ok: false, msg: provider + ' · ' + e.message });
+      return json(res, 401, { error: 'that sign-in could not be verified', code: 'bad-token' });
+    }
+    let user = db.users.find(u => u.oauth?.[provider] === claims.sub);
+    if (user) {
+      if (user.disabled) {
+        audit(req, 'auth.social.fail', { ok: false, user, msg: provider + ' · account-disabled' });
+        return json(res, 403, { error: 'this account has been disabled', code: 'disabled' });
+      }
+      audit(req, 'auth.social.ok', { user, msg: provider });
+      return json(res, 200, { user: publicUser(user), created: false, ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
+    }
+    // A new profile. Same invite rules as every other way of making one.
+    const code = text(body.code).trim().toUpperCase();
+    const inv = INVITE_ONLY ? db.invites.find(i => i.code === code && !i.usedBy && !i.revoked) : null;
+    if (INVITE_ONLY && !inv) {
+      audit(req, 'auth.register.denied', { ok: false, msg: provider + ' · invite-rejected' });
+      return json(res, 403, { error: 'a valid invite code is required', code: 'invite' });
+    }
+    const created = new Date().toISOString();
+    user = { id: crypto.randomBytes(12).toString('base64url'), name: nameFor(body, claims), created, oauth: { [provider]: claims.sub } };
+    if (inv) { user.invitedBy = inv.code; inv.usedBy = user.id; inv.usedAt = created; }
+    adoptSource(user, body.src);
+    db.users.push(user);
+    saveDb();
+    audit(req, 'auth.register.ok', { user, msg: inv ? inv.code + ' · ' + provider : provider });
+    signedUp(user, provider);
+    json(res, 200, { user: publicUser(user), created: true, ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
+  }
+};
+
 const passwordRoutes = {
   'POST /api/login/password': async (req, res) => {
     const body = await readBody(req);
@@ -1216,7 +1273,7 @@ const passwordRoutes = {
       if (!still()) return json(res, 401, WRONG);
     }
     audit(req, 'auth.password.ok', { user });
-    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user), ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   // For browsers that cannot make a passkey at all: plain http on a LAN address, some Firefox
@@ -1270,7 +1327,7 @@ const passwordRoutes = {
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: inv ? inv.code + ' · password' : 'password' });
     signedUp(user, 'password');
-    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user), ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   // What Settings shows: whether a password is set, and whether it could be removed.
@@ -2264,6 +2321,8 @@ const routes = {
       ...(PASSWORD_LOGIN ? { password_login: true } : {}),
       // Public: the sign-in screen is the first thing that reads it.
       ...(DEFAULT_LANG ? { default_lang: DEFAULT_LANG } : {}),
+      // Which "continue with" buttons the store app shows (api/social.js).
+      ...(Object.keys(SOCIAL).length ? { social: Object.keys(SOCIAL) } : {}),
       // Public like the two flags above: the caps are not a secret, and the absence of the
       // block is how the app knows this server does not take photos and videos at all.
       ...(MEDIA_ON ? { media: mediaConfig(MEDIA_LIMITS) } : {}),
@@ -2507,6 +2566,7 @@ const routes = {
 
   // Absent entirely while PASSWORD_LOGIN is off, so each of them is a plain 404.
   ...(PASSWORD_LOGIN ? passwordRoutes : {}),
+  ...(Object.keys(SOCIAL).length ? socialRoutes : {}),
 
   // Always there: more passkeys and device links need nothing an instance has to switch on.
   ...passkeyRoutes,
