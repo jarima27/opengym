@@ -26,7 +26,11 @@ const USER_ERROR = {
 };
 const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503 };
 
-export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI = () => true }) {
+// `freePlan` is the one Coach plan any profile may ask for without paying, once in the life of
+// the account (spec F4) — a hook into server.js, which keeps the mark on the profile: { open(user)
+// → whether it is still there to take, claim(user, jobId) → taken by that job }. A failed job
+// gives it back there (jobs.setFinishHook).
+export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI = () => true, freePlan = null }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
   const guard = (req, res) => {
     const user = readSession(req);
@@ -36,9 +40,10 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseA
   };
   /** The routes that start a job. On an instance that charges (billing.js) a job is what the
       subscription pays for; reading status, the log and the room stays open to everyone. */
+  const refuse = res => json(res, 402, { error: 'the AI Coach comes with the subscription', code: 'billing' });
   const guardJob = (req, res) => {
     const user = guard(req, res); if (!user) return null;
-    if (!mayUseAI(user)) { json(res, 402, { error: 'your free trial has ended — subscribe to keep using the Coach', code: 'billing' }); return null; }
+    if (!mayUseAI(user)) { refuse(res); return null; }
     return user;
   };
   const failEnqueue = (res, e) => {
@@ -72,8 +77,12 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseA
     },
 
     'POST /api/coach/plan': async (req, res) => {
-      const user = guardJob(req, res); if (!user) return;
+      const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
+      // Without the Coach, the first plan is still theirs to ask for: a new plan from the intake,
+      // not a refinement of one (that is a second request), and only while the gift is unopened.
+      const free = !mayUseAI(user);
+      if (free && (body.refine || !freePlan?.open(user))) return refuse(res);
       try {
         // The admin's configured length is the real limit; jobs.enqueue is where it is actually
         // enforced (it is the one place that already loads config for every job). This slice is
@@ -84,7 +93,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin, mayUseA
           lang: body.lang,
           refine: body.refine ? String(body.refine).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
         });
-        json(res, 202, { job });
+        if (free) freePlan.claim(user, job.id);
+        json(res, 202, free ? { job, freePlan: true } : { job });
       } catch (e) { failEnqueue(res, e); }
     },
 

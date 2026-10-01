@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': '구독하기',
   'Manage subscription': '구독 관리',
   'Logging workouts is always free. The subscription pays for the AI Coach.': '운동 기록은 언제나 무료입니다. 구독료는 AI 코치에 쓰입니다.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': '무료 체험이 끝났습니다. AI 코치를 계속 쓰려면 설정에서 구독하세요.',
   'Could not open the payment page': '결제 페이지를 열 수 없습니다',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': '이 웹사이트에서 결제한 구독은 취소됩니다. App Store나 Google Play에서 구매한 구독은 취소되지 않으니 그곳에서 취소하세요.',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': '{0} 기록까지 {1}{2} 남았어요. 오늘 깰 수도 있어요.',
   'The Coach can rework your week': '코치가 한 주를 다시 짜 줄 수 있어요',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': '지난주 계획된 운동 {1}회 중 {0}회를 했어요. 코치가 실제 한 주에 맞게 계획을 조정해 줄 수 있어요.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': '코치의 첫 계획은 무료예요. 목표와 운동할 요일을 알려 주세요.',
 }

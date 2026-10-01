@@ -267,6 +267,7 @@ function pump() {
 }
 
 function finish(job, result) {
+  if (onFinish) { try { onFinish(job.uid, job, result); } catch (e) { console.error('coach finish hook failed', e); } }
   cfgStore.logJob({
     at: new Date().toISOString(), uid: job.uid, kind: job.kind, trigger: job.trigger,
     outcome: result.outcome, errorClass: result.errorClass || null,
@@ -300,6 +301,10 @@ function finish(job, result) {
 // importing the web-push plumbing (and dragging it into every test that touches the queue).
 let onProposal = null;
 export function setProposalHook(fn) { onProposal = fn; }
+// Set by server.js to hear how every job ended — the free first plan is given back when its job
+// fails (routes.js). Before the forgotten-while-running check: a refund is the account's, not the log's.
+let onFinish = null;
+export function setFinishHook(fn) { onFinish = fn; }
 
 /* ---------- execution ---------- */
 

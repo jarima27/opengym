@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk } from '../billing.js';
+import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk, freePlanOpen, claimFreePlan, releaseFreePlan } from '../billing.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-01T12:00:00Z');
@@ -553,4 +553,49 @@ test('without PostHog, no event route and nothing sent', async t => {
   assert.equal((await h.call('/api/track', { uid: 'u1', method: 'POST', body: { event: 'import_done' } })).status, 404);
   assert.equal((await h.call('/api/code?c=ANY')).status, 404);
   assert.equal('analytics' in await (await h.call('/api/config')).json(), false);
+});
+
+/* The one Coach plan any profile may ask for without paying (spec F4). The mark is on the
+   profile's row on the server, so a second attempt is refused from any device, with any local
+   data; a job that fails gives it back. */
+test('the free first Coach plan: once per account, kept by the server, given back when the job fails', async t => {
+  const stripeApi = await fakeStripe(t);
+  const h = await startServer(t, {
+    env: stripeEnv(stripeApi.base),
+    users: [
+      { id: 'old', name: 'O', created: LONG_AGO },
+      { id: 'used', name: 'U', created: LONG_AGO, freePlanUsedAt: iso(Date.now() - 9 * DAY) }
+    ],
+    db: { billingSince: Date.now() - 200 * DAY }
+  });
+  const status = async uid => (await h.call('/api/billing', { uid })).json();
+  const row = uid => JSON.parse(fs.readFileSync(path.join(h.dataDir, 'db.json'), 'utf8')).users.find(u => u.id === uid);
+
+  assert.equal((await status('old')).ai, false);
+  assert.equal((await status('old')).freePlan, true);
+  // A refinement is a second request, not the gift; reviews and debriefs stay paid.
+  assert.equal((await h.call('/api/coach/plan', { uid: 'old', method: 'POST', body: { refine: 'four days' } })).status, 402);
+  assert.equal((await h.call('/api/coach/review', { uid: 'old', method: 'POST', body: {} })).status, 402);
+
+  // Used once already: refused, whatever the device remembers, and the status says so.
+  assert.equal((await status('used')).freePlan, false);
+  assert.ok((await status('used')).freePlanAt);
+  const again = await h.call('/api/coach/plan', { uid: 'used', method: 'POST', body: { intake: { goal: 'strength' } } });
+  assert.equal(again.status, 402);
+  assert.equal((await again.json()).code, 'billing');
+});
+
+test('the free plan’s mark: taken by one job, given back only by that job', () => {
+  const cfg = { on: true };
+  const user = { id: 'u' };
+  assert.equal(freePlanOpen(user, cfg), true);
+  assert.equal(freePlanOpen(user, { on: false }), false, 'an instance that does not charge has no gift to give: everything is open');
+  claimFreePlan(user, 'job1', Date.UTC(2026, 9, 1));
+  assert.equal(user.freePlanUsedAt, '2026-10-01T00:00:00.000Z');
+  assert.equal(freePlanOpen(user, cfg), false);
+  assert.equal(releaseFreePlan(user, 'job2'), false, 'another job cannot give it back');
+  assert.equal(freePlanOpen(user, cfg), false);
+  assert.equal(releaseFreePlan(user, 'job1'), true);
+  assert.equal(freePlanOpen(user, cfg), true);
+  assert.equal(releaseFreePlan(undefined, 'job1'), false);
 });

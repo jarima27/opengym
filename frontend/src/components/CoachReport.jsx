@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { t, useLang } from '../lib/i18n.js'
 import { todayISO, weekKey, weekStartOf } from '../lib/format.js'
-import { MOBILE } from '../lib/mobile.js'
 import { DEMO } from '../lib/demo.js'
-import { coachAccess } from '../lib/billing.js'
+import { useCoachAccess } from './useCoachAccess.js'
 import { pillsFor, reportView, logPills, samePillLog } from '../lib/coach-pills.js'
 import { coachReportFor, sameReport, logReport } from '../lib/coach-report.js'
 import { track } from '../lib/track.js'
@@ -13,22 +12,7 @@ import { openPaywall } from './Paywall.jsx'
 import Icon from './Icon.jsx'
 import { Button } from './ui.jsx'
 
-// Whether the Coach is this profile's (lib/billing.js accessOf): null while the server is asked,
-// then 'pro' | 'free' | 'open'. Nothing is sold in the phone app yet (it will sell through its
-// store), on an instance that does not charge, to a guest or in the demo: all 'open'.
-export function useCoachAccess() {
-  const charging = !!useStore(s => s.config?.billing)
-  const uid = useStore(s => s.user?.id)
-  const sold = charging && !!uid && !MOBILE && !DEMO
-  const [access, setAccess] = useState(sold ? null : 'open')
-  useEffect(() => {
-    if (!sold) { setAccess('open'); return }
-    let live = true
-    coachAccess().then(a => { if (live) setAccess(a || 'open') })
-    return () => { live = false }
-  }, [sold, uid])
-  return access
-}
+export { useCoachAccess }
 
 // What the training says, recomputed when the training does: the parts of S the pills read.
 const pillDeps = S => [S.workouts, S.routines, S.week, S.dayPlan, S.balanceTemplate, S.unit, S.weekStart, S.customEx, S.pillLog]

@@ -38,3 +38,37 @@ export function planLines(plan, price, copy, locale) {
 
 /** The call to action: the trial's length when checking out starts one, else the plain one. */
 export const ctaText = (pw, end) => (pw.cardTrialDays > 0 ? fill(pw.copy.cta, pw.cardTrialDays) : end ? pw.copy.endCta : pw.copy.ctaNoTrial)
+
+// The person's own data a paywall can quote (api/paywall.js COPY_FIELDS): blanks by name, so
+// the operator writes "Stop stalling on {exercise}" and never a number they cannot know.
+export const CONTEXT_KEYS = ['exercise', 'weeks', 'missed', 'gainKg']
+
+/** A line with its named blanks filled from `ctx`, or null when one of them has no data — the
+    line is then left out rather than shown with a hole in it. Numbered blanks are left alone. */
+export function fillNamed(s, ctx = {}) {
+  if (typeof s !== 'string' || !s) return null
+  let missing = false
+  const out = s.replace(/\{([a-zA-Z]+)\}/g, (m, k) => {
+    const v = ctx?.[k]
+    if (v == null || v === '') { missing = true; return m }
+    return String(v)
+  })
+  return missing ? null : out
+}
+
+// Which title a moment opens the paywall with; anything else gets the general one.
+const TITLE_FOR = { stall: 'titleStall', 'pill:stall': 'titleStall', comeback: 'titleComeback', day7: 'titleDay7' }
+
+/** The title for this paywall: the moment's own when it has one and its blanks can be filled,
+    else the general title. */
+export function titleFor(copy, reason, ctx) {
+  const own = TITLE_FOR[reason] && fillNamed(copy[TITLE_FOR[reason]], ctx)
+  return own || fillNamed(copy.title, ctx) || copy.title || ''
+}
+
+/** "Today · Day 27: we remind you · Day 30: billing starts" — only when checking out starts a
+    trial, with the reminder three days before its first charge (the promise the trial makes). */
+export function timelineText(copy, cardTrialDays) {
+  if (!(cardTrialDays > 3) || !copy.timeline) return null
+  return fill(copy.timeline, cardTrialDays - 3, cardTrialDays)
+}

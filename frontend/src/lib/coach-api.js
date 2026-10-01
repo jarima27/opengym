@@ -61,7 +61,7 @@ const track = r => {
 // where to go.
 const unpaid = e => {
   if (e?.status === 402 && e.data?.code === 'billing') {
-    e.message = t('Your free trial has ended. Subscribe in Settings to keep using the AI Coach.')
+    e.message = t('The AI Coach comes with the subscription')
     // On the website the paywall opens right here; the phone app sells through its store.
     import('../components/Paywall.jsx').then(m => m.openPaywall('coach')).catch(() => {})
   }
@@ -74,7 +74,15 @@ export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCA
 const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
 export const requestReview = (...a) => _requestReview(...a).then(track, unpaid)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
-export const requestPlan = (...a) => _requestPlan(...a).then(track, unpaid)
+// The free first plan (api/billing.js freePlanOpen): the server says when this was it.
+const gift = r => {
+  if (r?.freePlan) {
+    import('./track.js').then(m => m.track('coach_free_plan_created')).catch(() => {})
+    import('./billing.js').then(m => m.forgetCoachAccess()).catch(() => {})
+  }
+  return r
+}
+export const requestPlan = (...a) => _requestPlan(...a).then(gift).then(track, unpaid)
 const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang() }) })
 export const refinePlan = (...a) => _refinePlan(...a).then(track, unpaid)
 const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })

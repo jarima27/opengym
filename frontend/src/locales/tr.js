@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': 'Abone ol',
   'Manage subscription': 'Aboneliği yönet',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Antrenman kaydetmek her zaman ücretsiz. Abonelik Yapay Zekâ Koçu’nun masrafını karşılar.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Ücretsiz deneme süren bitti. Yapay Zekâ Koçu’nu kullanmaya devam etmek için Ayarlar’dan abone ol.',
   'Could not open the payment page': 'Ödeme sayfası açılamadı',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Bu web sitesinde ödenen abonelik iptal edilir. App Store veya Google Play’den alınan edilmez: onu orada iptal et.',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': '{0} rekoruna {1} {2} kaldı. Bugün kırılabilir.',
   'The Coach can rework your week': 'Koç haftanı yeniden düzenleyebilir',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Geçen hafta plandaki {1} seansın {0} tanesi yapılabildi. Koç planı gerçek haftana göre ayarlayabilir.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Koçtan ilk planın ücretsiz. Hedefini ve günlerini söyle.',
 }

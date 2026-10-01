@@ -1679,7 +1679,6 @@ export default {
   'Subscribe': 'Előfizetés indítása',
   'Manage subscription': 'Előfizetés kezelése',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Az edzések naplózása mindig ingyenes. Az előfizetés az MI-edzőt fizeti.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Lejárt az ingyenes próbaidőd. Fizess elő a Beállításokban, hogy továbbra is használhasd az MI-edzőt.',
   'Could not open the payment page': 'Nem sikerült megnyitni a fizetési oldalt',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Az ezen a weboldalon fizetett előfizetés megszűnik. Az App Store-ban vagy a Google Playen vásárolt nem: azt ott mondd le.',
@@ -1749,4 +1748,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': '{1} {2} választ el a(z) {0} rekordodtól. Ma megdőlhet.',
   'The Coach can rework your week': 'Az edző átszervezheti a hetedet',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'A múlt héten {1} tervezett edzésből {0} fért bele. Az edző a valódi hetedhez igazíthatja a tervet.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Az első edzéstervet ingyen kapod az edzőtől. Mondd el a célodat és a napjaidat.',
 }

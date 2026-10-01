@@ -34,7 +34,8 @@ import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } fro
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import {
   billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
-  revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber
+  revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber,
+  freePlanOpen, claimFreePlan, releaseFreePlan
 } from './billing.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
@@ -1897,12 +1898,26 @@ const priceFor = (user, plan) => variantFor(PAYWALL, user.id).prices?.[plan] || 
 const priceShown = createPriceCache(id => stripe(BILLING, 'GET', 'prices/' + encodeURIComponent(id)));
 const SYNC_BUDGET = createWindow({ max: 30, windowMs: 3600000 });
 
+// The free first Coach plan (billing.js freePlanOpen): taken when its job starts, given back
+// when that job fails.
+const FREE_PLAN = {
+  open: user => freePlanOpen(user, BILLING),
+  claim(user, jobId) { claimFreePlan(user, jobId); saveDb(); }
+};
+coachJobs.setFinishHook((uid, job, result) => {
+  if (result.outcome !== 'failed') return;
+  if (!releaseFreePlan(db.users.find(u => u.id === uid), job.id)) return;
+  try { saveDb(); } catch (e) { console.error('free plan: could not give it back', uid, e.message); }
+});
+
 const billingRoutes = {
-  // Where this profile stands: trial days left, or the subscription's state.
+  // Where this profile stands: trial days left, or the subscription's state — and whether the
+  // free first plan is still theirs to ask for.
   'GET /api/billing': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, billingAccess(user));
+    const a = billingAccess(user);
+    json(res, 200, { ...a, freePlan: !a.ai && FREE_PLAN.open(user), freePlanAt: user.freePlanUsedAt || null });
   },
 
   // The paywall this profile sees: its variant's words in the app's language, which plan is
@@ -2720,7 +2735,7 @@ const routes = {
   // them: they are closures over db and SECRET, and passing them in keeps that module free of
   // a cycle. Every one of them is inert while the feature is unconfigured.
   // mayUseAI: on an instance that charges, starting a job is what the subscription pays for.
-  ...coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI: user => billingAccess(user).ai }),
+  ...coachRoutes({ json, readBody, readSession, requireAdmin, mayUseAI: user => billingAccess(user).ai, freePlan: FREE_PLAN }),
 
   /* ---------- photos & videos ---------- */
   // Absent, not refusing, when MEDIA_UPLOADS=0: a 404 is what a server from before the feature

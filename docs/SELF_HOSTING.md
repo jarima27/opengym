@@ -383,8 +383,17 @@ How it behaves:
   after sign-up open it. Its words, the recommended plan, each plan's Stripe price and up to four
   A/B variants are edited in **Admin → Paywall** and are live on the next paywall anyone opens.
 - **End of trial.** When a trial or subscription runs out, the website shows the end-of-trial
-  screen, at most every three days. Coach jobs answer `402` until they subscribe; a failed card
-  (`past_due`) keeps the Coach on while the store or Stripe retries.
+  screen once; Coach jobs answer `402` until they subscribe; a failed card (`past_due`) keeps the
+  Coach on while the store or Stripe retries.
+- **Free first plan.** Every profile may ask the Coach for one plan without paying, once in the
+  life of the account. The mark is on the profile's row in `db.json` (`freePlanUsedAt`), so a new
+  phone or cleared app data does not bring it back; a job that fails gives it back.
+- **Offer moments.** The website offers Pro by itself a week after that free plan (with two
+  workouts since), when a lift of the plan has stalled, and on returning after five days off —
+  each once, and every offer, the end-of-trial screen included, at most every three days, never
+  with a workout running and never right after a record. The paywall's title for each moment
+  (and lines quoting the person's data: `{exercise}`, `{weeks}`, `{missed}`, `{gainKg}`) is
+  edited in Admin → Paywall, as is the trial timeline shown above the button.
 - **Creator codes.** Admin → Creator codes makes a code per creator or trainer. A sign-up
   through `https://<your domain>/?ref=CODE` gets the extra days on top of the trial, and the card
   shows how many signed up and how many pay. `utm_*` tags in the link are recorded too.

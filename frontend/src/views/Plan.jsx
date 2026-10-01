@@ -12,6 +12,7 @@ import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
 import { coachAvailable } from '../lib/coach.js'
+import { useFreePlan } from '../components/useCoachAccess.js'
 
 export default function Plan() {
   const nav = useNavigate()
@@ -26,6 +27,8 @@ export default function Plan() {
      configured, and invisible. The same predicate every other Coach surface uses gates it, so
      an instance without the feature sees exactly the Plan screen it saw before. */
   const showCoach = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })
+  // Without the Coach, its first plan is still a gift to take once (api/billing.js freePlanOpen).
+  const freePlan = useFreePlan()
 
   // Swap with the neighbour, the way the routine editor moves an exercise. `S.routines` is the
   // one order the whole app reads, so this is all there is to it (#142).
@@ -64,7 +67,7 @@ export default function Plan() {
       <span className="coach-cta-av"><Icon name="sparkles" /></span>
       <span className="coach-cta-t">
         <b>{t('Coach')}</b>
-        <span>{t('Plan design and reviews, from your own training')}</span>
+        <span>{freePlan ? t('Your first Coach plan, free. Tell it your goal and your days.') : t('Plan design and reviews, from your own training')}</span>
       </span>
       <Icon name="chevronRight" className="coach-cta-chev" />
     </button>}

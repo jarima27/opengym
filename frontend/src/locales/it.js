@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': 'Abbonati',
   'Manage subscription': 'Gestisci abbonamento',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Registrare gli allenamenti è sempre gratis. L’abbonamento paga il Coach IA.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'La tua prova gratuita è terminata. Abbonati in Impostazioni per continuare a usare il Coach IA.',
   'Could not open the payment page': 'Impossibile aprire la pagina di pagamento',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Un abbonamento pagato su questo sito viene annullato. Uno acquistato su App Store o Google Play no: annullalo lì.',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'Ti mancano {1} {2} al tuo record in {0}. Può cadere oggi.',
   'The Coach can rework your week': 'Il Coach può riorganizzare la tua settimana',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'La settimana scorsa ci sono state {0} sessioni su {1} del piano. Il Coach può adattare il piano alla tua settimana reale.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Il tuo primo piano del Coach, gratis. Digli il tuo obiettivo e i tuoi giorni.',
 }

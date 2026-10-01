@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': '立即订阅',
   'Manage subscription': '管理订阅',
   'Logging workouts is always free. The subscription pays for the AI Coach.': '记录训练永远免费。订阅费用用于 AI 教练。',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': '免费试用已结束。请在设置中订阅以继续使用 AI 教练。',
   'Could not open the payment page': '无法打开付款页面',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': '在本网站支付的订阅会被取消。通过 App Store 或 Google Play 购买的不会：请在那里取消。',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': '距离你的 {0} 纪录只差 {1} {2}。今天就可能突破。',
   'The Coach can rework your week': '教练可以重新安排你的一周',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': '上周计划中的 {1} 次训练完成了 {0} 次。教练可以按你的实际一周调整计划。',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': '你的第一份教练计划，免费。告诉它你的目标和训练日。',
 }

@@ -20,14 +20,16 @@ export const accessOf = a => (!a || !a.on ? 'open' : a.ai ? 'pro' : 'free')
 // Asked once and kept for a few minutes: the Home card, the report sync and the paywall moments
 // all want it, and none of them is worth a request each. A checkout or a store purchase drops it.
 const ACCESS_TTL = 5 * 60000
-let accessMemo = null // { at, value: Promise<'pro'|'free'|'open'> }
-export function coachAccess() {
-  if (accessMemo && Date.now() - accessMemo.at < ACCESS_TTL) return accessMemo.value
-  const value = billingStatus().then(accessOf, () => { accessMemo = null; return null })
-  accessMemo = { at: Date.now(), value }
+let statusMemo = null // { at, value: Promise<status | null> }
+/** GET /api/billing, kept for a few minutes; null where nothing is sold or it cannot be asked. */
+export function billingCached() {
+  if (statusMemo && Date.now() - statusMemo.at < ACCESS_TTL) return statusMemo.value
+  const value = billingStatus().catch(() => { statusMemo = null; return undefined })
+  statusMemo = { at: Date.now(), value }
   return value
 }
-export const forgetCoachAccess = () => { accessMemo = null }
+export const coachAccess = () => billingCached().then(a => (a === undefined ? null : accessOf(a)))
+export const forgetCoachAccess = () => { statusMemo = null }
 
 export const billingCheckout = plan => api('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: plan || 'monthly' }) })
 export const billingPortal = () => api('/api/billing/portal', { method: 'POST', body: '{}' })

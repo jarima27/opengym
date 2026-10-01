@@ -4,7 +4,7 @@ import { t, useLang } from '../lib/i18n.js'
 import { dateLocale, getLang } from '../lib/i18n-core.js'
 import { MOBILE } from '../lib/mobile.js'
 import { billingCheckout } from '../lib/billing.js'
-import { fetchPaywall, annualSaving, planLines, ctaText } from '../lib/paywall.js'
+import { fetchPaywall, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from '../lib/paywall.js'
 import { track } from '../lib/track.js'
 import Icon from './Icon.jsx'
 import { Button } from './ui.jsx'
@@ -17,9 +17,11 @@ import { Button } from './ui.jsx'
 // store app may not send people to a web checkout.
 const ORDER = ['annual', 'monthly']
 
-export function openPaywall(reason) {
+// `context` is the person's own data behind the moment it opens on — { exercise, weeks, missed,
+// gainKg } — which the operator's words can quote by name (lib/paywall.js fillNamed).
+export function openPaywall(reason, context = null) {
   if (MOBILE) return false
-  useUI.getState().openSheet(close => <Paywall reason={reason} close={close} />)
+  useUI.getState().openSheet(close => <Paywall reason={reason} context={context} close={close} />)
   return true
 }
 // Admin → Paywall → Preview: the words being edited, on the real screen with today's prices.
@@ -28,7 +30,7 @@ export function openPaywallPreview(preview, reason = 'preview') {
   useUI.getState().openSheet(close => <Paywall reason={reason} preview={preview} close={close} />)
 }
 
-function Paywall({ reason, preview, close }) {
+function Paywall({ reason, context, preview, close }) {
   const [pw, setPw] = useState(null)
   const [plan, setPlan] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -70,11 +72,18 @@ function Paywall({ reason, preview, close }) {
   }
   const later = () => { if (!preview) track('paywall_dismissed', { variant: pw.variant, reason }); close() }
 
+  // The operator's lines with the person's data in them; one whose data is missing is left out.
+  const ctx = context || {}
+  const subtitle = fillNamed(end ? c.endBody : c.subtitle, ctx)
+  const bullets = (c.bullets || []).map(b => fillNamed(b, ctx)).filter(Boolean)
+  const footnote = fillNamed(c.footnote, ctx)
+  const timeline = end ? null : timelineText(c, pw.cardTrialDays)
+
   return <>
-    <h3 style={{ marginBottom: 6 }}>{end ? c.endTitle : c.title}</h3>
-    <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>{end ? c.endBody : c.subtitle}</div>
-    {!!c.bullets?.length && <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
-      {c.bullets.map((b, i) => <div key={i} className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+    <h3 style={{ marginBottom: 6 }}>{end ? c.endTitle : titleFor(c, reason, ctx)}</h3>
+    {subtitle && <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>{subtitle}</div>}
+    {!!bullets.length && <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+      {bullets.map((b, i) => <div key={i} className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
         <Icon name="checkCircle" style={{ color: 'var(--acc)', flex: 'none', marginTop: 2 }} />
         <span className="small">{b}</span>
       </div>)}
@@ -98,8 +107,13 @@ function Paywall({ reason, preview, close }) {
       })}
     </div> : <div className="card small muted" style={{ marginBottom: 14 }}>{t('Subscriptions are sold in the iPhone and Android app.')}</div>}
 
+    {/* What the trial does and when, before the button that starts it: no surprise on day 30. */}
+    {!!offered.length && timeline && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12, lineHeight: 1.45 }}>
+      <Icon name="calendar" style={{ color: 'var(--acc)', flex: 'none', marginTop: 2 }} />
+      <span>{timeline}</span>
+    </div>}
     {!!offered.length && <Button variant="primary" onClick={go} disabled={busy || !plan}>{ctaText(pw, end)}</Button>}
-    {c.footnote && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>{c.footnote}</div>}
+    {footnote && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>{footnote}</div>}
     <div style={{ height: 8 }} />
     <Button variant="ghost" className="dim" onClick={later}>{c.later}</Button>
   </>

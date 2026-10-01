@@ -1022,7 +1022,6 @@ export const PT_BR_OVERRIDES = {
   'Subscribe': 'Assinar',
   'Manage subscription': 'Gerenciar assinatura',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Registrar treinos é sempre grátis. A assinatura paga o Treinador IA.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Seu teste grátis terminou. Assine em Configurações para continuar usando o Treinador IA.',
   'Could not open the payment page': 'Não foi possível abrir a página de pagamento',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Uma assinatura paga neste site é cancelada. Uma comprada na App Store ou no Google Play não: cancele por lá.',
@@ -1078,6 +1077,8 @@ export const PT_BR_OVERRIDES = {
   'You are {1} {2} from your {0} record. It could fall today.': 'Você está a {1} {2} do seu recorde em {0}. Pode cair hoje.',
   'The Coach can rework your week': 'O Treinador pode reajustar sua semana',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Na semana passada couberam {0} de {1} treinos do plano. O Treinador pode ajustar o plano à sua semana real.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Seu primeiro plano do Treinador, grátis. Conte seu objetivo e seus dias.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

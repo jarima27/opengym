@@ -8,7 +8,10 @@ import { useStore } from '../store/useStore.js'
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({ access: 'free', track: null, paywall: null }))
-vi.mock('../lib/billing.js', async importOriginal => ({ ...(await importOriginal()), coachAccess: () => Promise.resolve(mocks.access) }))
+vi.mock('../lib/billing.js', async importOriginal => ({
+  ...(await importOriginal()),
+  billingCached: () => Promise.resolve({ on: true, ai: mocks.access === 'pro', plan: mocks.access === 'pro' ? 'trial' : 'none' })
+}))
 vi.mock('../lib/track.js', () => ({ track: (...a) => mocks.track(...a) }))
 vi.mock('./Paywall.jsx', () => ({ openPaywall: (...a) => mocks.paywall(...a) }))
 

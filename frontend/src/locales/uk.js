@@ -1673,7 +1673,6 @@ export default {
   'Subscribe': 'Оформити підписку',
   'Manage subscription': 'Керувати підпискою',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Записувати тренування завжди безкоштовно. Підписка оплачує ШІ-тренера.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Твій безкоштовний період закінчився. Оформи підписку в Налаштуваннях, щоб і далі користуватися ШІ-тренером.',
   'Could not open the payment page': 'Не вдалося відкрити сторінку оплати',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Підписку, оплачену на цьому сайті, буде скасовано. Куплену в App Store чи Google Play — ні: скасуй її там.',
@@ -1743,4 +1742,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'До рекорду у вправі «{0}» лишилося {1} {2}. Може впасти вже сьогодні.',
   'The Coach can rework your week': 'Тренер може перебудувати твій тиждень',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'Минулого тижня вийшло {0} з {1} тренувань плану. Тренер може підлаштувати план під твій реальний тиждень.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Перший план від тренера — безкоштовно. Розкажи про мету й дні тренувань.',
 }

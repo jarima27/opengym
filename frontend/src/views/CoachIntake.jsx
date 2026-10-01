@@ -17,6 +17,7 @@ import { DAYN } from '../lib/format.js'
 import { EXDB } from '../lib/exercises.js'
 import { emptyCoach, coachAvailable, hasConsent, CONSENT_VERSION, CATEGORY_TEXT, appendChat } from '../lib/coach.js'
 import { requestPlan, disclosure } from '../lib/coach-api.js'
+import { useFreePlan } from '../components/useCoachAccess.js'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
 import Icon from '../components/Icon.jsx'
@@ -61,6 +62,7 @@ export default function CoachIntake() {
   const [needConsent] = useState(() => !editing && !hasConsent(S))
   const STEPS = [...(needConsent ? ['consent'] : []), 'goal', 'experience', 'days', 'length', 'equipment', 'limits', 'extras']
   const [step, setStep] = useState(0)
+  const freePlan = useFreePlan()
   const [busy, setBusy] = useState(false)
   const [p, setP] = useState(() => ({
     goal: null, experience: null, daysPerWeek: 3, preferredDays: [1, 3, 5],
@@ -128,6 +130,7 @@ export default function CoachIntake() {
       {key === 'consent' && <Consent onAgree={agree} onDecline={() => nav('/plan')} />}
 
       {key === 'goal' && <>
+        {freePlan && !editing && <div className="ob-gift"><Icon name="sparkles" /><span>{t('Your first Coach plan, free. Tell it your goal and your days.')}</span></div>}
         <div className="ob-eyebrow">{t('Your goal')}</div>
         <h1 className="ob-h">{t('What are you training for?')}</h1>
         <p className="ob-p">{t('The Coach builds the whole plan around this.')}</p>

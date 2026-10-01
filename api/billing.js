@@ -370,3 +370,19 @@ export async function revenueCatSubscriber(cfg, uid, fetchImpl = globalThis.fetc
   if (!r.ok) throw Object.assign(new Error(body?.message || `revenuecat answered ${r.status}`), { status: r.status });
   return body?.subscriber || null;
 }
+
+/* The one Coach plan a profile may ask for without paying, once in the life of the account
+   (spec F4). The mark lives on the profile's row, not on a device: clearing the app's data or
+   signing in on another phone does not bring it back. A job that fails gives it back — the
+   person got nothing for it — but only the job that took it. */
+export const freePlanOpen = (user, cfg) => !!cfg.on && !!user && !user.freePlanUsedAt;
+export function claimFreePlan(user, jobId, now = Date.now()) {
+  user.freePlanUsedAt = new Date(now).toISOString();
+  user.freePlanJob = jobId;
+}
+export function releaseFreePlan(user, jobId) {
+  if (!user || !user.freePlanJob || user.freePlanJob !== jobId) return false;
+  delete user.freePlanUsedAt;
+  delete user.freePlanJob;
+  return true;
+}

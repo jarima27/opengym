@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fill, money, annualSaving, planLines, ctaText } from './paywall.js'
+import { fill, money, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from './paywall.js'
 
 const copy = { perMonth: '{0}/mes', perYear: '{0}/año', cta: 'Empezar {0} días gratis', ctaNoTrial: 'Suscribirme', endCta: 'Seguir con el Coach IA' }
 const plans = { monthly: { amount: 499, currency: 'EUR', interval: 'month' }, annual: { amount: 3499, currency: 'EUR', interval: 'year' } }
@@ -31,5 +31,32 @@ describe('paywall sums', () => {
     expect(ctaText({ cardTrialDays: 30, copy }, false)).toBe('Empezar 30 días gratis')
     expect(ctaText({ cardTrialDays: 0, copy }, false)).toBe('Suscribirme')
     expect(ctaText({ cardTrialDays: 0, copy }, true)).toBe('Seguir con el Coach IA')
+  })
+})
+
+describe('the person’s own data on the paywall', () => {
+  const c = {
+    title: 'Un entrenador que revisa tu semana', titleStall: 'Deja de estancarte en {exercise}',
+    titleComeback: '¿Unos días fuera? El Coach puede reajustar tu semana.', titleDay7: 'Tu plan ha funcionado esta semana.',
+    timeline: 'Hoy: todo Pro desbloqueado · Día {0}: te avisamos · Día {1}: empieza el pago.'
+  }
+  it('fills named blanks, and gives up on a line whose blank has no data', () => {
+    expect(fillNamed('Deja de estancarte en {exercise}', { exercise: 'Sentadilla' })).toBe('Deja de estancarte en Sentadilla')
+    expect(fillNamed('{missed} sesiones sin hacer', {})).toBe(null)
+    expect(fillNamed('{missed} sesiones', { missed: 0 })).toBe('0 sesiones')
+    expect(fillNamed('Empezar {0} días gratis', {})).toBe('Empezar {0} días gratis')
+    expect(fillNamed('', {})).toBe(null)
+  })
+  it('the moment’s own title when it can be filled, the general one otherwise', () => {
+    expect(titleFor(c, 'stall', { exercise: 'Sentadilla' })).toBe('Deja de estancarte en Sentadilla')
+    expect(titleFor(c, 'pill:stall', { exercise: 'Press banca' })).toBe('Deja de estancarte en Press banca')
+    expect(titleFor(c, 'stall', {})).toBe('Un entrenador que revisa tu semana')
+    expect(titleFor(c, 'comeback')).toBe('¿Unos días fuera? El Coach puede reajustar tu semana.')
+    expect(titleFor(c, 'settings')).toBe('Un entrenador que revisa tu semana')
+  })
+  it('the trial’s timeline: the reminder three days before the first charge, only with a trial', () => {
+    expect(timelineText(c, 30)).toBe('Hoy: todo Pro desbloqueado · Día 27: te avisamos · Día 30: empieza el pago.')
+    expect(timelineText(c, 0)).toBe(null)
+    expect(timelineText({}, 30)).toBe(null)
   })
 })

@@ -1687,7 +1687,6 @@ export default {
   'Subscribe': 'สมัครสมาชิก',
   'Manage subscription': 'จัดการการสมัครสมาชิก',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'การบันทึกการออกกำลังกายฟรีเสมอ ค่าสมาชิกใช้สำหรับโค้ช AI',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'ช่วงทดลองใช้ฟรีของคุณสิ้นสุดแล้ว สมัครสมาชิกได้ที่ตั้งค่าเพื่อใช้โค้ช AI ต่อ',
   'Could not open the payment page': 'เปิดหน้าชำระเงินไม่ได้',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'การสมัครสมาชิกที่ชำระบนเว็บไซต์นี้จะถูกยกเลิก ส่วนที่ซื้อผ่าน App Store หรือ Google Play จะไม่ถูกยกเลิก: ให้ยกเลิกที่นั่น',
@@ -1757,4 +1756,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'อีก {1} {2} จะถึงสถิติ {0} ของคุณ วันนี้อาจทำลายได้',
   'The Coach can rework your week': 'โค้ชช่วยจัดสัปดาห์ใหม่ได้',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'สัปดาห์ที่แล้วทำได้ {0} จาก {1} ครั้งตามแผน โค้ชช่วยปรับแผนให้เข้ากับสัปดาห์จริงของคุณได้',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'แผนแรกจากโค้ช ฟรี บอกเป้าหมายและวันที่คุณฝึก',
 }

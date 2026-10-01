@@ -20,19 +20,27 @@ import fs from 'node:fs';
 
 export const PLANS = ['monthly', 'annual'];
 // Every text field, in the order the admin form lists them. {0} is filled in by the app: the
-// trial's days in the call to action, the price in perMonth / perYear.
+// trial's days in the call to action, the price in perMonth / perYear, the reminder's and the
+// first charge's day in the timeline. Named blanks carry the person's own data where the paywall
+// was opened from it: {exercise} and {weeks} (a stalled lift), {missed} (sessions missed last
+// week), {gainKg} (a lift's rise). A line whose blank has no data is left out, never shown half
+// empty; a title falls back to the general one.
 export const COPY_FIELDS = [
-  'title', 'subtitle', 'bullets', 'cta', 'ctaNoTrial', 'monthlyLabel', 'annualLabel', 'annualBadge',
-  'perMonth', 'perYear', 'footnote', 'later', 'endTitle', 'endBody', 'endCta'
+  'title', 'titleStall', 'titleComeback', 'titleDay7', 'subtitle', 'bullets', 'timeline', 'cta', 'ctaNoTrial',
+  'monthlyLabel', 'annualLabel', 'annualBadge', 'perMonth', 'perYear', 'footnote', 'later', 'endTitle', 'endBody', 'endCta'
 ];
 const MAX_TEXT = 300;
 const MAX_BULLETS = 6;
 
 export const DEFAULT_COPY = {
   es: {
-    title: 'Entrena con un plan que progresa solo',
+    title: 'Un entrenador que revisa tu semana',
+    titleStall: 'Deja de estancarte en {exercise}',
+    titleComeback: '¿Unos días fuera? El Coach puede reajustar tu semana.',
+    titleDay7: 'Tu plan ha funcionado esta semana. ¿Quieres que el Coach lo ajuste cada lunes?',
     subtitle: 'El Coach IA ajusta tu plan cada semana según lo que levantas de verdad.',
     bullets: ['Coach IA incluido, sin claves ni configuraciones', 'Progresión automática de cada ejercicio', 'Tus datos sincronizados en todos tus dispositivos'],
+    timeline: 'Hoy: todo Pro desbloqueado · Día {0}: te avisamos · Día {1}: empieza el pago. Cancela en un toque.',
     cta: 'Empezar {0} días gratis',
     ctaNoTrial: 'Suscribirme',
     monthlyLabel: 'Mensual',
@@ -47,9 +55,13 @@ export const DEFAULT_COPY = {
     endCta: 'Seguir con el Coach IA'
   },
   en: {
-    title: 'Train on a plan that progresses itself',
+    title: 'A coach that reviews your week',
+    titleStall: 'Stop stalling on {exercise}',
+    titleComeback: 'A few days off? The Coach can rework your week.',
+    titleDay7: 'Your plan worked this week. Want the Coach to adjust it every Monday?',
     subtitle: 'The AI Coach adjusts your plan every week from what you actually lift.',
     bullets: ['AI Coach included — no keys, no setup', 'Automatic progression on every exercise', 'Your data synced across all your devices'],
+    timeline: 'Today: all of Pro unlocked · Day {0}: we remind you · Day {1}: billing starts. Cancel in one tap.',
     cta: 'Start {0} days free',
     ctaNoTrial: 'Subscribe',
     monthlyLabel: 'Monthly',

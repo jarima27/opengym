@@ -1729,7 +1729,6 @@ export default {
   'Subscribe': 'اشترك',
   'Manage subscription': 'إدارة الاشتراك',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'تسجيل التمارين مجاني دائمًا. الاشتراك يغطي مدرب الذكاء الاصطناعي.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'انتهت تجربتك المجانية. اشترك من الإعدادات لمواصلة استخدام مدرب الذكاء الاصطناعي.',
   'Could not open the payment page': 'تعذّر فتح صفحة الدفع',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'يُلغى الاشتراك المدفوع على هذا الموقع. أما المشترى من App Store أو Google Play فلا: ألغِه هناك.',
@@ -1799,4 +1798,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'تفصلك {1} {2} عن رقمك القياسي في {0}. قد يُكسر اليوم.',
   'The Coach can rework your week': 'يمكن للمدرب إعادة ترتيب أسبوعك',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'الأسبوع الماضي تمّت {0} من أصل {1} حصص في الخطة. يمكن للمدرب ملاءمة الخطة مع أسبوعك الفعلي.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'خطتك الأولى من المدرب مجانًا. أخبره بهدفك وأيام تمرينك.',
 }

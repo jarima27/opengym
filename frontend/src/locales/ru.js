@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': 'Оформить подписку',
   'Manage subscription': 'Управление подпиской',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'Записывать тренировки всегда бесплатно. Подписка оплачивает ИИ-тренера.',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'Бесплатный период закончился. Оформите подписку в Настройках, чтобы и дальше пользоваться ИИ-тренером.',
   'Could not open the payment page': 'Не удалось открыть страницу оплаты',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'Подписка, оплаченная на этом сайте, отменяется. Купленная в App Store или Google Play — нет: отмените её там.',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'До рекорда в упражнении «{0}» осталось {1} {2}. Может пасть уже сегодня.',
   'The Coach can rework your week': 'Тренер может перестроить вашу неделю',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'На прошлой неделе получилось {0} из {1} тренировок плана. Тренер может подстроить план под вашу реальную неделю.',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'Первый план от тренера — бесплатно. Расскажите о цели и днях тренировок.',
 }

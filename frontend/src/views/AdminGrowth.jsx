@@ -59,12 +59,14 @@ export function CodesCard() {
 /* ------------------------------ paywall ------------------------------ */
 
 const LABELS = {
-  title: 'Title', subtitle: 'Subtitle', bullets: 'Bullet points — one per line', cta: 'Button, when checking out starts a trial ({0} = days)',
+  title: 'Title', titleStall: 'Title when a lift has stalled ({exercise}, {weeks})',
+  titleComeback: 'Title when back after a few days off', titleDay7: 'Title a week after the free Coach plan',
+  timeline: 'Trial timeline ({0} = reminder day, {1} = first charge day)', subtitle: 'Subtitle', bullets: 'Bullet points — one per line', cta: 'Button, when checking out starts a trial ({0} = days)',
   ctaNoTrial: 'Button, without a trial', monthlyLabel: 'Monthly plan name', annualLabel: 'Yearly plan name', annualBadge: 'Badge on the recommended plan',
   perMonth: 'Price per month ({0} = price)', perYear: 'Price per year ({0} = price)', footnote: 'Small print', later: 'Dismiss button',
   endTitle: 'Trial ended — title', endBody: 'Trial ended — text', endCta: 'Trial ended — button, without a trial'
 }
-const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody'])
+const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody', 'timeline', 'titleDay7'])
 const clone = o => JSON.parse(JSON.stringify(o))
 
 export function PaywallCard() {
@@ -122,6 +124,10 @@ export function PaywallCard() {
       The words on the website’s paywall and end-of-trial screen, and — for a test — each variant’s share of people and its own Stripe prices.
       Saved changes are live on the next paywall anyone opens. A field left empty uses the text shown in grey. Every paywall event in your
       analytics carries the experiment and the variant.
+    </div>
+    <div className="adm-lead">
+      Any line can quote the person’s own data where the paywall opened from it: {'{exercise}'} and {'{weeks}'} (a stalled lift),
+      {' {missed}'} (sessions missed last week), {'{gainKg}'} (a lift’s rise). A line whose data is missing is left out; a title falls back to the general one.
     </div>
 
     <label className="small dim">Experiment name — change it to start a new test with fresh groups</label>

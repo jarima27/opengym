@@ -1676,7 +1676,6 @@ export default {
   'Subscribe': 'सदस्यता लें',
   'Manage subscription': 'सदस्यता प्रबंधित करें',
   'Logging workouts is always free. The subscription pays for the AI Coach.': 'वर्कआउट लॉग करना हमेशा मुफ़्त है। सदस्यता AI कोच का खर्च उठाती है।',
-  'Your free trial has ended. Subscribe in Settings to keep using the AI Coach.': 'आपका मुफ़्त ट्रायल खत्म हो गया है। AI कोच का उपयोग जारी रखने के लिए सेटिंग्स में सदस्यता लें।',
   'Could not open the payment page': 'भुगतान पेज नहीं खुल सका',
   // Delete account, the welcome's import step, the paywall and store subscriptions (hosted launch).
   'A subscription paid on this website is cancelled. One bought in the App Store or Google Play is not: cancel it there.': 'इस वेबसाइट पर भुगतान की गई सदस्यता रद्द हो जाती है। App Store या Google Play से खरीदी गई नहीं: उसे वहीं रद्द करें।',
@@ -1746,4 +1745,6 @@ export default {
   'You are {1} {2} from your {0} record. It could fall today.': 'आप {0} में अपने रिकॉर्ड से {1} {2} दूर हैं। आज ही टूट सकता है।',
   'The Coach can rework your week': 'कोच आपका हफ़्ता फिर से बना सकता है',
   'Last week {0} of {1} planned sessions fitted in. The Coach can fit the plan to your real week.': 'पिछले हफ़्ते प्लान के {1} में से {0} सेशन हो पाए। कोच प्लान को आपके असली हफ़्ते के हिसाब से ढाल सकता है।',
+  // The Coach's free first plan (spec F4).
+  'Your first Coach plan, free. Tell it your goal and your days.': 'कोच का आपका पहला प्लान, मुफ़्त। उसे अपना लक्ष्य और दिन बताएँ।',
 }
