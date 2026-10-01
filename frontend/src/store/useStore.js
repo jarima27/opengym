@@ -1406,7 +1406,11 @@ export const useStore = create((set, get) => {
     async resetDemo() {
       const { buildDemoState } = await import('../lib/demoSeed.js')
       markOwed(false)
-      persist(Object.assign(clone(DEF), buildDemoState()), false)
+      // The visitor's language survives a reset when they picked one; otherwise the demo follows
+      // the device, like any copy nobody has chosen a language for (lib/default-lang.js).
+      const cur = get().S
+      const lang = cur?.langAuto === false ? { lang: cur.lang, langAuto: false } : { lang: detectedLang(), langAuto: true }
+      persist(Object.assign(clone(DEF), buildDemoState(), lang), false)
       // The demo's photos and videos were only ever in this browser, and the reset takes them too.
       await mediaStore.clearAll().catch(() => {})
     },

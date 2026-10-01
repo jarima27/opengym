@@ -53,6 +53,14 @@ describe('instance default language', () => {
     expect(shown()).toBe('de')
   })
 
+  it('before any server has answered (a first visit, the demo, a phone on its own) a fresh copy is in the device language, not English', () => {
+    nav(['es-ES', 'en'])
+    useStore.setState({ S: freshState(), config: null })
+    expect(shown()).toBe('es')
+    nav(['nl-NL'])
+    expect(shown()).toBe('en')   // a language the app does not speak: English
+  })
+
   it('without DEFAULT_LANG a fresh copy follows the browser when the app speaks it', () => {
     nav(['de-DE', 'en'])
     useStore.setState({ S: freshState(), config: { invite_only: false, allow_guest: true } })

@@ -53,7 +53,8 @@ export const hasCachedDefaultLang = () => cachedDefaultLang() !== null
 /**
  * The language to show this copy in, on this device: its own `lang`, or for a copy that never
  * picked one, what autoLang says. Before the config is in, the default this device last saw
- * stands in for it; with none seen yet the copy's stored language is used unchanged.
+ * stands in for it; with none seen yet — a first visit, or a build with no server to ask at all
+ * (the demo, a phone on its own) — the device's language does, rather than English.
  */
 export function effectiveLang(S, config, navLangs = browserLangs()) {
   const own = (S && typeof S.lang === 'string' && S.lang) || 'en'
@@ -61,8 +62,7 @@ export function effectiveLang(S, config, navLangs = browserLangs()) {
   let cfg = config
   if (!cfg) {
     const seen = cachedDefaultLang()
-    if (seen === null) return own
-    cfg = { default_lang: seen }
+    cfg = seen === null ? {} : { default_lang: seen }
   }
   return autoLang(S, cfg, navLangs) || own
 }

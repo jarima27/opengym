@@ -2,8 +2,6 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { MOBILE } from '../lib/mobile.js'
-import { DEMO } from '../lib/demo.js'
 import { billingCached, accessOf } from '../lib/billing.js'
 import { takeTrialOffer } from '../lib/welcome.js'
 import { todayISO, isoOf, fmtNum, weekStartOf } from '../lib/format.js'
@@ -14,6 +12,7 @@ import { offerFor, offerAllowed, lastOfferAt, offersSeen, markOffer } from '../l
 import { useLang, getLang } from '../lib/i18n.js'
 import { effectiveLang } from '../lib/default-lang.js'
 import { openPaywall } from './Paywall.jsx'
+import { sellsHere } from './useCoachAccess.js'
 
 // The moments the website opens the paywall by itself:
 //
@@ -27,15 +26,15 @@ import { openPaywall } from './Paywall.jsx'
 //
 // All of them under the same limits (lib/offers.js offerAllowed): one offer every three days at
 // most, never with a workout running, never right after a record. Nothing at all on an instance
-// that does not charge (no billing block in its config), in the demo, or in the phone app, which
-// sells through its store.
+// that does not charge (no billing block in its config), in the demo, or in a phone build that
+// sells nothing (useCoachAccess.js sellsHere); the store app gets them, with its store's paywall.
 export default function BillingPrompts() {
   const charging = !!useStore(s => s.config?.billing)
   const user = useStore(s => s.user)
   const ready = useStore(s => s.ready)
   const sheets = useUI(s => s.sheets.length)
   const loc = useLocation()
-  const on = charging && !!user && !MOBILE && !DEMO
+  const on = sellsHere(charging, user?.id)
   const home = loc.pathname === '/home'
   // An offer quotes the person's own lift by name, so it waits for their language — exercise
   // names included — to be in place: one opened a moment earlier says "barbell full squat".

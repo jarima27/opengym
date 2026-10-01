@@ -7,7 +7,9 @@ import { billingCheckout, billingCached, billingResume } from '../lib/billing.js
 import { useStore } from '../store/useStore.js'
 import { DEFAULT_SERVER } from '../lib/app-account.js'
 import { fmtDate } from '../lib/format.js'
-import { fetchPaywall, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from '../lib/paywall.js'
+import { fetchPaywall, demoPaywall, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from '../lib/paywall.js'
+import { DEMO } from '../lib/demo.js'
+import { SIGNUP } from '../lib/brand.js'
 import { track } from '../lib/track.js'
 import Icon from './Icon.jsx'
 import { Button } from './ui.jsx'
@@ -52,11 +54,13 @@ function Paywall({ reason, context, preview, close }) {
   const viewed = useRef(false)
   // A subscription paused from the cancel flow is not sold again: it is resumed.
   const [paused, setPaused] = useState(null)
-  useEffect(() => { if (!preview) billingCached().then(a => { if (a?.plan === 'paused') setPaused(a) }).catch(() => {}) }, [])
+  useEffect(() => { if (!preview && !DEMO) billingCached().then(a => { if (a?.plan === 'paused') setPaused(a) }).catch(() => {}) }, [])
 
   useEffect(() => {
     let live = true
-    fetchPaywall(getLang()).then(async real => {
+    // The demo has no server: the real offer, in the built-in words.
+    const asked = DEMO ? Promise.resolve(demoPaywall(getLang())) : fetchPaywall(getLang())
+    asked.then(async real => {
       if (!live) return
       let p = preview ? { ...real, ...preview } : real
       // The store app: the operator's offering for this variant, priced by the store.
@@ -87,6 +91,8 @@ function Paywall({ reason, context, preview, close }) {
   const saving = annualSaving(pw.plans)
   const go = async () => {
     if (preview) { toast('Preview — nothing is charged'); return }
+    // Nothing is sold in the demo: the button opens the sign-up for an account of one's own.
+    if (DEMO) { window.open(SIGNUP, '_blank', 'noopener'); close(); return }
     setBusy(true)
     if (STORE) {
       track('checkout_started', { plan, via: 'store', variant: pw.variant, reason })
@@ -156,6 +162,7 @@ function Paywall({ reason, context, preview, close }) {
     </div>}
     {!!offered.length && <Button variant="primary" onClick={go} disabled={busy || !plan}>{ctaText(pw, end)}</Button>}
     {footnote && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>{footnote}</div>}
+    {DEMO && <div className="dim small" style={{ marginTop: 6, lineHeight: 1.5 }}>{t('This is the demo: the button opens the sign-up for your own account.')}</div>}
     {/* What the stores ask every subscription screen to say, and where the terms are. */}
     {STORE && !!offered.length && <div className="dim small" style={{ marginTop: 10, lineHeight: 1.5 }}>
       {t('Charged to your store account. It renews automatically unless you cancel at least 24 hours before the end of the period; manage or cancel it in your store account settings.')}

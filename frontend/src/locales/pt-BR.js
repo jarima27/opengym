@@ -865,17 +865,13 @@ export const PT_BR_OVERRIDES = {
   'Every top set on this one came in at RPE 9.5 or above for three sessions and the weight has not moved. Swapping the movement for four weeks usually breaks that stall faster than grinding the same one.': 'Todas as séries principais deste exercício ficaram em RPE 9,5 ou mais por três sessões e o peso não se mexeu. Trocar o movimento por quatro semanas costuma destravar essa estagnação mais rápido do que insistir no mesmo.',
   'Example data, stored only in this browser — change anything you like.': 'Dados de exemplo, salvos somente neste navegador — mude o que quiser.',
   'No training history yet — starting conservatively.': 'Ainda não há histórico de treino — começando com cautela.',
-  'Passkey sign-in, sync across your devices, your own data.': 'Login com chave de acesso, sincronização entre seus dispositivos, seus próprios dados.',
   'Puts the example plan, workouts and weigh-ins back the way they started.': 'Redefine o plano, os treinos e as pesagens de exemplo como estavam no início.',
   'Reset': 'Redefinir',
   'Reset demo data': 'Redefinir dados da demo',
   'Reset demo data?': 'Redefinir os dados da demo?',
   'Revised as you asked. Everything you did not question is exactly as it was.': 'Revisado como você pediu. Tudo o que você não questionou está exatamente como estava.',
-  'Self-host it in a minute →': 'Hospede você mesmo em um minuto →',
-  'Self-host Tiza': 'Hospedar o Tiza por conta própria',
   'Sessions have been running about fifteen minutes over. This is the accessory with the least to lose from one set fewer.': 'As sessões estão passando uns quinze minutos do previsto. Este é o exercício acessório que menos perde com uma série a menos.',
   'The two big lower-body and pressing patterns first, while you are fresh.': 'Primeiro os dois grandes padrões de membros inferiores e de empurrar, enquanto você está descansado.',
-  'This demo runs entirely in your browser on example data — nothing is sent anywhere. Passkey sign-in and sync across your devices come with the Tiza server, which you get by self-hosting it.': 'Esta demo roda inteiramente no seu navegador com dados de exemplo — nada é enviado para lugar nenhum. O login com chave de acesso e a sincronização entre seus dispositivos vêm com o servidor Tiza, que você obtém hospedando-o por conta própria.',
   'Three things worth changing, and one worth knowing about. Everything else is working — the squat and the pulls are both progressing on schedule.': 'Três coisas que vale a pena mudar e uma que vale a pena saber. Todo o resto está funcionando — o agachamento e as puxadas estão progredindo como previsto.',
   'You have moved this session to Saturday three weeks running. Better the plan says so than that you keep overriding it.': 'Você mudou esta sessão para sábado três semanas seguidas. Melhor o plano dizer isso do que você ficar alterando toda vez.',
   'You’re in the demo': 'Você está na demo',
@@ -1137,6 +1133,12 @@ export const PT_BR_OVERRIDES = {
   'Your purchase is restored.': 'Sua compra foi restaurada.',
   'Your training, and a Coach that reads it.': 'Seu treino, e um Treinador que o lê.',
   // Settings footer: the licence notice
+  // Tiza as a product: the demo and the store app offer an account, not self-hosting
+  'Create your free account': 'Crie sua conta grátis',
+  'An account keeps your workouts safe and in sync on all your devices, and brings the Coach.': 'Com uma conta, seus treinos ficam seguros e sincronizados em todos os seus dispositivos, e o Treinador vem junto.',
+  'This demo runs entirely in your browser on example data — nothing is sent anywhere.': 'Esta demo roda inteiramente no seu navegador com dados de exemplo — nada é enviado para lugar nenhum.',
+  'Create an account or sign in': 'Crie uma conta ou entre',
+  'This is the demo: the button opens the sign-up for your own account.': 'Esta é a demo: o botão abre o cadastro da sua própria conta.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

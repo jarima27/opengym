@@ -15,6 +15,7 @@ import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { t } from '../lib/i18n.js'
 import { MOBILE } from '../lib/mobile.js'
+import { DEFAULT_SERVER } from '../lib/app-account.js'
 import { CATEGORY_TEXT } from '../lib/coach.js'
 import { getApiKey, setApiKey, clearApiKey } from '../lib/coach-secrets.js'
 import { HTTP_PROVIDERS, HTTP_PROVIDER_IDS, baseUrlFor, validateBaseUrl } from '../../../api/coach/core/providers.js'
@@ -54,7 +55,8 @@ export default function CoachSetup() {
   const [step, setStep] = useState(-1)                     // -1 idle, 0..2 running, 3 done
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { if (!MOBILE) nav('/settings', { replace: true }) }, [])
+  // The store app's Coach comes with the account: no key of one's own, no other server.
+  useEffect(() => { if (!MOBILE || DEFAULT_SERVER) nav('/settings', { replace: true }) }, [])
   useEffect(() => { getApiKey().then(k => setHasKey(!!k)) }, [])
   // Ask the paired server afresh: the admin may have switched the Coach on since this phone booted.
   useEffect(() => { if (user) refreshConfig() }, [user])

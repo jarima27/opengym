@@ -10,6 +10,7 @@ import { api } from './api.js'
 import { hasConsent, coachAvailable } from './coach.js'
 import { DEMO } from './demo.js'
 import { MOBILE } from './mobile.js'
+import { DEFAULT_SERVER } from './app-account.js'
 import { t, getLang } from './i18n.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
@@ -97,7 +98,8 @@ export async function autoDebrief(workoutId) {
   const { S, config, user, coachLocal } = useStore.getState()
   if (DEMO || !workoutId || !S.coach?.autoDebrief || !hasConsent(S)) return
   if (!coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode: coachLocal?.mode })) return
-  const access = MOBILE ? 'open' : await import('./billing.js').then(m => m.coachAccess()).catch(() => null)
+  // A phone build that sells nothing has nothing to check; the store app is sold like the website.
+  const access = MOBILE && !DEFAULT_SERVER ? 'open' : await import('./billing.js').then(m => m.coachAccess()).catch(() => null)
   if (access !== 'pro' && access !== 'open') return
   _requestDebrief(workoutId).then(track).catch(() => {})
 }

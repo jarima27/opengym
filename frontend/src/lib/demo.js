@@ -10,5 +10,7 @@
 // time, so the demo-only UI folds away and the seed generator — imported dynamically — never
 // lands in a self-hosted bundle.
 export const DEMO = import.meta.env.VITE_DEMO === '1'
-export const DEMO_SEEDED = 'gym_demo_seeded_v1'
+// v2: seeded in the visitor's language, as a free account (components/useCoachAccess.js) — a
+// browser that saw v1 is seeded again once.
+export const DEMO_SEEDED = 'gym_demo_seeded_v2'
 export { SOURCE as REPO } from './brand.js'

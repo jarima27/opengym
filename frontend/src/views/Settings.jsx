@@ -14,7 +14,7 @@ import { pushSupported, enablePush, disablePush, sendTestPush, syncPushSubscript
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang } from '../lib/i18n.js'
 import { effectiveLang } from '../lib/default-lang.js'
-import { DEMO, REPO } from '../lib/demo.js'
+import { DEMO } from '../lib/demo.js'
 import { MOBILE, isAndroid, shareExport, shareExportBlob, syncReminder, notificationPermission } from '../lib/mobile.js'
 import { nudgePrefs } from '../../../api/coach/core/nudge-prefs.js'
 import { referencedFiles } from '../lib/media-refs.js'
@@ -24,7 +24,7 @@ import { getMediaStatus, subscribeMediaStatus, pendingRefCount } from '../lib/me
 import { limitsFrom, fmtMB, MB } from '../lib/media-limits.js'
 import { setRestAccent } from '../lib/rest-alert.js'
 import { checkForUpdate, downloadAndInstall } from '../lib/update.js'
-import { NAME, SITE, SITE_HOST, SOURCE, UPSTREAM, UPSTREAM_NAME, APK_UPDATES } from '../lib/brand.js'
+import { NAME, SITE, SITE_HOST, SOURCE, UPSTREAM, UPSTREAM_NAME, APK_UPDATES, SIGNUP } from '../lib/brand.js'
 import { forgetCoach } from '../lib/coach-api.js'
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, menuSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -297,15 +297,19 @@ export default function Settings() {
     {!(MOBILE && user) && <Section title={MOBILE ? t('Your data') : DEMO ? t('Demo') : t('Account')}>
       {MOBILE ? <>
         <Row icon="lock" iconTint="var(--acc)" title={t('All data stays on this phone')} subtitle={t('No account, no cloud — back it up anytime with Export below.')} />
-        <Row icon="link" iconTint="var(--indigo)" title={t('Connect to my server')} subtitle={t('Sync this device to your own self-hosted Tiza instead.')} accessory="chevron"
-          onClick={connectServer} />
+        {/* The store app has an account of its own to offer; only a build without one points at a server. */}
+        {DEFAULT_SERVER
+          ? <Row icon="person" iconTint="var(--indigo)" title={t('Create an account or sign in')} subtitle={t('An account keeps your workouts safe and in sync on all your devices, and brings the Coach.')} accessory="chevron"
+            onClick={() => useStore.setState({ needsMobileOnboarding: true })} />
+          : <Row icon="link" iconTint="var(--indigo)" title={t('Connect to my server')} subtitle={t('Sync this device to your own self-hosted Tiza instead.')} accessory="chevron"
+            onClick={connectServer} />}
         <KeptChangesRows />
       </> : DEMO ? <>
         <Row icon="sparkles" iconTint="var(--acc)" title={t('You’re in the demo')} subtitle={t('Example data, stored only in this browser — change anything you like.')} />
         <Row icon="reset" iconTint="var(--blue)" title={t('Reset demo data')} accessory="chevron"
           onClick={() => confirmSheet({ title: t('Reset demo data?'), message: t('Puts the example plan, workouts and weigh-ins back the way they started.'), confirmText: t('Reset'), onConfirm: () => { resetDemo(); nav('/home'); toast(t('Demo data reset')) } })} />
-        <Row icon="rocket" iconTint="var(--indigo)" title={t('Self-host Tiza')} subtitle={t('Passkey sign-in, sync across your devices, your own data.')} accessory="chevron"
-          onClick={() => window.open(REPO, '_blank', 'noopener')} />
+        <Row icon="rocket" iconTint="var(--indigo)" title={t('Create your free account')} subtitle={t('An account keeps your workouts safe and in sync on all your devices, and brings the Coach.')} accessory="chevron"
+          onClick={() => window.open(SIGNUP, '_blank', 'noopener')} />
       </> : user ? <>
         {user.admin && <Row icon="wrench" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
         <PasskeysRow state={passkeys.st} changed={credsChanged} />
@@ -338,8 +342,9 @@ export default function Settings() {
     {/* ---------- subscription: only on an instance that charges (api/billing.js) ---------- */}
     {user && !DEMO && (!MOBILE || DEFAULT_SERVER) && <SubscriptionSection />}
 
-    {/* ---------- the Coach on a phone: through the paired server, or with the user's own key ---------- */}
-    {MOBILE && <Section title={t('AI Coach')}>
+    {/* ---------- the Coach on a phone: through the paired server, or with the user's own key ----------
+        Not in the store app: its Coach comes with the account (and the subscription). */}
+    {MOBILE && !DEFAULT_SERVER && <Section title={t('AI Coach')}>
       <Row icon="sparkles" iconTint="var(--acc)" title={t('AI Coach')} accessory="chevron"
         subtitle={coachLocal?.mode === 'server' ? t('Runs on your Tiza server') : coachLocal?.mode === 'byok' ? t('Runs on this phone with your own API key') : t('Off — choose how the Coach should run.')}
         onClick={() => nav('/coach/setup')} />

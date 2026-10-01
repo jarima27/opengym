@@ -3,6 +3,8 @@
 // language, so none of them is in the locale packs.
 import { api } from './api.js'
 import { getLang } from './i18n.js'
+import { OFFER } from './brand.js'
+import { DEFAULT_COPY } from '../../../api/coach/core/paywall-copy.js'
 
 export const fetchPaywall = (lang = getLang()) => api('/api/paywall?lang=' + encodeURIComponent(lang))
 
@@ -71,4 +73,18 @@ export function titleFor(copy, reason, ctx) {
 export function timelineText(copy, cardTrialDays) {
   if (!(cardTrialDays > 3) || !copy.timeline) return null
   return fill(copy.timeline, cardTrialDays - 3, cardTrialDays)
+}
+
+// The paywall of the demo, which has no server to ask: the real offer (lib/brand.js OFFER) in the
+// built-in words (api/coach/core/paywall-copy.js). Its button opens the sign-up for an account.
+export function demoPaywall(lang = getLang()) {
+  const copy = DEFAULT_COPY[lang] || DEFAULT_COPY[String(lang).split('-')[0]] || DEFAULT_COPY.en
+  return {
+    experiment: 'demo', variant: 'demo', highlight: 'annual', offering: null, copy,
+    plans: {
+      monthly: { amount: OFFER.monthly, currency: OFFER.currency, interval: 'month' },
+      annual: { amount: OFFER.annual, currency: OFFER.currency, interval: 'year' }
+    },
+    cardTrialDays: OFFER.trialDays
+  }
 }

@@ -3,7 +3,8 @@ import { useUI } from '../store/useUI.js'
 import { webauthnOK, passkeyLogin, passkeyRegister, bio } from '../lib/api.js'
 import { hasData } from '../store/useStore.js'
 import { t } from '../lib/i18n.js'
-import { DEMO, REPO } from '../lib/demo.js'
+import { DEMO } from '../lib/demo.js'
+import { SIGNUP } from '../lib/brand.js'
 import { guestAllowed } from '../lib/guest.js'
 import { useState, useRef, useEffect } from 'react'
 import Icon from '../components/Icon.jsx'
@@ -120,10 +121,11 @@ export default function Login() {
       <div className="muted" style={{ marginBottom: 30 }}>{t('Live demo — everything stays in this browser.')}</div>
       <Button variant="primary" icon="sparkles" onClick={() => setGuest(true)}>{t('Start the demo')}</Button>
       <div className="card small muted" style={{ textAlign: 'start', marginTop: 16 }}>
-        {t('This demo runs entirely in your browser on example data — nothing is sent anywhere. Passkey sign-in and sync across your devices come with the Tiza server, which you get by self-hosting it.')}
+        {t('This demo runs entirely in your browser on example data — nothing is sent anywhere.')}{' '}
+        {t('An account keeps your workouts safe and in sync on all your devices, and brings the Coach.')}
       </div>
       <div className="dim small" style={{ marginTop: 22, lineHeight: 1.6 }}>
-        <a href={REPO} target="_blank" rel="noopener">{t('Self-host it in a minute →')}</a>
+        <a href={SIGNUP} target="_blank" rel="noopener">{t('Create your free account')} →</a>
       </div>
     </div>
   )
