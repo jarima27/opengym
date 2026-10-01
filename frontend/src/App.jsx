@@ -229,7 +229,8 @@ function Shell() {
           including on the sign-in screen, when the server has just ended the session. */}
       <SyncBanner />
       {/* The chat owns the bottom of the screen: its composer sits where the tabs would be. */}
-      {loc.pathname !== '/coach' && <TabBar onStart={startFlow} />}
+      {/* Nor while a phone is still choosing how to use the app: there is nowhere to go yet. */}
+      {loc.pathname !== '/coach' && !(authed && needsMobileOnboarding) && <TabBar onStart={startFlow} />}
       <RestTimer />
       <BillingPrompts />
       {authed && <CoachReportSync />}

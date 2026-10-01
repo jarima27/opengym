@@ -718,6 +718,12 @@ paths:
                 code: { type: string, description: An invite code, on an invite-only instance. }
                 src: { type: object, description: Attribution, as at the other sign-ups. }
                 token: { type: boolean, description: Also answer the session as `token` (native HTTP only). }
+                authorizationCode:
+                  type: string
+                  description: >-
+                    Apple only: the authorization code from the same sign-in. With APPLE_TEAM_ID,
+                    APPLE_KEY_ID and APPLE_PRIVATE_KEY set, the server exchanges it for a refresh
+                    token and revokes that when the profile is deleted, as Apple asks.
             example: { provider: apple, idToken: 'eyJraWQiOi…', name: Ada, token: true }
       responses:
         '200':

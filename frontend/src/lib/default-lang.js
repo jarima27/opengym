@@ -47,6 +47,8 @@ export function rememberDefaultLang(config) {
 function cachedDefaultLang() {
   try { return localStorage.getItem(CACHE_KEY) } catch { return null }
 }
+/** Whether this device has heard any instance's answer (or been told there is none). */
+export const hasCachedDefaultLang = () => cachedDefaultLang() !== null
 
 /**
  * The language to show this copy in, on this device: its own `lang`, or for a copy that never

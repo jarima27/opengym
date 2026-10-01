@@ -95,3 +95,49 @@ export function nameFor(body, claims) {
   const given = String(body?.name || claims?.given_name || claims?.name || '').replace(/\s+/g, ' ').trim();
   return given.slice(0, 40) || 'Tiza';
 }
+
+/* ---------- Apple: revoking the account's tokens when it is deleted ----------
+   Apple asks apps that offer Sign in with Apple to revoke the user's tokens through its REST API
+   when the account is deleted. That takes a refresh token, which only the authorization code the
+   app got at sign-in can be exchanged for, and a client secret: a short JWT signed (ES256) with
+   the team's Sign in with Apple key. APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY (the .p8,
+   PEM; "\n" may be written as \\n in .env) switch it on; without them nothing is exchanged and a
+   deleted account's Apple sign-in simply stops opening anything. */
+export function appleKeysConfig(env = process.env) {
+  const str = k => String(env[k] || '').trim();
+  const pem = str('APPLE_PRIVATE_KEY').replace(/\\n/g, '\n');
+  if (!str('APPLE_TEAM_ID') || !str('APPLE_KEY_ID') || !pem) return null;
+  return { teamId: str('APPLE_TEAM_ID'), keyId: str('APPLE_KEY_ID'), privateKey: pem, apiBase: (str('APPLE_API_BASE') || 'https://appleid.apple.com').replace(/\/+$/, '') };
+}
+
+/** The client secret Apple's token endpoints take: an ES256 JWT, valid for five minutes. */
+export function appleClientSecret(cfg, clientId, now = Date.now()) {
+  const enc = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const t = Math.floor(now / 1000);
+  const head = enc({ alg: 'ES256', kid: cfg.keyId }) + '.' + enc({ iss: cfg.teamId, iat: t, exp: t + 300, aud: 'https://appleid.apple.com', sub: clientId });
+  const sig = crypto.sign('sha256', Buffer.from(head), { key: cfg.privateKey, dsaEncoding: 'ieee-p1363' });
+  return head + '.' + sig.toString('base64url');
+}
+
+async function appleForm(cfg, path, fields, fetchImpl) {
+  const r = await fetchImpl(cfg.apiBase + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(fields).toString(), signal: AbortSignal.timeout(15000)
+  });
+  let body = null;
+  try { body = await r.json(); } catch { /* revoke answers an empty 200 */ }
+  if (!r.ok) throw new SocialError('apple', `${path} answered ${r.status}${body?.error ? ' ' + body.error : ''}`);
+  return body || {};
+}
+
+/** The authorization code from the app → a refresh token to revoke later. */
+export async function appleRefreshToken(cfg, clientId, code, { fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  const body = await appleForm(cfg, '/auth/token', { client_id: clientId, client_secret: appleClientSecret(cfg, clientId, now()), code, grant_type: 'authorization_code' }, fetchImpl);
+  if (typeof body.refresh_token !== 'string' || !body.refresh_token) throw new SocialError('apple', 'no refresh token in the answer');
+  return body.refresh_token;
+}
+
+/** Revokes a refresh token: the person's Apple ID no longer lists the app. */
+export async function appleRevoke(cfg, clientId, token, { fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  await appleForm(cfg, '/auth/revoke', { client_id: clientId, client_secret: appleClientSecret(cfg, clientId, now()), token, token_type_hint: 'refresh_token' }, fetchImpl);
+}

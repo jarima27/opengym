@@ -42,13 +42,15 @@ describe('the store app’s account', () => {
   })
 
   it('Apple or Google: the provider’s token goes to the server, with the name Apple gives once', async () => {
-    const social = { initialize: vi.fn(async () => {}), login: vi.fn(async () => ({ result: { idToken: 'jwt', profile: { givenName: 'Ada', familyName: 'L' } } })) }
+    const social = { initialize: vi.fn(async () => {}), login: vi.fn(async () => ({ result: { idToken: 'jwt', authorizationCode: 'code1', profile: { givenName: 'Ada', familyName: 'L' } } })) }
     const http = httpAnswering(200, { user: { id: 'u3', name: 'Ada L' }, token: 't3', created: true })
     const s = await acc.providerSignIn(BASE, 'apple', { social, http, src: { platform: 'ios' } })
     expect(s.created).toBe(true)
     expect(http.post.mock.calls[0][0].url).toBe(BASE + '/api/login/social')
-    expect(http.post.mock.calls[0][0].data).toEqual({ provider: 'apple', idToken: 'jwt', token: true, name: 'Ada L', src: { platform: 'ios' } })
+    // Apple's authorization code rides along, for the server to revoke on account deletion.
+    expect(http.post.mock.calls[0][0].data).toEqual({ provider: 'apple', idToken: 'jwt', token: true, name: 'Ada L', authorizationCode: 'code1', src: { platform: 'ios' } })
     await acc.providerSignIn(BASE, 'google', { social, http })
+    expect(http.post.mock.calls[1][0].data.authorizationCode).toBeUndefined()
     expect(social.initialize).toHaveBeenLastCalledWith({ google: { webClientId: 'web.apps.googleusercontent.com', iOSClientId: 'ios.apps.googleusercontent.com', mode: 'online' } })
   })
 

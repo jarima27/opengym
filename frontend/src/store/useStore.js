@@ -4,7 +4,7 @@ import { localTZ } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
-import { rememberDefaultLang } from '../lib/default-lang.js'
+import { rememberDefaultLang, hasCachedDefaultLang } from '../lib/default-lang.js'
 import { rememberExerciseMedia } from '../lib/exercise-media.js'
 import { guestAllowed } from '../lib/guest.js'
 import { MOBILE, initReminderSync, nativeLoad, nativeSave, onAppActive, readJsonFile, syncReminder, writeAutoBackup, writeJsonFile } from '../lib/mobile.js'
@@ -1420,6 +1420,10 @@ export const useStore = create((set, get) => {
       if (MOBILE) {
         const remote = await loadRemote()
         set({ coachLocal: coachDeviceSettings(await loadCoachDevice()) })
+        // A phone with no server to ask never hears an instance's DEFAULT_LANG, so a copy that
+        // never chose a language follows the phone's (lib/default-lang.js) instead of staying in
+        // English. A server paired later answers its own, which then counts.
+        if (remote?.mode !== 'remote' && !hasCachedDefaultLang()) rememberDefaultLang({})
         if (remote?.mode === 'remote') {
           setRemoteAuth(remote.base, remote.token)
           pairedBase = remote.base || null

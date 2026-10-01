@@ -200,8 +200,10 @@ How the pieces fit:
   exercise shows its studio video from the account's server, or its text (SELF_HOSTING.md →
   "Exercise videos").
 
-Still to do before a submission: Apple asks apps that offer Sign in with Apple to revoke the
-Apple token when an account is deleted (REST API, needs the team's private key) — not done yet.
+- **Deleting an account** (Settings) works for every way in. For one made with Apple, the server
+  revokes its Apple tokens, as Apple asks: the app sends Apple's authorization code with the
+  sign-in, the server exchanges it for a refresh token and revokes it on deletion — with
+  `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (a *Sign in with Apple* key) set.
 
 ## Distribution of openGym's own app — deliberately no app stores
 

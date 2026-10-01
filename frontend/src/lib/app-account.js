@@ -64,7 +64,9 @@ export async function providerSignIn(base, provider, { social, src, ...opts } = 
   const SocialLogin = social || (await import('@capgo/capacitor-social-login')).SocialLogin
   await SocialLogin.initialize(provider === 'google'
     ? { google: { webClientId: GOOGLE_WEB_CLIENT_ID, iOSClientId: GOOGLE_IOS_CLIENT_ID || undefined, mode: 'online' } }
-    : { apple: { clientId: ENV.VITE_APPLE_CLIENT_ID || undefined, redirectUrl: '' } })
+    // The authorization code too, for Apple: the server exchanges it for the token it revokes
+    // if the account is ever deleted (api/social.js).
+    : { apple: { clientId: ENV.VITE_APPLE_CLIENT_ID || undefined, redirectUrl: '', useProperTokenExchange: true } })
   let res
   try {
     res = await SocialLogin.login({ provider, options: provider === 'google' ? { scopes: ['email', 'profile'] } : { scopes: ['name', 'email'] } })
@@ -77,7 +79,8 @@ export async function providerSignIn(base, provider, { social, src, ...opts } = 
   if (!r.idToken) throw failure(t('Could not sign in with {0}.', provider === 'apple' ? 'Apple' : 'Google'), 'provider', 0)
   // Apple gives the name to the app once, the first time; the server keeps it for the profile.
   const name = [r.profile?.givenName, r.profile?.familyName].filter(Boolean).join(' ').trim()
-  const body = { provider, idToken: r.idToken, token: true, ...(name ? { name } : {}), ...(src ? { src } : {}) }
+  const code = provider === 'apple' && typeof r.authorizationCode === 'string' ? r.authorizationCode : null
+  const body = { provider, idToken: r.idToken, token: true, ...(name ? { name } : {}), ...(code ? { authorizationCode: code } : {}), ...(src ? { src } : {}) }
   return session(base, await nativePost(base, '/api/login/social', body, opts))
 }
 

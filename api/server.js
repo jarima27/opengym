@@ -39,7 +39,7 @@ import {
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
 import { ymoveConfig, exerciseMediaConfig, createVideoStore, loadMap, YmoveDown } from './ymove.js';
-import { PROVIDERS, socialConfig, createKeySet, verifyIdToken, SocialError, nameFor } from './social.js';
+import { PROVIDERS, socialConfig, createKeySet, verifyIdToken, SocialError, nameFor, appleKeysConfig, appleRefreshToken, appleRevoke } from './social.js';
 import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
 import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
 
@@ -1189,6 +1189,21 @@ async function removeEmail(req, res, user, body) {
 const SOCIAL = socialConfig();
 // <PROVIDER>_JWKS_URL moves where the keys are read from — only ever for the tests.
 const SOCIAL_KEYS = Object.fromEntries(Object.keys(SOCIAL).map(p => [p, createKeySet(process.env[p.toUpperCase() + '_JWKS_URL'] || PROVIDERS[p].jwks)]));
+const APPLE_KEYS = SOCIAL.apple ? appleKeysConfig() : null;
+// Signed in with Apple and the app sent its authorization code: exchanged now for the refresh
+// token that deleting the account will revoke (Apple asks for it). In the background — the
+// sign-in does not wait on Apple — and kept on the profile's row, which db.json's mode guards.
+function keepAppleToken(user, claims, code) {
+  if (!APPLE_KEYS || typeof code !== 'string' || !code || code.length > 2048) return;
+  const clientId = Array.isArray(claims.aud) ? claims.aud[0] : claims.aud;
+  appleRefreshToken(APPLE_KEYS, clientId, code)
+    .then(token => {
+      if (!db.users.includes(user)) return;
+      user.oauth = { ...(user.oauth || {}), appleRefresh: token, appleClient: clientId };
+      saveDb();
+    })
+    .catch(e => console.error('social: Apple code exchange for', user.id, '-', e.message));
+}
 const socialRoutes = {
   // { provider: 'apple' | 'google', idToken, name?, code?, src?, token? } → the profile that
   // provider account opened, or a new one. Not exempt from the origin check: a page elsewhere must
@@ -1212,6 +1227,7 @@ const socialRoutes = {
         return json(res, 403, { error: 'this account has been disabled', code: 'disabled' });
       }
       audit(req, 'auth.social.ok', { user, msg: provider });
+      if (provider === 'apple' && !user.oauth.appleRefresh) keepAppleToken(user, claims, body.authorizationCode);
       return json(res, 200, { user: publicUser(user), created: false, ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
     }
     // A new profile. Same invite rules as every other way of making one.
@@ -1229,6 +1245,7 @@ const socialRoutes = {
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: inv ? inv.code + ' · ' + provider : provider });
     signedUp(user, provider);
+    if (provider === 'apple') keepAppleToken(user, claims, body.authorizationCode);
     json(res, 200, { user: publicUser(user), created: true, ...appToken(req, body, user) }, { 'Set-Cookie': sessionCookie(user) });
   }
 };
@@ -1980,6 +1997,12 @@ function removeProfile(u) {
   if (BILLING.stripe.on && isPaying(u.billing) && u.billing.subscription) {
     stripe(BILLING, 'DELETE', 'subscriptions/' + encodeURIComponent(u.billing.subscription))
       .catch(e => console.error('billing: could not cancel', u.billing.subscription, 'of deleted profile', u.id, '-', e.message));
+  }
+  // Signed up with Apple: its tokens are revoked, as Apple asks of a deleted account. Best
+  // effort, like Stripe above; the profile is gone either way.
+  if (APPLE_KEYS && u.oauth?.appleRefresh) {
+    appleRevoke(APPLE_KEYS, u.oauth.appleClient, u.oauth.appleRefresh)
+      .catch(e => console.error('social: could not revoke the Apple token of deleted profile', u.id, '-', e.message));
   }
   saveDb();
 }

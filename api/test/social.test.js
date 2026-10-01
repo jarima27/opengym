@@ -13,7 +13,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { socialConfig, createKeySet, verifyIdToken, SocialError, nameFor } from '../social.js';
+import { socialConfig, createKeySet, verifyIdToken, SocialError, nameFor, appleKeysConfig, appleClientSecret, appleRefreshToken, appleRevoke } from '../social.js';
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -167,4 +167,70 @@ test('without client ids the route does not exist', async t => {
   const h = await startServer(t, {});
   assert.equal((await h.post('/api/login/social', { provider: 'apple', idToken: 'x' })).status, 404);
   assert.equal('social' in await (await h.get('/api/config')).json(), false);
+});
+
+/* ------------------------------ Apple: revoking on deletion ------------------------------ */
+
+const apple256 = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const P8 = apple256.privateKey.export({ type: 'pkcs8', format: 'pem' });
+
+test('the client secret is an ES256 JWT Apple can verify', () => {
+  assert.equal(appleKeysConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K' }), null, 'all three or nothing');
+  const cfg = appleKeysConfig({ APPLE_TEAM_ID: 'TEAM123', APPLE_KEY_ID: 'KEY123', APPLE_PRIVATE_KEY: P8.replace(/\n/g, '\\n') });
+  assert.ok(cfg, 'a key written on one line with \\n is read back');
+  const jwtStr = appleClientSecret(cfg, 'fit.tiza.app', NOW);
+  const [h, c, sig] = jwtStr.split('.');
+  assert.deepEqual(JSON.parse(Buffer.from(h, 'base64url')), { alg: 'ES256', kid: 'KEY123' });
+  const claims = JSON.parse(Buffer.from(c, 'base64url'));
+  assert.deepEqual([claims.iss, claims.sub, claims.aud, claims.exp - claims.iat], ['TEAM123', 'fit.tiza.app', 'https://appleid.apple.com', 300]);
+  assert.ok(crypto.verify('sha256', Buffer.from(h + '.' + c), { key: apple256.publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url')));
+});
+
+test('the code is exchanged for a refresh token, which is what gets revoked', async () => {
+  const cfg = { teamId: 'T', keyId: 'K', privateKey: P8, apiBase: 'https://apple.test' };
+  const calls = [];
+  const fetchImpl = async (url, o) => {
+    calls.push({ url, form: new URLSearchParams(o.body) });
+    if (url.endsWith('/auth/token')) return { ok: true, json: async () => ({ refresh_token: 'r1', id_token: 'x' }) };
+    return { ok: true, json: async () => { throw new Error('empty'); } };
+  };
+  assert.equal(await appleRefreshToken(cfg, 'fit.tiza.app', 'code1', { fetchImpl, now: () => NOW }), 'r1');
+  assert.equal(calls[0].form.get('grant_type'), 'authorization_code');
+  assert.equal(calls[0].form.get('code'), 'code1');
+  await appleRevoke(cfg, 'fit.tiza.app', 'r1', { fetchImpl, now: () => NOW });
+  assert.equal(calls[1].url, 'https://apple.test/auth/revoke');
+  assert.equal(calls[1].form.get('token'), 'r1');
+  assert.equal(calls[1].form.get('token_type_hint'), 'refresh_token');
+  await assert.rejects(appleRefreshToken(cfg, 'fit.tiza.app', 'bad', { fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) }) }), /invalid_grant/);
+});
+
+test('signed up with Apple, deleted from the app: Apple is told to revoke', async t => {
+  const keys = await keyServer(t);
+  const appleCalls = [];
+  const srv = http.createServer((req, res) => {
+    let b = ''; req.on('data', d => { b += d; }); req.on('end', () => {
+      appleCalls.push({ url: req.url, form: new URLSearchParams(b) });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(req.url === '/auth/token' ? JSON.stringify({ refresh_token: 'refresh-1' }) : '');
+    });
+  });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  t.after(() => srv.close());
+  const h = await startServer(t, {
+    APPLE_CLIENT_IDS: 'fit.tiza.app', APPLE_JWKS_URL: keys,
+    APPLE_TEAM_ID: 'TEAM', APPLE_KEY_ID: 'KEY', APPLE_PRIVATE_KEY: P8, APPLE_API_BASE: `http://127.0.0.1:${srv.address().port}`
+  });
+  const r = await (await h.post('/api/login/social', { provider: 'apple', idToken: jwt(apple({}, Date.now())), authorizationCode: 'code-1', name: 'Ada', token: true })).json();
+  const row = () => JSON.parse(fs.readFileSync(path.join(h.dataDir, 'db.json'), 'utf8')).users.find(u => u.id === r.user.id);
+  for (let i = 0; i < 50 && !row()?.oauth?.appleRefresh; i++) await new Promise(res => setTimeout(res, 20));
+  assert.equal(row().oauth.appleRefresh, 'refresh-1');
+  assert.equal(appleCalls[0].form.get('code'), 'code-1');
+  assert.equal(appleCalls[0].form.get('client_id'), 'fit.tiza.app');
+
+  const del = await h.post('/api/account/delete', { confirm: 'Ada' }, { Authorization: 'Bearer ' + r.token });
+  assert.equal(del.status, 200);
+  for (let i = 0; i < 50 && appleCalls.length < 2; i++) await new Promise(res => setTimeout(res, 20));
+  assert.equal(appleCalls[1].url, '/auth/revoke');
+  assert.equal(appleCalls[1].form.get('token'), 'refresh-1');
+  assert.equal(row(), undefined);
 });

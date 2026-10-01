@@ -434,6 +434,17 @@ profile every time; it is never matched to an existing profile by e-mail, becaus
 are unproven identifiers and that would let someone take over an account by typing its address
 first. Such a profile has no password or passkey, so it signs in through the app.
 
+Apple asks apps that offer Sign in with Apple to revoke the account's Apple tokens when it is
+deleted. With a *Sign in with Apple* key from the Apple Developer account, the server does: it
+exchanges the authorization code the app sends at sign-in for a refresh token (kept on the
+profile's row in `db.json`) and revokes it when the profile is deleted.
+
+```bash
+APPLE_TEAM_ID=ABCDE12345
+APPLE_KEY_ID=KEY1234567
+APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----"   # the .p8; \n for line breaks
+```
+
 ### Exercise videos (optional, hosted instances)
 
 The exercise dataset's images and animations are © Gym visual and may not be used in a paid
