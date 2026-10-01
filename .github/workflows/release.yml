@@ -15,6 +15,16 @@
 #   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 #   Without them the bundle is built unsigned (a check, not something to upload).
 #
+# Google Play upload, only when the variable TIZA_ANDROID_UPLOAD = true (scripts/play-upload.mjs):
+#   PLAY_SERVICE_ACCOUNT_JSON     secret: the JSON key of a service account invited in Play Console
+#                                 with release rights for the app
+#   PLAY_TRACK                    variable, optional: the track, "alpha" (Play's closed testing
+#                                 track) unless set — a closed track of your own goes by its name
+#   PLAY_RELEASE_STATUS           variable, optional: "completed" (testers get it) unless set;
+#                                 "draft" while the app itself is still a draft in Play Console
+#   The signed bundle goes up as one release named "<version> (<version code>)". The app's first
+#   bundle has to be uploaded by hand: Play's API cannot create the app.
+#
 # iPhone (App Store Connect upload), only when the variable TIZA_IOS = true, secrets:
 #   APPLE_TEAM_ID                 the developer team
 #   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8   an App Store Connect API key (App Manager), whose
@@ -146,6 +156,23 @@ jobs:
         with:
           name: tiza-android-${{ needs.version.outputs.name }}
           path: frontend/android/app/build/outputs/bundle/release/*.aab
+      # After the artifact, so the bundle is kept even when Play refuses it.
+      - name: Upload to Google Play
+        if: vars.TIZA_ANDROID_UPLOAD == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          TRACK: ${{ vars.PLAY_TRACK || 'alpha' }}
+          STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          RELEASE: ${{ needs.version.outputs.name }} (${{ needs.version.outputs.code }})
+        run: |
+          set -eu
+          if [ -z "${ANDROID_KEYSTORE_FILE:-}" ]; then
+            echo "::error::TIZA_ANDROID_UPLOAD is on, but the bundle is unsigned (no ANDROID_UPLOAD_KEYSTORE_B64)"; exit 1
+          fi
+          [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ] || { echo "::error::TIZA_ANDROID_UPLOAD is on, but PLAY_SERVICE_ACCOUNT_JSON is not set"; exit 1; }
+          aab=$(find frontend/android/app/build/outputs/bundle/release -name '*.aab' | head -1)
+          node scripts/play-upload.mjs --package fit.tiza.app --aab "$aab" --track "$TRACK" --status "$STATUS" --name "$RELEASE"
+          echo "Google Play: $RELEASE on the \"$TRACK\" track ($STATUS)" >> "$GITHUB_STEP_SUMMARY"
 
   ios:
     needs: [version, test]

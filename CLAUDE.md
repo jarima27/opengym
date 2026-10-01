@@ -57,7 +57,8 @@ TypeScript — match the existing style by hand.
 Tiza's releases are built by GitHub Actions on its public mirror (docs/RELEASING.md): work
 happens in a private repository, a `vX.Y.Z` tag there publishes that version's code to the mirror
 (`.github/workflows/publish-mirror.yml`), and the mirror tests and builds it
-(`release.yml`: server images, Android bundle, iPhone build) after `test.yml`. Tests run on
+(`release.yml`: server images, Android bundle — to Play's closed testing with
+`TIZA_ANDROID_UPLOAD`, `scripts/play-upload.mjs` —, iPhone build) after `test.yml`. Tests run on
 Node 22, the same version as `web/Dockerfile` / `api/Dockerfile` (`node:22-alpine`).
 `.gitlab-ci.yml` and `.gitea/workflows/` are upstream openGym's and do not run for Tiza.
 
