@@ -24,3 +24,8 @@ frontend/bundle-size.json
 
 # The Tiza website build (landing/build.mjs)
 landing/dist/
+
+# The server kit's secrets and restores (deploy/, docs/DEPLOY.md); the *.example files are tracked
+deploy/*.env
+deploy/restore/
+deploy/data.before-restore-*/

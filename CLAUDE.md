@@ -21,7 +21,10 @@ mcp/       optional MCP server — read-only stdio bridge exposing a user's work
            runs when an LLM client spawns it.
 media/     exercise img/gif, gitignored, fetched at runtime by the `media` compose service.
 website/   static marketing site (plain HTML/CSS/JS), deployed separately by .gitlab-ci.yml.
-docs/      SELF_HOSTING.md, MOBILE.md.
+deploy/    the hosted service's server kit (docs/DEPLOY.md): compose.yml with cloudflared and a
+           restic backup to R2, backup.sh, check.sh, and *.env.example templates (the real
+           .env/tiza.env/backup.env are gitignored).
+docs/      SELF_HOSTING.md, MOBILE.md, RELEASING.md, DEPLOY.md.
 ```
 
 ## Commands

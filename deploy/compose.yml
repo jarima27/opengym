@@ -1,0 +1,117 @@
+# Tiza's own server — app.tiza.fit on one small VPS (docs/DEPLOY.md, step by step).
+#
+#   internet ──HTTPS──▶ Cloudflare ──tunnel (outbound only)──▶ cloudflared ──▶ web:80 ──/api──▶ api:3000
+#                                                                                     data/ ◀─┘
+#   backup: data/ ──restic, encrypted──▶ Cloudflare R2, every night, 30 daily + 12 monthly kept
+#
+# Nothing here publishes a port. The only way in is the tunnel, which cloudflared opens from the
+# inside, so the server's firewall can refuse every inbound connection (SSH aside, if you keep it).
+#
+# Three files sit next to this one, each made from its .example and never committed:
+#   .env         what compose itself reads: the image version, the tunnel token, the backup hour
+#   tiza.env     the app's settings and secrets (Stripe, RevenueCat, YMove, Apple, Google…)
+#   backup.env   the R2 bucket, its keys and the backups' encryption password
+# Each service gets only its own: the api never sees the R2 keys or the tunnel token, and the
+# backup never sees the app's secrets.
+#
+# Upstream openGym's docker-compose.yml (repository root) is the self-hosting one; this file is
+# the hosted, paid service: prebuilt images from the public mirror, no dataset media (© Gym
+# visual, NOTICE.md), Cloudflare in front.
+
+name: tiza
+
+x-logging: &logging
+  # Docker keeps every line a container prints, forever, unless told otherwise; on a small disk
+  # that is the slow way to run out of space. 3 × 10 MB per container.
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  # Accounts, passkeys, workouts, billing — everything lives in ./data.
+  api:
+    image: ${TIZA_IMAGES:-ghcr.io/jarima27}/tiza-api:${TIZA_VERSION:?set TIZA_VERSION in .env (the release, e.g. 1.0.0)}
+    restart: unless-stopped
+    env_file: tiza.env
+    environment:
+      - PORT=3000
+      - DATA_DIR=/data
+      # The api is reachable only through web, which overwrites the forwarded headers with the
+      # real peer — so the sign-in throttle counts people, not "the web container".
+      - TRUST_PROXY=1
+      # The paid service never serves the dataset's images and animations (© Gym visual).
+      - DATASET_MEDIA=off
+    volumes:
+      - ./data:/data
+    logging: *logging
+
+  # The app's files and the single origin passkeys need: /api is proxied to api.
+  web:
+    image: ${TIZA_IMAGES:-ghcr.io/jarima27}/tiza-web:${TIZA_VERSION:?set TIZA_VERSION in .env}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      - NGINX_PORT=80
+      - BACKEND=api
+      - PORT=3000
+      - RESOLVER=127.0.0.11
+      # Cloudflare is really in front (the tunnel is the only way in), so its CF-Connecting-IP —
+      # which Cloudflare sets itself, replacing anything a client sent — names the visitor.
+      - CF_CONNECTING_IP=$$http_cf_connecting_ip
+      - MEDIA_UPLOAD_MAX=48m
+      # /img/ and /gif/ answer 404, whatever is on disk.
+      - DATASET_MEDIA=off
+    logging: *logging
+
+  # The tunnel: an outbound connection to Cloudflare, which sends app.tiza.fit's traffic down it.
+  # Its public hostname (app.tiza.fit → http://web:80) is set in the Cloudflare dashboard.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    restart: unless-stopped
+    depends_on:
+      - web
+    command: tunnel --no-autoupdate --metrics 127.0.0.1:20241 run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env (Cloudflare → Zero Trust → Networks → Tunnels)}
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging: *logging
+
+  # Nightly, encrypted copy of ./data to R2 (backup.sh): restic snapshots, 30 daily and 12
+  # monthly kept, and each night a test restore of the essentials. ./data is mounted read-only
+  # here; a restore lands in ./restore and is moved into place by hand (docs/DEPLOY.md).
+  backup:
+    image: restic/restic:0.19.1
+    restart: unless-stopped
+    init: true
+    # restic files each snapshot under a host name; a fixed one keeps the retention rules
+    # applying to one series even though the container is recreated on every update.
+    hostname: tiza-backup
+    entrypoint: ["/bin/sh", "/backup/backup.sh"]
+    command: ["daemon"]
+    env_file: backup.env
+    environment:
+      - BACKUP_AT=${BACKUP_AT:-03:30}
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - ./data:/data:ro
+      - ./restore:/restore
+      - ./backup.sh:/backup/backup.sh:ro
+      - restic-cache:/root/.cache/restic
+    healthcheck:
+      # Healthy while R2 holds a snapshot less than 26 hours old.
+      test: ["CMD", "/bin/sh", "/backup/backup.sh", "health"]
+      interval: 1h
+      timeout: 2m
+      retries: 1
+      start_period: 1h
+    logging: *logging
+
+volumes:
+  restic-cache:

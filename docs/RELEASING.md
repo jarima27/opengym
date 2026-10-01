@@ -36,8 +36,9 @@ footer) working.
    `TIZA_RELEASES` = `true`, and the secrets of the parts you want built
    (`.github/workflows/release.yml` lists them): the Android upload keystore, and — with
    `TIZA_IOS` = `true` — the Apple team id and an App Store Connect API key.
-5. **The server pulls the images.** Point the hosted instance's compose file at
-   `ghcr.io/jarima27/tiza-api` and `ghcr.io/jarima27/tiza-web` (make the two packages public in
+5. **The server pulls the images.** The hosted instance's compose file (`deploy/compose.yml`,
+   set up as in [DEPLOY.md](DEPLOY.md)) runs `ghcr.io/jarima27/tiza-api` and
+   `ghcr.io/jarima27/tiza-web` at the version in its `.env` (make the two packages public in
    GitHub → Packages, or log the server in to GHCR).
 
 ## Cutting a release
@@ -47,7 +48,8 @@ footer) working.
 3. `publish-mirror.yml` copies the tagged tree onto the mirror as "Tiza v1.4.0" and tags it;
    `release.yml` on the mirror tests it and builds everything.
 4. Take the `.aab` from the mirror's release page to Google Play; the iPhone build is already in
-   TestFlight when `TIZA_IOS` is on. Update the server to the new image tag.
+   TestFlight when `TIZA_IOS` is on. Update the server to the new version (DEPLOY.md → *Day to
+   day*).
 
 A tag that is already on the mirror is refused, so a published version is never overwritten.
 Google Play's version code comes from the version (1.4.0 → 10400), so it only goes up.
