@@ -4,6 +4,7 @@ import { t } from '../lib/i18n.js'
 import { WorkoutRow, workoutDetailSheet, logPastWorkoutSheet } from '../sheets.jsx'
 import { Button } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
+import EmptyStart from '../components/EmptyStart.jsx'
 
 export default function History() {
   const nav = useNavigate()
@@ -13,6 +14,6 @@ export default function History() {
       <div style={{ flex: 1, marginInlineStart: 12 }}><h1>{t('History')}</h1><div className="sub">{t('{0} workouts', S.workouts.length)}</div></div></div>
     <Button icon="plus" onClick={logPastWorkoutSheet} style={{ marginBottom: 12 }}>{t('Log a past workout')}</Button>
     {S.workouts.length ? <div className="list">{[...S.workouts].reverse().map(w => <WorkoutRow key={w.id} w={w} onClick={() => workoutDetailSheet(w)} />)}</div>
-      : <div className="empty"><div className="ico"><Icon name="history" /></div>{t('No workouts yet.')}</div>}
+      : <EmptyStart icon="history" title={t('Your workouts will be here')} text={t('Every session you finish: what you lifted, how long it took, your records.')} />}
   </>
 }

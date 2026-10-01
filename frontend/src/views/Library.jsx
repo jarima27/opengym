@@ -65,6 +65,10 @@ export default function Library() {
       <button className={'chip nocap' + (!eqOn ? ' on' : '')} onClick={() => { setEq(''); setShown(40) }}>{t('Any equipment')}</button>
       {eqOpts.map(x => <button key={x} className={'chip' + (eqOn === x ? ' on' : '')} onClick={() => { setEq(x); setShown(40) }}>{t(x)}</button>)}
     </div>}
+    {!S.workouts.length && !narrowed && <div className="small dim row" style={{ gap: 8, margin: '-2px 2px 12px', alignItems: 'center' }}>
+      <Icon name="trophy" style={{ fontSize: 14, color: 'var(--acc)' }} />
+      <span>{t('Your best weight on each exercise will show here, next to its name.')}</span>
+    </div>}
     <div className="list">
       <div className="item" {...tappable(() => customExSheet(null, ex => exerciseDetailSheet(ex), q.trim()))}>
         <div className="thumb thumb-x"><Icon name="sparkles" /></div>
@@ -79,7 +83,8 @@ export default function Library() {
           <Button size="sm" variant="tinted" icon="plus" onClick={ev => { ev.stopPropagation(); addToRoutineSheet(e) }}>{t('Plan')}</Button>
         </div>
       })}
-      {f.length === 0 && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>{t('No match')}</div>}
+      {f.length === 0 && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>{t('No match')}
+        {q.trim() && <div><Button icon="plus" onClick={() => customExSheet(null, ex => exerciseDetailSheet(ex), q.trim())}>{t('Create “{0}”', q.trim())}</Button></div>}</div>}
     </div>
     {f.length > shown && <><div style={{ height: 10 }} /><Button onClick={() => setShown(s => s + 40)}>{t('Show more')}</Button></>}
   </>

@@ -6,6 +6,7 @@ import { t } from '../lib/i18n.js'
 import { DEMO } from '../lib/demo.js'
 import { SIGNUP } from '../lib/brand.js'
 import { guestAllowed } from '../lib/guest.js'
+import { markWelcome } from '../lib/welcome.js'
 import { useState, useRef, useEffect } from 'react'
 import Icon from '../components/Icon.jsx'
 import { Button, Segmented } from '../components/ui.jsx'
@@ -158,7 +159,8 @@ export default function Login() {
         // Without passkeys and without the guest entrance there is no way in from this browser,
         // so say that plainly instead of offering a local profile that cannot be created.
         : t("This browser doesn't support passkeys, and this instance requires an account. Try a browser or device with passkey support.")}</div>}
-      {canGuest && <Button variant="ghost" className="dim" onClick={() => setGuest(true)}>{t('Continue without account')}</Button>}
+      {/* A new guest gets the same guided first run as a new account (F11). */}
+      {canGuest && <Button variant="ghost" className="dim" onClick={() => { if (!hasData(useStore.getState().S)) markWelcome(); setGuest(true) }}>{t('Continue without account')}</Button>}
       <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>{pwOn ? t('Passkeys use {0}. A password works too, where passkeys do not.', bio()) : t('Passkeys use {0} — no passwords.', bio())}<br />{t('Each profile keeps its own plan, workouts & body weight.')}</div>
     </div>
   )

@@ -5,7 +5,7 @@ import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf, smOf, searchExercises, exOr, isAssisted, betterWeight, beatsWeight } from './lib/exercises.js'
 import { activeProfile, exAvailable, ALL_EQUIPMENT, newProfile } from './lib/equipment.js'
 import { fmtDate, fmtDateRange, fmtNum, fmtPlate, exerciseNameText, fmtVol, fmtDur, durPart, todayISO, isoOf, uid, exCount, routineCount, setsWorkCount, DAYN, DAYS, weekOrder, weekStartOf, weekDayOffset, MONTHS_LONG, ACCENTS } from './lib/format.js'
-import { lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, effectiveRoutineIds, workoutDay, workoutVolume, setsDone, setsDoneActive, setUnitsTotal, lastBW, supersetUnits, sessionSections, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, EFFORT, capEffort, stepEffort, isBw, isPerSide, sideReps, workSetsDone, applyIntensifierPlan, MAX_PLANNED_WARMUPS, NOTE_MAX } from './lib/history.js'
+import { lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, effectiveRoutineIds, workoutDay, workoutVolume, setsDone, setsDoneActive, setUnitsTotal, lastBW, supersetUnits, sessionSections, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, EFFORT, capEffort, stepEffort, isBw, isPerSide, sideReps, workSetsDone, applyIntensifierPlan, MAX_PLANNED_WARMUPS, NOTE_MAX, nextTrainingDay } from './lib/history.js'
 import { usesBar, defaultBarWeight, hasBarOverride, isNoBar } from './lib/bar.js'
 import { PLATE_SIZES, pairsOf, ownsPlates, withPlatePairs, withStandardPlates, withLoadKind, loadKindFor, baseWeightFor, dropGrid } from './lib/plates.js'
 import { toScale, rirOf, EFFORT_PRESETS, effortColor } from './lib/effort.js'
@@ -35,6 +35,7 @@ import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } fr
 import { buildPlanBundle, parsePlan, mergePlan, printPlan, planPrintHTML } from './lib/plan-share.js'
 import { estimate1RM, best1RM, is1RMRecord, REP_CAP } from './lib/onerm.js'
 import { exerciseHistory } from './lib/exercise-history.js'
+import { nextTimeLines } from './lib/next-time.js'
 import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS, weightIncrement } from './lib/progression.js'
 import { normalizeRepRange } from './lib/rep-range.js'
 import { MOBILE, shareExport, printHtml } from './lib/mobile.js'
@@ -133,12 +134,21 @@ export function confirmSheet(opts) {
 // Plan names and blurbs live here, not in lib/starter.js: check-source-strings.mjs only finds
 // string literals written inside a t() call, so copy parked in the catalog and passed in as a
 // variable is invisible to it — it would quietly stay English in every language.
-const PLAN_COPY = {
+export const PLAN_COPY = {
   ppl: () => ({ name: t('Push / Pull / Legs'), about: t('Push, pull and legs each get their own day.') }),
   'upper-lower': () => ({ name: t('Upper / Lower'), about: t('Upper body twice, lower body twice.') }),
   'full-body': () => ({ name: t('Full Body'), about: t('Three sessions, the whole body each time.') }),
   '5x5': () => ({ name: t('5×5'), about: t('Five sets of five on the main barbell lifts.') })
 }
+
+// The starter routines' own names, in the profile's language when they are made: after that
+// they are the person's to rename, like any routine.
+const STARTER_NAMES = {
+  'Push Day': () => t('Push Day'), 'Pull Day': () => t('Pull Day'), 'Leg Day': () => t('Leg Day'),
+  'Upper A': () => t('Upper A'), 'Lower A': () => t('Lower A'), 'Upper B': () => t('Upper B'), 'Lower B': () => t('Lower B'),
+  'Full Body A': () => t('Full Body A'), 'Full Body B': () => t('Full Body B'), 'Full Body C': () => t('Full Body C'),
+}
+export const namedStarter = routines => routines.map(r => (STARTER_NAMES[r.name] ? { ...r, name: STARTER_NAMES[r.name]() } : r))
 
 // Adds the plan's routines and puts them on its weekdays. Existing routines are never touched
 // and only the weekdays the plan asks for are reassigned; an id with no plan behind it changes
@@ -148,7 +158,7 @@ export function loadStarterPlan(planId) {
   const plan = buildStarterPlan(planId)
   if (!plan) return false
   update(st => {
-    st.routines.push(...plan.routines)
+    st.routines.push(...namedStarter(plan.routines))
     plan.schedule.forEach(({ day, routineId }) => { st.week[day] = [routineId] })
   })
   toast(t('{0} loaded', PLAN_COPY[planId]().name))
@@ -2183,6 +2193,7 @@ export function startFlow(routineIds) {
 export function beginWorkout(routineIds, bw) {
   const st = S()
   const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineIds)
+  if (!(st.workouts || []).length) track('first_workout_started', { calibrating: entries.filter(e => e.calibrating).length })
   update(s => {
     s.active = {
       id: uid(), d: todayISO(), start: Date.now(),
@@ -2611,15 +2622,37 @@ export function exitWorkoutEdit(onExit = () => nav('/history')) {
 
 function FinishSummary({ w, prs, e1prs = [], close, past = false }) {
   const st = useStore(s => s.S)
+  // The moment a finished workout is for (F11): what the next session asks of each lift, from
+  // the engine that will build it — and when that session is.
+  const ahead = past ? [] : nextTimeLines(st, w)
+  const first = !past && (st.workouts || []).length === 1
+  const next = past ? null : nextTrainingDay(st, todayISO())
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
-    <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
+    <h3 style={{ margin: '8px 0' }}>{first ? t('Your first workout is done!') : t('Workout complete!')}</h3>
     <div className="tiles" style={{ textAlign: 'start' }}>
       <div className="tile"><div className="l">{t('Duration')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtDur(w.end - w.start)}</div></div>
       <div className="tile"><div className="l">{t('Volume')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtVol(w.vol, st.unit)}</div></div>
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsWorkCount(setsDone(w), workSetsDone(w))}</div></div>
       <div className="tile"><div className="l">{t('PRs')}</div><div className="v" style={{ fontSize: 20 }}>{prs.length || '—'}</div></div>
     </div>
+    {ahead.length > 0 && <div className="nexttime">
+      <div className="nexttime-h"><Icon name="arrowUp" />{t('Next time')}</div>
+      {ahead.map(l => {
+        const ex = EXIDX[l.id]
+        const value = l.weight != null ? `${fmtNum(l.weight)} ${st.unit}` : t('{0} reps', l.reps)
+        const delta = l.delta > 0 ? ` (+${fmtNum(l.delta)})` : ''
+        return <div key={l.id} className="nexttime-row">
+          <span className={exerciseNameClass(ex)}>{ex ? exerciseNameFor(ex) : l.id}</span>
+          <strong className={l.delta > 0 ? 'up' : ''}>{value}{delta}</strong>
+        </div>
+      })}
+      {first && <div className="nexttime-f">{t('Complete every rep and Tiza raises it for you.')}</div>}
+    </div>}
+    {next && <div className="small muted row" style={{ justifyContent: 'center', gap: 6, marginBottom: 12 }}>
+      <Icon name="calendar" style={{ fontSize: 13, flex: 'none' }} />
+      <span>{t('Next session: {0}, {1}', t(DAYN[next.weekday]), next.routine.name)}{st.reminder?.on && st.reminder?.time ? ' · ' + t('we’ll remind you at {0}', st.reminder.time) : ''}</span>
+    </div>}
     {(prs.length > 0 || e1prs.length > 0) && <div style={{ textAlign: 'start', marginBottom: 12 }}>
       {prs.map(id => <div key={id} className="small accent row" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} <span className={exerciseNameClass(EXIDX[id])}>{EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id}</span></div>)}
       {e1prs.map(p => <div key={p.id} className="small accent row" style={{ gap: 5 }}><Icon name="chartLine" style={{ fontSize: 13 }} />{t('Best estimated 1RM:')} <span className={exerciseNameClass(EXIDX[p.id])}>{EXIDX[p.id] ? exerciseNameFor(EXIDX[p.id]) : p.id}</span> · {fmtNum(p.est)} {st.unit}</div>)}
@@ -2694,6 +2727,7 @@ function doFinishWorkout() {
   })
   useStore.getState().autoBackupNow()
   track('workout_completed', { count: S().workouts.length, backfill: past })
+  if (!past && S().workouts.length === 1) track('first_workout_done')
   // The Coach reads it now when that is switched on (lib/coach-api.js autoDebrief) — a session
   // logged into the past is history, not today's training.
   if (!past && shown?.id) autoDebrief(shown.id).catch(() => {})

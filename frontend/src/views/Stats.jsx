@@ -6,6 +6,7 @@ import { lastBW, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, me
 import { fmtNum, fmtDate, fmtVol, todayISO, weekStartOf, exerciseNameText } from '../lib/format.js'
 import { speedUnitOf, speedLabel, toSpeed } from '../lib/speed.js'
 import { t, exerciseNameFor, exerciseNameClass, getLang } from '../lib/i18n.js'
+import EmptyStart from '../components/EmptyStart.jsx'
 import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, exerciseHistorySheet, WorkoutRow, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
@@ -452,6 +453,7 @@ export default function Stats() {
   return <>
     <div className="hdr"><div><h1>{t('Stats')}</h1><div className="sub">{t('Progress & history')}</div></div>
       <button className="iconbtn" onClick={() => nav('/history')} aria-label={t('History')}><Icon name="history" /></button></div>
+    {!workouts.length && <EmptyStart card icon="trophy" title={t('Your first record will appear here')} text={t('Your progress, your records and the muscles you train, from your first workout on.')} />}
 
     <div className="tiles">
       <div className="tile"><div className="l"><Icon name="dumbbell" />{t('Workouts')}</div><div className="v">{workouts.length}</div></div>

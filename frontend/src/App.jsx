@@ -42,7 +42,7 @@ import Muscles from './views/Muscles.jsx'
 import StructuralBalance from './views/StructuralBalance.jsx'
 import Settings from './views/Settings.jsx'
 import Admin from './views/Admin.jsx'
-import Welcome from './views/Welcome.jsx'
+import FirstRun from './views/FirstRun.jsx'
 import BillingPrompts from './components/BillingPrompts.jsx'
 import { CoachReportSync } from './components/CoachReport.jsx'
 import { welcomePending } from './lib/welcome.js'
@@ -198,7 +198,7 @@ function Shell() {
           {!authed ? <Login /> : needsMobileOnboarding ? (DEFAULT_SERVER ? <Suspense fallback={null}><AppWelcome /></Suspense> : <MobileOnboarding />) : (
             <Routes>
               <Route path="/home" element={welcomePending() ? <Navigate to="/welcome" replace /> : <Home />} />
-              <Route path="/welcome" element={<Welcome />} />
+              <Route path="/welcome" element={<FirstRun />} />
               {/* Gym check-in — switched off in Settings, the route falls through to the
                   catch-all redirect below. */}
               {S.checkIn !== false && <Route path="/checkin" element={<CheckIn />} />}
@@ -230,7 +230,7 @@ function Shell() {
       <SyncBanner />
       {/* The chat owns the bottom of the screen: its composer sits where the tabs would be. */}
       {/* Nor while a phone is still choosing how to use the app: there is nowhere to go yet. */}
-      {loc.pathname !== '/coach' && !(authed && needsMobileOnboarding) && <TabBar onStart={startFlow} />}
+      {loc.pathname !== '/coach' && loc.pathname !== '/welcome' && !(authed && needsMobileOnboarding) && <TabBar onStart={startFlow} />}
       <RestTimer />
       <BillingPrompts />
       {authed && <CoachReportSync />}

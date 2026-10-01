@@ -16,6 +16,8 @@ import { api, beacon } from '../lib/api.js'
 import { insertionIndexAfterCurrentUnit, nextUnfinishedUnit, setProgressHighWater, supersetFlowStep, restAfterSet, restOnRecheck, restSecFor, warmupRestSecFor } from '../lib/supersetFlow.js'
 import Media from '../components/Media.jsx'
 import StallNotice from '../components/StallNotice.jsx'
+import Tip, { closeTip } from '../components/Tip.jsx'
+import { rateCalibration, awaitingRating } from '../lib/calibration.js'
 import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, finishWorkout, exitWorkoutEdit, workoutCompleteSheet, confirmSheet, exerciseNoteSheet, sessionNoteSheet, renameWorkoutSheet, swapActiveWorkoutExercise, barWeightSheet, menuSheet, effortPickerSheet, exerciseHistorySheet, addRoutineToSessionSheet } from '../sheets.jsx'
 import { effortColor } from '../lib/effort.js'
 import Icon from '../components/Icon.jsx'
@@ -93,6 +95,50 @@ const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/
 // "last time" recap and the progression line — leaving the name, the ⋯ menu, the one-line plan
 // the rows are measured against, and the sets.
 // Nothing dropped is lost: it is all still on the ⋯ menu, or one ⋮ switch back to list/cards.
+// "I don't know how much I lift" (F11, lib/calibration.js): the lift's first session finds its
+// weight. A light set, then how it went — easy: another, heavier; about right: that is the weight
+// (the plan's sets take it, and so does the routine); too hard: the one before. Calibration sets
+// are warm-ups to everything else, so they never become the first stall or a record.
+function Calibration({ entry, entryIdx, unit }) {
+  const update = useStore(s => s.update)
+  const work = entry.sets.filter(x => !x.cal && !isWarmupRow(x)).length
+  if (entry.calFound != null) return <div className="calib">
+    <div className="calib-h"><Icon name="checkCircle" />{t('Your weight: {0}', fmtNum(entry.calFound) + ' ' + unit)}</div>
+    <div className="calib-p">{t(work === 1 ? 'Do your set with it. Tiza keeps it for next time.' : 'Do your {0} sets with it. Tiza keeps it for next time.', work)}</div>
+  </div>
+  const at = awaitingRating(entry.sets)
+  const row = at >= 0 ? entry.sets[at] : entry.sets.find(x => x.cal && !x.done)
+  if (!row) return null
+  const weight = fmtNum(row.w) + ' ' + unit
+  if (at < 0) return <div className="calib">
+    <div className="calib-h"><Icon name="target" />{t('First time: let’s find your weight')}</div>
+    <div className="calib-p">{t('Do {0} reps with {1}, then tick the set.', row.r, weight)}</div>
+  </div>
+  const rate = rating => update(s => {
+    const e = s.active?.entries?.[entryIdx]
+    if (!e) return
+    const res = rateCalibration(e.sets, at, rating, { ...(e.target || {}), id: e.id }, s.unit)
+    e.sets = res.sets
+    if (res.found == null) return
+    e.calFound = res.found
+    if (e.target) e.target.weight = res.found
+    // The routine keeps the weight found, so next time is built from it rather than asked again.
+    const rid = e.rid || [].concat(s.active.routineIds || [])[0]
+    for (const c of (s.routines.find(r => r.id === rid)?.ex || [])) {
+      if (c.id === e.id) { c.weight = res.found; delete c.calibrate }
+    }
+  }, true)
+  return <div className="calib">
+    <div className="calib-h"><Icon name="target" />{t('How did {0} feel?', weight)}</div>
+    <div className="calib-b">
+      <Button onClick={() => rate('easy')}>{t('Easy')}</Button>
+      <Button variant="primary" onClick={() => rate('good')}>{t('About right')}</Button>
+      <Button onClick={() => rate('hard')}>{t('Too hard')}</Button>
+    </div>
+    <div className="calib-p" style={{ marginTop: 8 }}>{t('Easy: one more set, heavier. About right: that’s your weight.')}</div>
+  </div>
+}
+
 function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSide, onField, onAddSet, onRemoveSet, onAddWarmup, onRemoveSetAt, onStartTimed, onPairPrev, onPairNext, onSetRowRef, onProgressionSettings, onNoProg, onSwap, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onRemoveExercise, busy }) {
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
@@ -552,7 +598,12 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     </button>}
     {/* A stalled lift: the Coach's way out, once a set of it is done and the rest is over. */}
     {mode === 'reps' && <StallNotice exId={entry.id} inWorkout doneSets={entry.sets.filter(x => x.done && !isWarmupRow(x)).length} />}
+    {/* The first workout's third hint (F11), once the first two have been seen. */}
+    {entryIdx === 0 && mode === 'reps' && !bw && !entry.calibrating && <Tip k="weight" after={['set', 'rest']}>
+      {t('Tiza works this weight out. Complete every rep and next time it goes up.')}
+    </Tip>}
     </>}
+    {entry.calibrating && <Calibration entry={entry} entryIdx={entryIdx} unit={S.unit} />}
     <div className="card" style={{ marginTop: 10, marginBottom: 0 }}>
       {/* the header carries the same eff3/timed sizing as the rows, or the labels drift off their
           columns; over L/R rows it also has to skip the side badge that sits in front of the weight cell */}
@@ -592,6 +643,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
           </div>
           )}
           {loadLine(String(i))}
+          {entryIdx === 0 && !editing && i === entry.sets.findIndex(x => !x.done) && <Tip k="set" className="up">{t('Tap here when you finish the set.')}</Tip>}
           {/* Drop-sets and rest-pause bursts extend this same row — no long rest, no new set.
               A planned exercise arrives with these already filled in (applyIntensifierPlan);
               every value here is just as editable as the main row's own weight/reps. */}
@@ -1075,6 +1127,8 @@ function ActiveWorkout() {
     const m = modeAt(idx)
     const cardioEntry = m === 'cardio'
     let exJustDone = false, workoutDone = false, checked = false
+    // The first set ticked has taken the first workout's first hint with it (F11).
+    closeTip('set')
     update(s => {
       const e = s.active.entries[idx]
       // A per-side tick flips just that side; the row's own `done` (both sides) is then

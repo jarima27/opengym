@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useUI } from '../store/useUI.js'
 import { t } from '../lib/i18n.js'
 import { Button } from './ui.jsx'
+import Tip from './Tip.jsx'
 
 const clock = sec => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0')
 
@@ -42,6 +43,7 @@ export default function RestTimer() {
   // A rest that is over has nothing left to hold, so Ready offers no pause.
   return (
     <div id="timer" className={'rest' + (timer.paused ? ' paused' : '')}>
+      {!timer.ready && <Tip k="rest" className="float">{t('The rest runs on its own; we’ll let you know when it’s over.')}</Tip>}
       <div className="head">
         <div className="t" role={timer.ready ? 'status' : undefined}>{timer.ready ? t('Ready') : clock(timer.left)}</div>
         <div className="bar"><i style={{ width: pct + '%' }} /></div>

@@ -7,6 +7,7 @@ import { buildSets, applyIntensifierPlan, modeOf } from './history.js'
 import { isWarmupRow } from './workout-model.js'
 import { nextPrescription, applyPrescription, defaultIncrement, weightIncrement, plannedOf } from './progression.js'
 import { dropGrid } from './plates.js'
+import { calibrates, calibrationStart, calibrationRow } from './calibration.js'
 
 /**
  * Where a planned session's reps come from (Settings → During a workout). 'plan', the default:
@@ -34,7 +35,14 @@ export function buildPlannedEntry(st, cfg, routine, { noProg = false } = {}) {
   const step = modeOf(cfg) === 'reps' ? weightIncrement(cfg, st.unit) : defaultIncrement(cfg.id, st.unit)
   const planReps = !startsFromLast(st)
   const rows = applyPrescription(buildSets(st, cfg, { step, rid: routine?.id, useTarget: plan.kind === 'off', planReps }), plan, step)
-  const sets = applyIntensifierPlan(rows, cfg, dropGrid(st, cfg))
+  let sets = applyIntensifierPlan(rows, cfg, dropGrid(st, cfg))
+  // "I don't know how much I lift" (F11, lib/calibration.js): the first session of such a lift
+  // opens with one light calibration set, and the plan's sets wait at 0 for the weight it finds.
+  // Only while there is nothing logged to start from: an import later makes the history decide.
+  const calibrating = cfg.calibrate === true && plan.kind === 'first' && calibrates(cfg)
+  if (calibrating) {
+    sets = [calibrationRow(calibrationStart(cfg, st.unit), cfg.reps), ...sets.filter(s => !isWarmupRow(s)).map(s => ({ ...s, w: 0 }))]
+  }
   const target = { ...cfg }
   if (plan.weight != null) target.weight = plan.weight
   if (plan.reps != null) target.reps = plan.reps
@@ -47,7 +55,7 @@ export function buildPlannedEntry(st, cfg, routine, { noProg = false } = {}) {
     && rows.some(s => !isWarmupRow(s) && s.r !== cfg.reps)
   // `planned` is what the routine asked for, kept apart from the target the prescription moved,
   // so the next session can tell an edited plan from a progressed one (nextPrescription).
-  return { target, plan, sets, planned: plannedOf(cfg), ...(carried ? { carried: true } : {}) }
+  return { target, plan, sets, planned: plannedOf(cfg), ...(carried ? { carried: true } : {}), ...(calibrating ? { calibrating: true } : {}) }
 }
 
 /**

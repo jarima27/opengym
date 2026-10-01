@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
@@ -11,6 +11,8 @@ import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 import CoachReportCard from '../components/CoachReport.jsx'
+import { firstSteps } from '../lib/first-run.js'
+import { track } from '../lib/track.js'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -114,6 +116,9 @@ export default function Home() {
       </div>}
     </div>
 
+    {/* The first week's checklist (F11): until it is all done, closed, or two weeks have passed. */}
+    <FirstSteps />
+
     {/* The week's pills — what the Coach would say (F2); nothing in a week with nothing to say. */}
     <CoachReportCard />
 
@@ -141,8 +146,10 @@ export default function Home() {
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
         <div className="muted small" style={{ marginBottom: 12 }}>{t('Set up your weekly routine to get going — or load a ready-made starter plan.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
-        <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
+        {/* The guided first run first (F11): a few questions, and the plan that fits them. */}
+        <Button variant="primary" icon="sparkles" onClick={() => nav('/welcome')}>{t('Make me a plan')}</Button>
+        <div style={{ height: 8 }} /><Button icon="list" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
+        <div style={{ height: 8 }} /><Button variant="ghost" onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}
 
@@ -187,12 +194,51 @@ export default function Home() {
         <div>
           <div className="row" style={{ gap: 7, fontSize: 22, fontWeight: 600, letterSpacing: '-.021em' }}>
             <Icon name="flame" style={{ color: 'var(--orange)' }} />
-            {t('{0} week streak', streakWeeks(S))}
+            {t(streakWeeks(S) === 1 ? '1 week streak' : '{0} week streak', streakWeeks(S))}
           </div>
           <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(S.workouts.length === 1 ? '{0} workout total' : '{0} workouts total', S.workouts.length)}</div>
         </div>
         <Icon name="calendar" className="chev" style={{ fontSize: 20 }} />
       </div>
     </div>
+  </div>
+}
+
+// F11's "first steps": a first workout, three in the first week, the history brought over (for
+// someone who came from another app) and a body weight, each a tap away from being done.
+function FirstSteps() {
+  const nav = useNavigate()
+  const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
+  const steps = firstSteps(S)
+  // Reported once, the day the last one is ticked.
+  useEffect(() => {
+    if (!steps?.done || S.firstRun?.checklistDone) return
+    update(s => { s.firstRun = { ...s.firstRun, checklistDone: Date.now() } })
+    track('checklist_done')
+  }, [steps?.done])
+  if (!steps?.visible) return null
+  const start = () => (S.active ? nav('/workout') : startFlow(effectiveRoutineIds(S, todayISO())))
+  const label = {
+    first: [t('Your first workout'), start],
+    three: [t('3 workouts in your first week ({0}/3)', steps.items.find(i => i.key === 'three')?.count || 0), start],
+    import: [t('Bring your history from your old app'), () => nav('/settings')],
+    weight: [t('Your body weight'), () => bwSheet()]
+  }
+  const left = steps.items.filter(i => !i.done).length
+  return <div className="card">
+    <div className="row between" style={{ marginBottom: 4 }}>
+      <h2 style={{ margin: 0 }}>{t('First steps')}</h2>
+      <button className="iconbtn" aria-label={t('Close')} onClick={() => update(s => { s.firstRun = { ...s.firstRun, stepsClosed: true } })}><Icon name="xmark" /></button>
+    </div>
+    <div className="muted small" style={{ marginBottom: 6 }}>{t(left === 1 ? '1 left' : '{0} left', left)}</div>
+    {steps.items.map(i => {
+      const [text, act] = label[i.key]
+      return <div key={i.key} className={'steps-row' + (i.done ? ' done' : '')}>
+        <Icon name={i.done ? 'checkCircle' : 'circle'} />
+        <span>{text}</span>
+        {!i.done && <Button size="sm" variant="tinted" onClick={act}>{t('Go')}</Button>}
+      </div>
+    })}
   </div>
 }

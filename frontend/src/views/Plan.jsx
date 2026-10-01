@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { DAYN, weekOrder, weekStartOf, uid, exCount, routineCount } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
+import EmptyStart from '../components/EmptyStart.jsx'
 import { dayAssignSheet, dayAddRoutineSheet, starterPlanSheet, planToolsSheet, confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -72,6 +73,12 @@ export default function Plan() {
       <Icon name="chevronRight" className="coach-cta-chev" />
     </button>}
 
+    {/* Nothing planned yet (F11): what will be here, and the questions that make it — above the
+        empty week, not under it. */}
+    {!S.routines.length && <div className="card" style={{ paddingBottom: 14 }}>
+      <EmptyStart icon="clipboard" title={t('Your plan will be here')} text={t('Your training days and what to do on each. Answer a few questions and Tiza makes it for you.')} />
+      <Button variant="ghost" icon="list" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
+    </div>}
     <div className="cols"><div>
       <h4 className="sec">{t('Week schedule')}</h4>
       <div className="list" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -124,10 +131,7 @@ export default function Plan() {
             style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }}
             onClick={ev => { ev.stopPropagation(); moveRoutine(i, 1) }}><Icon name="chevronDown" /></button>
         </div>}
-        <Icon name="chevronRight" className="chev" /></SwipeToDelete>)}</div> : <>
-        <div className="empty"><div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Create one or load the starter plan.')}</div>
-        <Button icon="sparkles" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
-      </>}
+        <Icon name="chevronRight" className="chev" /></SwipeToDelete>)}</div> : null}
     </div></div>
   </>
 }

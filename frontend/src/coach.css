@@ -75,6 +75,31 @@
 .ob-foot{position:sticky;bottom:calc(58px + var(--sab));padding:30px 0 14px;background:linear-gradient(to top,var(--bg) 58%,transparent);display:flex;gap:10px;margin-top:18px}
 .ob-foot .btn{font-size:17px;padding:15px 18px;border-radius:var(--r-lg)}
 .ob-hint{text-align:center;font-size:13px;color:var(--label-3);margin-top:8px}
+/* The guided first run (views/FirstRun.jsx): no tab bar under it, a progress bar instead of dots. */
+.ob.alone .ob-foot{bottom:var(--sab)}
+.ob.alone .ob-body{padding-bottom:110px}
+.ob-progress{flex:1;display:flex;align-items:center;gap:10px;margin:0 12px}
+.ob-bar{flex:1;height:5px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.ob-bar i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width var(--med) var(--ease)}
+.ob-count{font-size:13px;color:var(--label-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ob-days.five{grid-template-columns:repeat(5,1fr)}
+.ob-week.static .ob-wd{display:flex;align-items:center;justify-content:center}
+.ob-list{background:var(--surface);border-radius:var(--r-lg);padding:4px 14px}
+.ob-list-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;font-size:15px}
+.ob-list-row + .ob-list-row{border-top:var(--hair) solid var(--sep)}
+.ob-lifts{display:flex;flex-direction:column;gap:10px}
+.ob-lift{background:var(--surface);border-radius:var(--r-lg);padding:12px 14px}
+.ob-lift-n{font-weight:600;margin-bottom:8px}
+.ob-lift-r{display:flex;align-items:center;gap:8px}
+.ob-lift-f{flex:1;min-width:0}
+.ob-lift-f.small{flex:0 0 64px}
+.ob-lift-f input{width:100%;text-align:center;font-size:17px;padding:9px 6px;border-radius:10px;border:0;background:var(--surface-2);color:var(--label)}
+.ob-lift .chip{white-space:nowrap;text-transform:none}
+.ob-lift .chip.on{background:var(--acc-soft);color:var(--acc)}
+.ob-wait{display:flex;flex-direction:column;align-items:center;padding-top:12vh}
+.ob-spin{font-size:46px;color:var(--acc);margin-bottom:18px;animation:ob-pulse 1.4s ease-in-out infinite}
+@keyframes ob-pulse{0%,100%{opacity:.45;transform:scale(.92)}50%{opacity:1;transform:scale(1.05)}}
+.ob-big-icon{display:flex;justify-content:center;font-size:46px;color:var(--acc);margin:8vh 0 16px}
 
 /* ---------- chat ---------- */
 .chat{padding-bottom:40px}

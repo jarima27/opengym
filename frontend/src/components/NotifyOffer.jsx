@@ -19,14 +19,26 @@ import Icon from './Icon.jsx'
 //
 // Shown only where it can work and has not been answered: the phone, or a signed-in browser
 // that supports Web Push and has never been asked.
-async function canAsk(user) {
+export async function canAsk(user) {
   if (MOBILE) return (await notificationPermission()) === 'prompt'
   return !!user && pushSupported() && Notification.permission === 'default'
 }
 
+/** Asks for the permission and turns the day reminder on with it. Throws when it is refused. */
+export async function turnOnReminders(from, count = 0) {
+  const { S, update } = useStore.getState()
+  if (MOBILE) {
+    const ok = await syncReminder({ ...S, reminder: { ...(S.reminder || DEF.reminder), on: true } }, true)
+    if (!ok) throw new Error(t('Could not change notification settings'))
+  } else {
+    await enablePush()
+  }
+  update(s => { s.reminder = { ...(s.reminder || DEF.reminder), on: true, tz: localTZ() } })
+  track('notifications_enabled', { from, count })
+}
+
 export default function NotifyOffer({ count }) {
   const user = useStore(s => s.user)
-  const update = useStore(s => s.update)
   const toast = useUI(s => s.toast)
   const [show, setShow] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -47,15 +59,7 @@ export default function NotifyOffer({ count }) {
   const turnOn = async () => {
     setBusy(true)
     try {
-      if (MOBILE) {
-        const S = useStore.getState().S
-        const ok = await syncReminder({ ...S, reminder: { ...(S.reminder || DEF.reminder), on: true } }, true)
-        if (!ok) throw new Error(t('Could not change notification settings'))
-      } else {
-        await enablePush()
-      }
-      update(s => { s.reminder = { ...(s.reminder || DEF.reminder), on: true, tz: localTZ() } })
-      track('notifications_enabled', { from: 'finish', count })
+      await turnOnReminders('finish', count)
       toast(t('Reminders on'))
       setShow(false)
     } catch (e) {

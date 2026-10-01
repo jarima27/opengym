@@ -226,7 +226,7 @@ export default function CoachIntake() {
   </div>
 }
 
-function Choice({ on, icon, title, sub, onClick }) {
+export function Choice({ on, icon, title, sub, onClick }) {
   return <button className={'ob-choice' + (on ? ' on' : '')} onClick={onClick}>
     <Icon name={icon} />
     <span className="ob-choice-t">{title}{sub && <span className="ob-choice-s">{sub}</span>}</span>
@@ -236,7 +236,7 @@ function Choice({ on, icon, title, sub, onClick }) {
 
 /* The disclosure: what leaves, where to, who pays. Rendered from the same category list the
    payload is built from, so the promise on screen cannot drift from what actually goes. */
-function Consent({ onAgree, onDecline }) {
+export function Consent({ onAgree, onDecline }) {
   const config = useStore(s => s.config)
   const [info, setInfo] = useState(null)
   useEffect(() => { disclosure().then(setInfo).catch(() => {}) }, [])
