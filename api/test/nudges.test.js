@@ -188,3 +188,22 @@ test('Russian and Arabic counts read right', () => {
   assert.equal(planNudges(S('pl'), { today: sun })[0].title, 'Twój tydzień: 3 treningi');
   assert.equal(planNudges(S('ar'), { today: sun })[0].title, 'أسبوعك: 3 تمارين');
 });
+
+test('the Coach’s weekly report: its first line on the morning the app worked it out for, once, and only when it is the report’s to send', () => {
+  const report = { on: MON, kind: 'stall', title: 'Lo que te diría tu Coach esta semana', body: 'Sentadilla: 4 sesiones en 3 semanas sin subir.', push: true };
+  const S = plan({ coachReport: report, workouts: [workout(addDays(MON, -1))] });
+  const [n] = planNudges(S, { today: MON });
+  assert.equal(n.kind, 'report');
+  assert.equal(n.time, '09:00');
+  assert.equal(n.key, `report:${MON}`);
+  assert.equal(n.title, report.title);
+  assert.equal(n.body, report.body);
+  assert.equal(n.url, '/home?n=report');
+  // Another day, a report someone with the Coach hears from the Coach about, or switched off: none.
+  assert.notEqual(planNudges(S, { today: addDays(MON, 1) })[0]?.kind, 'report');
+  assert.notEqual(planNudges({ ...S, coachReport: { ...report, push: false } }, { today: MON })[0]?.kind, 'report');
+  assert.notEqual(planNudges({ ...S, nudges: { report: false } }, { today: MON })[0]?.kind, 'report');
+  assert.notEqual(planNudges({ ...S, coachReport: { ...report, body: 7 } }, { today: MON })[0]?.kind, 'report');
+  // Only the trial outranks it.
+  assert.equal(planNudges(S, { today: MON, trial: { endsOn: addDays(MON, 3) } })[0].kind, 'trial');
+});

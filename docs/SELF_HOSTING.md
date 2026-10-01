@@ -577,6 +577,7 @@ and a few engagement nudges — at most one a day — that each person can switc
 | Comeback | 18:30, 4, 7, 14 and 30 days after the last workout — or 1, 3 and 7 days after signing up, before the first one |
 | Week summary | 19:00 on the last day of the week, when there was at least one workout: count, volume, records, trend |
 | Trial ending | 12:00, 3 days and 1 day before a web trial ends (only when billing is on; the stores remind their own customers) |
+| Coach's weekly report | 09:00 on the first day of the week: the first line of "What your Coach would tell you this week" — the app works it out ahead from rules on the device (`frontend/src/lib/coach-pills.js`, no AI) and keeps it in the profile; someone with the Coach hears from the Coach's own review instead |
 
 The planner is `api/coach/core/nudges.js`, shared with the mobile app, which schedules the same
 nudges as local notifications. Each one is sent once (`nudges` and `nudgedOn` on the user's row

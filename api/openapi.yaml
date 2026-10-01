@@ -2755,7 +2755,8 @@ paths:
         `workout_completed`, `paywall_viewed`, `paywall_dismissed`, `checkout_started`,
         `onboarding_import_shown`, `onboarding_import_picked`, `onboarding_import_skipped`,
         `review_prompted`, `notification_opened`, `notifications_prompted`,
-        `notifications_enabled`. `signup`, `trial_started`, `subscribed`, `cancelled` and
+        `notifications_enabled`, `pill_shown`, `pill_locked_tapped`, `weekly_report_viewed`,
+        `coach_free_plan_created`, `trial_recap_viewed`, `cancel_reason`. `signup`, `trial_started`, `subscribed`, `cancelled` and
         `notification_sent` come from the server alone. `props` keeps
         at most 12 short scalar values; anything else is dropped. At most 120 an hour per profile.
       requestBody:

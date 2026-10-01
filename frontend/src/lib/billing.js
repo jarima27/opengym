@@ -11,6 +11,24 @@ export async function billingStatus() {
   try { return await api('/api/billing') }
   catch (e) { if (e.status === 404) return null; throw e }
 }
+// Whether the Coach is this profile's, for what the app SHOWS — the server still decides every
+// Coach call (api/coach/routes.js answers 402):
+//   'pro'   a trial, a subscription, past due, or comped: the Coach is theirs
+//   'free'  an instance that charges, and this profile is not paying
+//   'open'  nothing is sold here (a self-hosted instance): everything shown, nothing offered
+export const accessOf = a => (!a || !a.on ? 'open' : a.ai ? 'pro' : 'free')
+// Asked once and kept for a few minutes: the Home card, the report sync and the paywall moments
+// all want it, and none of them is worth a request each. A checkout or a store purchase drops it.
+const ACCESS_TTL = 5 * 60000
+let accessMemo = null // { at, value: Promise<'pro'|'free'|'open'> }
+export function coachAccess() {
+  if (accessMemo && Date.now() - accessMemo.at < ACCESS_TTL) return accessMemo.value
+  const value = billingStatus().then(accessOf, () => { accessMemo = null; return null })
+  accessMemo = { at: Date.now(), value }
+  return value
+}
+export const forgetCoachAccess = () => { accessMemo = null }
+
 export const billingCheckout = plan => api('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: plan || 'monthly' }) })
 export const billingPortal = () => api('/api/billing/portal', { method: 'POST', body: '{}' })
 

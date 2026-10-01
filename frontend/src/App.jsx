@@ -40,6 +40,7 @@ import Settings from './views/Settings.jsx'
 import Admin from './views/Admin.jsx'
 import Welcome from './views/Welcome.jsx'
 import BillingPrompts from './components/BillingPrompts.jsx'
+import { CoachReportSync } from './components/CoachReport.jsx'
 import { welcomePending } from './lib/welcome.js'
 import { readArrival, listenForNotificationTaps } from './lib/notify.js'
 import { track } from './lib/track.js'
@@ -227,6 +228,7 @@ function Shell() {
       {loc.pathname !== '/coach' && <TabBar onStart={startFlow} />}
       <RestTimer />
       <BillingPrompts />
+      {authed && <CoachReportSync />}
       <Modals />
       <Toast />
       <TimerFlash />

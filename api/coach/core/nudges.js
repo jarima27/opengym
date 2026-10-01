@@ -10,6 +10,10 @@
  *
  * The kinds, at most ONE per day (the first in NUDGE_PRIORITY wins):
  *   trial     3 days and 1 day before a web trial ends (the server knows; the stores do their own)
+ *   report    the first morning of the week: the first line of "What your Coach would tell you
+ *             this week", which the app works out ahead and keeps in S.coachReport (the pills
+ *             need the exercise catalogue and the progression engine: frontend/src/lib/
+ *             coach-report.js). Only when the app says the push is the report's to send
  *   today     "Trained today?" in the evening of a planned day with nothing logged yet
  *   weekly    the week's summary, on its last evening, when there was at least one workout — a
  *             week with training in it hears about that rather than about the days since
@@ -24,10 +28,10 @@
 import { NUDGE_KINDS, NUDGE_DEFAULTS, HHMM, nudgePrefs } from './nudge-prefs.js';
 
 export { NUDGE_KINDS, NUDGE_DEFAULTS, nudgePrefs };
-export const NUDGE_PRIORITY = ['trial', 'today', 'weekly', 'comeback'];
+export const NUDGE_PRIORITY = ['trial', 'report', 'today', 'weekly', 'comeback'];
 // Fixed local times for the kinds the person does not time themselves: late enough to be after
 // work, early enough not to wake anyone.
-export const NUDGE_TIMES = { comeback: '18:30', weekly: '19:00', trial: '12:00' };
+export const NUDGE_TIMES = { comeback: '18:30', weekly: '19:00', trial: '12:00', report: '09:00' };
 export const COMEBACK_DAYS = [4, 7, 14, 30];
 export const FIRST_DAYS = [1, 3, 7];
 // "Trained today?" stops after two weeks without a workout: by then it is the comeback's job,
@@ -111,6 +115,12 @@ export function planNudges(S, { today, days = 1, startedOn = null, trial = null,
             copyOf(L).trial[(trial.card ? 'card' : 'open') + n], { url: trial.card ? '/settings' : '/home?paywall=trial' }));
         }
       }
+    }
+    const rep = S.coachReport;
+    if (prefs.report && rep && typeof rep === 'object' && rep.on === date && rep.push !== false
+      && typeof rep.title === 'string' && typeof rep.body === 'string' && rep.title && rep.body) {
+      candidates.push(make('report', `report:${date}`, date, NUDGE_TIMES.report,
+        [rep.title.slice(0, 80), rep.body.slice(0, 240)], { url: '/home' }));
     }
     if (prefs.today && !quiet && !reminderNear && gap != null && gap <= TODAY_MAX_GAP) {
       const rs = plannedRoutines(S, date);

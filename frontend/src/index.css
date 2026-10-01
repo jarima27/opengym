@@ -1727,3 +1727,12 @@ body.chips-dragging *{cursor:inherit}
 [dir="rtl"] .hm-wrap,[dir="rtl"] .cal-grid{direction:ltr}
 /* Tight tracking is tuned for Latin; Arabic is a connected script and gets none. */
 [dir="rtl"] *{letter-spacing:0}
+
+/* The week's pills (components/CoachReport.jsx): one observation each; a held-back one shows its
+   real title and keeps the rest out of reach until the Coach is theirs. */
+.coach-report .pill{display:block;width:100%;text-align:start;background:var(--surface-2);border-radius:12px;padding:10px 12px;margin-top:8px;color:inherit;font:inherit;border:0}
+.coach-report .pill-title{font-weight:600;line-height:1.3}
+.coach-report .pill-body{color:var(--label-2);margin-top:3px;line-height:1.4}
+.coach-report .pill-locked{cursor:pointer}
+.coach-report .pill-locked:active{opacity:.8}
+.blurred{filter:blur(5px);user-select:none;-webkit-user-select:none;pointer-events:none}

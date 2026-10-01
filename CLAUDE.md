@@ -73,6 +73,10 @@ signed Android APK, and deploys the demo/docs site. The Gitea and GitHub workflo
   - `onerm.js` — estimated 1RM from logged sets.
   - `finish-workout.js` — reduces a completed session back into state (weights advance, PRs, etc).
   - `recovery.js` / `recovery-view.js` — fatigue/muscle-recovery model.
+  - `coach-pills.js` — the Coach's "pills": rule-based weekly observations (stall, neglected
+    muscle, imbalance, missed sessions, progress) built on the helpers above, no AI; free users
+    see one whole and the rest by title (`components/CoachReport.jsx`), and `coach-report.js`
+    keeps the next Monday's report in `S.coachReport` for the push.
   - `workout-model.js`, `supersetFlow.js` — in-session workout state machine, incl. supersets.
   - `exercises.js` / `exercises-data.js` — the exercise library (1,324 built-ins + user-defined).
   - `api.js` — the only place that talks to the backend (`fetch` wrapper, session cookie flows).

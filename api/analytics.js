@@ -21,7 +21,10 @@
 export const CLIENT_EVENTS = new Set([
   'import_done', 'workout_completed', 'paywall_viewed', 'paywall_dismissed', 'checkout_started',
   'onboarding_import_shown', 'onboarding_import_picked', 'onboarding_import_skipped', 'review_prompted',
-  'notification_opened', 'notifications_prompted', 'notifications_enabled'
+  'notification_opened', 'notifications_prompted', 'notifications_enabled',
+  // The Coach's pills and the way to Pro (spec "píldoras del Coach y conversión a Pro", F9).
+  'pill_shown', 'pill_locked_tapped', 'weekly_report_viewed', 'coach_free_plan_created',
+  'trial_recap_viewed', 'cancel_reason'
 ]);
 export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent']);
 

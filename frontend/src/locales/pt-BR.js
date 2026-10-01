@@ -1061,6 +1061,22 @@ export const PT_BR_OVERRIDES = {
   '3 days and 1 day before your free trial ends.': '3 dias e 1 dia antes de o seu teste grátis terminar.',
   'Don’t let a workout slip by': 'Não deixe nenhum treino passar',
   'Tiza reminds you on the days you have a workout planned, and checks in that evening if it slipped by. Change it anytime in Settings.': 'O app avisa nos dias com treino planejado e, se passar, pergunta à noite. Você pode mudar isso quando quiser em Configurações.',
+  // The Coach's pills and weekly report (lib/coach-pills.js, components/CoachReport.jsx).
+  '{0}: {1} sessions in {2} weeks without going up. The Coach has a plan to get it moving.': '{0}: {1} sessões em {2} semanas sem subir. O Treinador tem um plano para destravar.',
+  '{0}: {1} sessions in {2} days without going up. The Coach has a plan to get it moving.': '{0}: {1} sessões em {2} dias sem subir. O Treinador tem um plano para destravar.',
+  '{0}: {1} sessions in a row short of the target reps. The Coach has a plan to get it moving.': '{0}: {1} sessões seguidas abaixo das repetições previstas. O Treinador tem um plano para destravar.',
+  '{0}: {1} days without direct work. Add {2} to your next session.': '{0}: {1} dias sem trabalho direto. Inclua {2} no seu próximo treino.',
+  'Your {0} is lagging behind your {1}. It is your weakest link right now.': 'Em {0} você está atrás de {1}. É o seu elo mais fraco agora.',
+  'Missed sessions last week': 'Treinos perdidos na semana passada',
+  'Last week you missed 1 planned session. The Coach can rework your week.': 'Na semana passada você perdeu 1 treino do plano. O Treinador pode reajustar sua semana.',
+  'Last week you missed {0} planned sessions. The Coach can rework your week.': 'Na semana passada você perdeu {0} treinos do plano. O Treinador pode reajustar sua semana.',
+  'Going up: {0}': 'Subindo: {0}',
+  '{0}: +{1} {2} estimated 1RM in the last 4 weeks. Keep it up.': '{0}: +{1} {2} de 1RM estimado nas últimas 4 semanas. Continue assim.',
+  'What your Coach would tell you this week': 'O que seu Treinador diria esta semana',
+  '1 more observation from the Coach about your week': 'Mais 1 observação do Treinador sobre sua semana',
+  '{0} more observations from the Coach about your week': 'Mais {0} observações do Treinador sobre sua semana',
+  'Hide until next week': 'Ocultar até a próxima semana',
+  'The first morning of the week: what the Coach sees in your training.': 'A primeira manhã da semana: o que o Treinador vê no seu treino.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

@@ -10,6 +10,7 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
+import CoachReportCard from '../components/CoachReport.jsx'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -112,6 +113,9 @@ export default function Home() {
         </Button>
       </div>}
     </div>
+
+    {/* The week's pills — what the Coach would say (F2); nothing in a week with nothing to say. */}
+    <CoachReportCard />
 
     {/* Jump to the gym check-in cards (QR membership codes). Shown here as a quick tap on
         arrival at the gym; folds away per user via the "Gym check-in" switch in Settings. */}

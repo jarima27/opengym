@@ -767,6 +767,9 @@ function NudgeSection({ S, update, trial = false }) {
       <Row icon="chartLine" iconTint="var(--blue)" title={t('Week summary')} subtitle={t('On the week’s last evening: workouts, volume and records.')}>
         <Switch checked={p.weekly} onChange={() => set({ weekly: !p.weekly })} />
       </Row>
+      <Row icon="sparkles" iconTint="var(--indigo)" title={t('Coach’s weekly report')} subtitle={t('The first morning of the week: what the Coach sees in your training.')}>
+        <Switch checked={p.report} onChange={() => set({ report: !p.report })} />
+      </Row>
       {trial && (
         <Row icon="star" iconTint="var(--yellow)" title={t('Trial reminders')} subtitle={t('3 days and 1 day before your free trial ends.')}>
           <Switch checked={p.trial} onChange={() => set({ trial: !p.trial })} />
