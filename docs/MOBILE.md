@@ -246,7 +246,10 @@ membership, the distribution certificate and profile as protected file variables
   service. `NOTICE.md` carries an app-store exception (an additional permission under
   AGPL §7) granted by the copyright holder — relevant only if store distribution ever happens.
 - The app requests notification permission when the workout-day reminder is switched on,
-  and again at the first rest if it is still unanswered. On Android it declares
+  when the offer on the first workout-complete screen is accepted, and again at the first rest
+  if it is still unanswered. Once granted, the smart reminders ("trained today?", comebacks,
+  the week's summary — `api/coach/core/nudges.js`, the same planner the server sends Web Push
+  from) are scheduled a week ahead as local notifications and re-planned on every change. On Android it declares
   `SCHEDULE_EXACT_ALARM` so the reminder fires to the minute where the user allows exact
   alarms (Android 14 no longer grants it at install). The rest countdown does not depend on
   it: a foreground service (`specialUse`) keeps the countdown in the notification and holds a

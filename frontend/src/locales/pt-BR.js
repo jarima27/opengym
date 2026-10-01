@@ -1051,6 +1051,16 @@ export const PT_BR_OVERRIDES = {
   'Your account has been deleted': 'Sua conta foi excluída',
   'Your profile, workouts and photos are deleted from the server for good.': 'Seu perfil, treinos e fotos são excluídos do servidor para sempre.',
   'Your profile, your workouts, your body weight and your photos are deleted from the server. This cannot be undone — export a backup first if you want to keep them.': 'Seu perfil, seus treinos, seu peso corporal e suas fotos são excluídos do servidor. Não dá para desfazer — exporte um backup antes se quiser guardá-los.',
+  // Smart reminders: Settings → Notifications and the offer after a finished workout.
+  'Rest timer, workout reminders and your week, even with Tiza closed.': 'Timer de descanso, lembretes de treino e sua semana, mesmo com o app fechado.',
+  'Trained today?': 'Já treinou hoje?',
+  'An evening check on planned days with nothing logged.': 'Um aviso à noite nos dias planejados sem nada registrado.',
+  'Check-in time': 'Horário do aviso',
+  'After a few days without training.': 'Depois de alguns dias sem treinar.',
+  'Trial reminders': 'Avisos do teste',
+  '3 days and 1 day before your free trial ends.': '3 dias e 1 dia antes de o seu teste grátis terminar.',
+  'Don’t let a workout slip by': 'Não deixe nenhum treino passar',
+  'Tiza reminds you on the days you have a workout planned, and checks in that evening if it slipped by. Change it anytime in Settings.': 'O app avisa nos dias com treino planejado e, se passar, pergunta à noite. Você pode mudar isso quando quiser em Configurações.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

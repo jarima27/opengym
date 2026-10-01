@@ -48,7 +48,7 @@ vi.mock('../lib/wakelock.js', () => ({ wakeLockSupported: () => false }))
 vi.mock('../lib/mobile.js', () => ({
   get MOBILE() { return mocks.MOBILE },
   isAndroid: () => Promise.resolve(mocks.android),
-  shareExport: vi.fn(), syncReminder: vi.fn(),
+  shareExport: vi.fn(), syncReminder: vi.fn(), notificationPermission: () => Promise.resolve(null),
 }))
 vi.mock('../lib/update.js', () => ({
   checkForUpdate: (...a) => mocks.checkForUpdate(...a),

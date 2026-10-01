@@ -15,7 +15,8 @@ import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang } from '../lib/i18n.js'
 import { effectiveLang } from '../lib/default-lang.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, isAndroid, shareExport, shareExportBlob, syncReminder } from '../lib/mobile.js'
+import { MOBILE, isAndroid, shareExport, shareExportBlob, syncReminder, notificationPermission } from '../lib/mobile.js'
+import { nudgePrefs } from '../../../api/coach/core/nudge-prefs.js'
 import { referencedFiles } from '../lib/media-refs.js'
 import { mediaStore } from '../lib/media-store.js'
 import { syncMedia, fetchToStore } from '../lib/media-sync.js'
@@ -714,6 +715,10 @@ function NotificationsCard({ S, update, toast }) {
 // this card only owns the OS permission prompt when the switch turns on.
 function MobileReminderCard({ S, update, toast }) {
   const setReminder = patch => update(s => { s.reminder = { ...(s.reminder || DEF.reminder), ...patch, tz: localTZ() } })
+  // The smart reminders need the phone's permission, which the day reminder's switch asks for
+  // (as does the offer after a finished workout); until then they would schedule nothing.
+  const [perm, setPerm] = useState(null)
+  useEffect(() => { notificationPermission().then(setPerm) }, [S.reminder?.on])
   const toggle = async () => {
     const on = !S.reminder?.on
     if (on) {
@@ -722,7 +727,7 @@ function MobileReminderCard({ S, update, toast }) {
     }
     setReminder({ on })
   }
-  return (
+  return <>
     <Section title={t('Notifications')}
       footer={S.reminder?.on ? t('Reminds you at this time on days that have a routine planned.') : null}>
       <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')}>
@@ -735,10 +740,44 @@ function MobileReminderCard({ S, update, toast }) {
         </Row>
       )}
     </Section>
+    {perm === 'granted' && <NudgeSection S={S} update={update} />}
+  </>
+}
+
+// The engagement nudges (api/coach/core/nudges.js), one switch each. On the web they arrive as
+// Web Push, so they show once push is on; on the phone they are local notifications. The trial
+// row only where this server sells a trial on the web — the stores remind their own customers.
+function NudgeSection({ S, update, trial = false }) {
+  const p = nudgePrefs(S)
+  const set = patch => update(s => { s.nudges = { ...nudgePrefs(s), ...patch } })
+  return (
+    <Section title={t('Smart reminders')} footer={t('At most one a day.')}>
+      <Row icon="checkCircle" iconTint="var(--green)" title={t('Trained today?')} subtitle={t('An evening check on planned days with nothing logged.')}>
+        <Switch checked={p.today} onChange={() => set({ today: !p.today })} />
+      </Row>
+      {p.today && (
+        <Row icon="clock" iconTint="var(--purple)" title={t('Check-in time')}>
+          <input type="time" className="timef" value={p.todayTime}
+            onChange={e => { if (e.target.value) set({ todayTime: e.target.value }) }} />
+        </Row>
+      )}
+      <Row icon="flame" iconTint="var(--orange)" title={t('Comeback nudges')} subtitle={t('After a few days without training.')}>
+        <Switch checked={p.comeback} onChange={() => set({ comeback: !p.comeback })} />
+      </Row>
+      <Row icon="chartLine" iconTint="var(--blue)" title={t('Week summary')} subtitle={t('On the week’s last evening: workouts, volume and records.')}>
+        <Switch checked={p.weekly} onChange={() => set({ weekly: !p.weekly })} />
+      </Row>
+      {trial && (
+        <Row icon="star" iconTint="var(--yellow)" title={t('Trial reminders')} subtitle={t('3 days and 1 day before your free trial ends.')}>
+          <Switch checked={p.trial} onChange={() => set({ trial: !p.trial })} />
+        </Row>
+      )}
+    </Section>
   )
 }
 
 function PushCard({ S, update, toast }) {
+  const billing = useStore(s => s.config?.billing)
   const [on, setOn] = useState(false)
   const [busy, setBusy] = useState(false)
   const supported = pushSupported()
@@ -760,7 +799,11 @@ function PushCard({ S, update, toast }) {
     setBusy(true)
     try {
       if (!v) { await disablePush(); setOn(false); toast(t('Notifications off')) }
-      else { await enablePush(); setOn(true); toast(t('Notifications on')) }
+      else {
+        await enablePush(); setOn(true); toast(t('Notifications on'))
+        // the server's nudges go out on this clock (useStore boot re-stamps it on every load)
+        update(s => { s.reminder = { ...(s.reminder || DEF.reminder), tz: localTZ() } })
+      }
     } catch (e) { toast(e.message || t('Could not change notification settings')) }
     setBusy(false)
   }
@@ -783,7 +826,7 @@ function PushCard({ S, update, toast }) {
           (S.reminder?.tz ? ' ' + t('Timezone: {0} (auto-detected, updates if you travel).', S.reminder.tz) : '')
         : null}
     >
-      <Row icon="bell" iconTint="var(--red)" title={t('Push notifications')} subtitle={t('Rest-timer alerts, even if Tiza is closed.')}>
+      <Row icon="bell" iconTint="var(--red)" title={t('Push notifications')} subtitle={t('Rest timer, workout reminders and your week, even with Tiza closed.')}>
         <Switch checked={on} disabled={busy} onChange={toggle} />
       </Row>
       {on && (
@@ -799,6 +842,7 @@ function PushCard({ S, update, toast }) {
       )}
     </Section>
     {on && <div style={{ marginTop: -12, marginBottom: 22 }}><Button size="sm" icon="bell" onClick={test}>{t('Send test notification')}</Button></div>}
+    {on && <NudgeSection S={S} update={update} trial={!!billing} />}
   </>
 }
 

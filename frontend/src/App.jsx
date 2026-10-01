@@ -41,6 +41,9 @@ import Admin from './views/Admin.jsx'
 import Welcome from './views/Welcome.jsx'
 import BillingPrompts from './components/BillingPrompts.jsx'
 import { welcomePending } from './lib/welcome.js'
+import { readArrival, listenForNotificationTaps } from './lib/notify.js'
+import { track } from './lib/track.js'
+import { openPaywall } from './components/Paywall.jsx'
 import CoachChat from './views/CoachChat.jsx'
 import CoachIntake from './views/CoachIntake.jsx'
 import CoachSetup from './views/CoachSetup.jsx'
@@ -116,6 +119,17 @@ function Shell() {
   // Click-drag a horizontal chip strip to scroll it sideways (lib/hchips.js) — on a desktop
   // browser there's otherwise no way to reach the filters past the edge.
   useEffect(() => installChipDrag(), [])
+  // A tapped notification lands on its own screen: the service worker moves an open window there
+  // (lib/notify.js), a new one or the phone's tap starts there. Its marks are counted, the plans
+  // opened if it asks for them, and then taken off the route so a reload does neither again.
+  useEffect(() => listenForNotificationTaps(path => navigate(path)), [navigate])
+  useEffect(() => {
+    const a = readArrival(loc.search)
+    if (!a || !ready) return
+    track('notification_opened', { kind: a.kind })
+    navigate(loc.pathname + a.search, { replace: true })
+    if (a.paywall) openPaywall('notification')
+  }, [loc.search, ready])
   // Once per signed-in boot, hand the server this browser's push subscription again (see
   // lib/push.js): a subscription the instance lost is back before the next reminder is due,
   // with nobody having to visit Settings. Web only — the APK has no service worker.

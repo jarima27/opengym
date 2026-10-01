@@ -19,6 +19,7 @@ import { coachRoutes } from './coach/routes.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
 import { dayReminderPush, restTimerPush, testPush } from './push-messages.js';
+import { planNudges, nudgePrefs, nudgeTimes } from './coach/core/nudges.js';
 import { verifyError } from './verify-error.js';
 import {
   hashPassword, verifyPassword, needsRehash, passwordProblem, passwordLength, nameKey, BusyError,
@@ -349,12 +350,14 @@ function effectiveRoutineId(S, iso) {
 }
 // Computes "now" in an arbitrary IANA zone (e.g. "Europe/Lisbon") instead of the server's own —
 // each user's reminder fires by their own clock, wherever they and their phone actually are.
-function userNow(tz) {
+// `at` is for the other instants that need reading on the user's calendar (their signup, the
+// end of their trial); the tick itself always asks about now.
+function userNow(tz, at = new Date()) {
   try {
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: tz, hour12: false,
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-    }).formatToParts(new Date());
+    }).formatToParts(at);
     const g = t => parts.find(p => p.type === t)?.value;
     const date = `${g('year')}-${g('month')}-${g('day')}`;
     // Weekday is derived from the zone's own date, not the server's — a Sunday-evening review
@@ -409,6 +412,69 @@ function readStateCached(uid) {
   while (stateCache.size > STATE_CACHE_MAX) stateCache.delete(stateCache.keys().next().value);
   return S;
 }
+// The day reminder the user set themselves: at their time, on a planned day not yet trained.
+function remindDay(user, S) {
+  if (!S?.reminder?.on) return;
+  const now = userNow(S.reminder.tz || 'UTC');
+  if (!now) return;
+  const late = minutesLate(S.reminder.time, now);
+  if (!(late >= 0 && late <= REMINDER_WINDOW_MIN)) return;
+  if (user.lastReminder === now.date) return;
+  if ((S.workouts || []).some(w => w?.d === now.date)) return;
+  const rid = effectiveRoutineId(S, now.date);
+  if (!rid) return; // rest day — nothing planned
+  const routine = (S.routines || []).find(r => r?.id === rid);
+  console.log('reminder firing', user.id, rid);
+  user.lastReminder = now.date;
+  saveDb();
+  sendPush(user.id, dayReminderPush(S.lang, routine));
+  ANALYTICS.capture('notification_sent', user, { kind: 'day' });
+}
+
+// The engagement nudges (coach/core/nudges.js): "trained today?", the comebacks, the week's
+// summary, the end of a web trial. The planner says which one today gets, if any; this sends it
+// once it is due. Later than NUDGE_WINDOW_MIN after its time it is dropped rather than sent at an
+// hour nobody would expect it. Once per kind per key (`user.nudges`), and once per day
+// (`user.nudgedOn`) whatever changes in the plan between ticks.
+const NUDGE_WINDOW_MIN = 30;
+function nudge(user, S) {
+  // The clock is the one the app stamps on every load (store boot); without it, nobody's evening
+  // is known, and a guess would be someone's night.
+  const tz = S?.reminder?.tz;
+  if (!tz || typeof tz !== 'string') return;
+  const now = userNow(tz);
+  if (!now || user.nudgedOn === now.date) return;
+  const prefs = nudgePrefs(S);
+  // Cheap gate first: the planner reads the whole history, and most ticks are nowhere near any
+  // of the handful of times a nudge can go out at.
+  const near = t => { const late = minutesLate(t, now); return late >= 0 && late <= NUDGE_WINDOW_MIN; };
+  if (!nudgeTimes(prefs).some(near)) return;
+  const started = Date.parse(user.created);
+  const plan = planNudges(S, {
+    today: now.date,
+    startedOn: Number.isFinite(started) ? userNow(tz, new Date(started))?.date : null,
+    trial: trialFor(user, tz)
+  });
+  const n = plan.find(x => x.date === now.date && near(x.time));
+  if (!n || user.nudges?.[n.kind] === n.key) return;
+  console.log('nudge firing', user.id, n.key);
+  user.nudges = { ...(user.nudges || {}), [n.kind]: n.key };
+  user.nudgedOn = now.date;
+  saveDb();
+  sendPush(user.id, { title: n.title, body: n.body, tag: n.tag, url: '#' + n.url });
+  ANALYTICS.capture('notification_sent', user, { kind: n.kind });
+}
+// A trial this server can speak for: its own open trial, or a Stripe one that is going to turn
+// into a charge. The stores remind their own customers, and a cancelled one is not starting.
+function trialFor(user, tz) {
+  const a = billingAccess(user);
+  if (!a.on) return null;
+  const day = at => (at ? userNow(tz, new Date(at))?.date : null);
+  if (a.plan === 'trial' && !a.via) return day(a.trialEnds) ? { endsOn: day(a.trialEnds), card: false } : null;
+  if (a.via === 'stripe' && a.cardTrial && !a.endsAt && day(a.periodEnd)) return { endsOn: day(a.periodEnd), card: true };
+  return null;
+}
+
 setInterval(() => {
   for (const user of db.users) {
     if (!db.subs.some(s => s.userId === user.id)) continue;
@@ -417,20 +483,8 @@ setInterval(() => {
     // PUT /api/data refuses the obvious shapes, but a file already on disk answers to nobody.
     try {
       const S = readStateCached(user.id);
-      if (!S?.reminder?.on) continue;
-      const now = userNow(S.reminder.tz || 'UTC');
-      if (!now) continue;
-      const late = minutesLate(S.reminder.time, now);
-      if (!(late >= 0 && late <= REMINDER_WINDOW_MIN)) continue;
-      if (user.lastReminder === now.date) continue;
-      if ((S.workouts || []).some(w => w?.d === now.date)) continue;
-      const rid = effectiveRoutineId(S, now.date);
-      if (!rid) continue; // rest day — nothing planned
-      const routine = (S.routines || []).find(r => r?.id === rid);
-      console.log('reminder firing', user.id, rid);
-      user.lastReminder = now.date;
-      saveDb();
-      sendPush(user.id, dayReminderPush(S.lang, routine));
+      remindDay(user, S);
+      nudge(user, S);
     } catch (e) {
       console.error('reminder tick', user.id, e);
     }

@@ -20,9 +20,10 @@
 // trial_started, subscribed, cancelled) are not in it: a client must not be able to fake those.
 export const CLIENT_EVENTS = new Set([
   'import_done', 'workout_completed', 'paywall_viewed', 'paywall_dismissed', 'checkout_started',
-  'onboarding_import_shown', 'onboarding_import_picked', 'onboarding_import_skipped', 'review_prompted'
+  'onboarding_import_shown', 'onboarding_import_picked', 'onboarding_import_skipped', 'review_prompted',
+  'notification_opened', 'notifications_prompted', 'notifications_enabled'
 ]);
-export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled']);
+export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent']);
 
 const MAX_QUEUE = 1000;
 const BATCH = 100;

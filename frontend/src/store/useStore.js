@@ -1506,11 +1506,13 @@ export const useStore = create((set, get) => {
         if (!me.user?.id) throw Object.assign(new Error('no user'), { status: 200, code: 'bad-response' })
         get().setUser(me.user)
         // Re-stamp the reminder's timezone on every load — keeps it correct if you're travelling,
-        // without needing to revisit Settings.
+        // without needing to revisit Settings. Also with the reminder off on a browser that takes
+        // push: the server's nudges ("trained today?", the week's summary) go out on this clock.
         const restampTz = () => {
           const tz = localTZ()
-          if (get().S.reminder?.on && get().S.reminder.tz !== tz) {
-            get().update(s => { s.reminder = { ...s.reminder, tz } })
+          const pushes = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+          if (tz && (get().S.reminder?.on || pushes) && get().S.reminder?.tz !== tz) {
+            get().update(s => { s.reminder = { ...(s.reminder || DEF.reminder), tz } })
           }
         }
         // Closed with the sign-in's question still open: asked again once the app is up (see the

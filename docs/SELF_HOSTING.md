@@ -567,15 +567,28 @@ in this archive — and unreadable without the secret next to them, like everyth
 
 ## 7. Notifications
 
-openGym can push two kinds of alert to your phone/desktop, even when the app isn't open:
-rest-timer-over, and a reminder on days you have a workout planned but haven't logged one yet.
+openGym can push alerts to your phone/desktop, even when the app isn't open: rest-timer-over,
+a reminder at your chosen time on days you have a workout planned but haven't logged one yet,
+and a few engagement nudges — at most one a day — that each person can switch off one by one:
+
+| Nudge | When (the person's local time) |
+|---|---|
+| *Trained today?* | 20:00 by default (adjustable) on a planned day with nothing logged; skipped when the day reminder is within 3 hours of it, and after 2 weeks without a workout |
+| Comeback | 18:30, 4, 7, 14 and 30 days after the last workout — or 1, 3 and 7 days after signing up, before the first one |
+| Week summary | 19:00 on the last day of the week, when there was at least one workout: count, volume, records, trend |
+| Trial ending | 12:00, 3 days and 1 day before a web trial ends (only when billing is on; the stores remind their own customers) |
+
+The planner is `api/coach/core/nudges.js`, shared with the mobile app, which schedules the same
+nudges as local notifications. Each one is sent once (`nudges` and `nudgedOn` on the user's row
+in `db.json`) and up to 30 minutes late, never later.
+
 Turn it on per-profile in **Settings → Notifications** (requires a signed-in passkey profile and
-HTTPS — see section 3).
+HTTPS — see section 3). The app also offers it once, after the first finished workout.
 
 No setup needed server-side, and nothing to configure per timezone: VAPID keys are generated on
 first run and saved to `./data/vapid.json`, and each user's browser reports its own timezone
-automatically when they turn the reminder on — it fires at their local time, and follows them if
-they travel, regardless of what timezone the server itself runs in.
+on every start — reminders fire at their local time, and follow them if they travel, regardless
+of what timezone the server itself runs in.
 
 Where it works: any desktop browser, Android Chrome, and on iOS only the app **added to the Home
 Screen** (Safari in a tab has no Web Push). The Android APK's day reminder is a local

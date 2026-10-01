@@ -99,7 +99,10 @@ WebAuthn passkeys (`@simplewebauthn/server`) plus a signed session cookie (HMAC'
 gated by env vars: `ADMIN_UIDS` (admin dashboard), `INVITE_ONLY` (signup needs a code),
 `ALLOW_GUEST` (client-only guest mode never hits the server at all), plus a rotating
 `data/audit.log` (JSONL) for sign-in/admin events. Web Push (`web-push`, VAPID keys
-auto-generated into `data/vapid.json`) drives rest-timer-over and day-reminder notifications.
+auto-generated into `data/vapid.json`) drives rest-timer-over and day-reminder notifications,
+and the engagement nudges — "trained today?", comebacks, the week's summary, trial ending —
+planned by `api/coach/core/nudges.js` (pure, all languages) and shared with the phone, which
+schedules the same ones as local notifications (`lib/mobile.js`).
 
 ### MCP server (`mcp/src`)
 

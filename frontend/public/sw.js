@@ -167,15 +167,24 @@ self.addEventListener('push', e => {
       icon: 'icon-512.png',
       badge: 'icon-180.png',
       tag,
-      renotify: true
+      renotify: true,
+      // Where a tap lands: an app route as a hash ('#/stats?n=weekly'), nothing else.
+      data: { url: typeof data.url === 'string' && /^#\/[\w/?=&.-]*$/.test(data.url) ? data.url : null }
     })
   })())
 })
+// A tap opens the app on the notification's own screen. An open window is told where to go
+// (the router lives in the page) and focused; with none open, a new one starts there.
 self.addEventListener('notificationclick', e => {
   e.notification.close()
+  const hash = e.notification.data?.url || null
   e.waitUntil(self.clients.matchAll({ type: 'window' }).then(clients => {
     const c = clients.find(c => 'focus' in c)
-    return c ? c.focus() : self.clients.openWindow('./')
+    if (c) {
+      if (hash) c.postMessage({ type: 'open', hash })
+      return c.focus()
+    }
+    return self.clients.openWindow(hash ? './' + hash : './')
   }))
 })
 // The push service rotated the subscription (key change, expiry): subscribe again with the same

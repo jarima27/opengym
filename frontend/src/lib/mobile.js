@@ -12,6 +12,7 @@
 import { t } from './i18n-core.js'
 import { isoOf, todayISO } from './format.js'
 import { effectiveRoutineIds } from './history.js'
+import { firstRunDay } from './notify.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -120,6 +121,7 @@ export function buildReminderNotifications(S, now = new Date()) {
       title: t('Workout day'),
       body: t('{0} is on the plan today — let’s go!', label),
       schedule: { at, allowWhileIdle: true },
+      extra: { url: '/home?n=day' },
     })
   }
   return notifications
@@ -129,22 +131,46 @@ export function buildReminderNotifications(S, now = new Date()) {
 // the bounded window. Cheap enough to run after any state change — the plan or the reminder time
 // may just have been edited. `interactive` gates the OS permission prompt to the Settings toggle;
 // a background resync never pops a dialog.
+// The nudges ride along (lib/mobile-nudges.js): scheduled whenever this phone may show
+// notifications at all, each kind as Settings → Notifications has it — never a permission prompt
+// of their own. Their ids are a fixed range after the reminder's, cancelled with it every time.
+export const NUDGE_WINDOW_DAYS = 7
+export const NUDGE_ID_BASE = 3000
+const nudgeIds = () => Array.from({ length: NUDGE_WINDOW_DAYS }, (_, d) => ({ id: NUDGE_ID_BASE + d }))
 export async function syncReminder(S, interactive = false) {
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     await LocalNotifications.cancel({ notifications: [
       ...LEGACY_REMINDER_IDS,
       ...Array.from({ length: REMINDER_WINDOW_DAYS }, (_, d) => ({ id: REMINDER_ID_BASE + d })),
+      ...nudgeIds(),
     ] }).catch(() => {})
     const r = S.reminder
-    if (!r?.on) return true
     let perm = await LocalNotifications.checkPermissions()
-    if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
-    if (perm.display !== 'granted') return false
-    const notifications = buildReminderNotifications(S)
+    if (r?.on && perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
+    // Nothing may be shown: fine when nothing was asked for, a failure when the reminder was.
+    if (perm.display !== 'granted') return !r?.on
+    const now = new Date()
+    // Loaded here, not at the top: the planner carries every language's copy, and the web build
+    // (where the server sends the nudges) should not download it with this module.
+    const { buildNudgeNotifications } = await import('./mobile-nudges.js')
+    const notifications = [
+      ...(r?.on ? buildReminderNotifications(S, now) : []),
+      ...buildNudgeNotifications(S, now, { startedOn: firstRunDay(todayISO()) }),
+    ]
     if (notifications.length) await LocalNotifications.schedule({ notifications })
     return true
   } catch (e) { return false }
+}
+
+// Whether this phone may show notifications: 'granted', 'denied', or 'prompt' (never asked).
+export async function notificationPermission() {
+  if (!MOBILE) return null
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const p = await LocalNotifications.checkPermissions()
+    return p.display === 'granted' ? 'granted' : p.display === 'denied' ? 'denied' : 'prompt'
+  } catch (e) { return null }
 }
 
 // Capacitor emits appStateChange when the native shell returns to the foreground. The visibility
@@ -160,6 +186,13 @@ export function initReminderSync(getState) {
   document.addEventListener('visibilitychange', resync)
   import('@capacitor/app').then(({ App }) => {
     App.addListener('appStateChange', ({ isActive }) => { if (isActive) resync() })
+  }).catch(() => {})
+  // A tapped reminder or nudge opens its own screen; the route's `n` mark is counted by App.jsx.
+  import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+    LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+      const url = notification?.extra?.url
+      if (typeof url === 'string' && url.startsWith('/')) location.hash = '#' + url
+    })
   }).catch(() => {})
 }
 
