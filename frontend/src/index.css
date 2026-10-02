@@ -1807,3 +1807,10 @@ body.chips-dragging *{cursor:inherit}
 .pr-line{flex-wrap:wrap}
 .pr-share{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;padding:3px 10px;border-radius:99px;background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:600}
 .pr-share svg{font-size:13px}
+
+/* The paywall after the first plan (F12): a screen of the guided first run, closed by its X. */
+.pw-screen{position:relative;padding-top:6px}
+.pw-x{position:absolute;top:-4px;inset-inline-end:-6px;z-index:1}
+.pw-free{display:block;margin:6px auto 0;background:none;border:0;color:var(--label-2);font-size:14px;text-decoration:underline;text-underline-offset:3px;padding:8px}
+.pw-exit{text-align:center;padding-top:10px}
+.pw-exit-icon{font-size:38px;color:var(--acc);display:flex;justify-content:center;margin-bottom:8px}

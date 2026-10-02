@@ -86,11 +86,18 @@ Node 22, the same version as `web/Dockerfile` / `api/Dockerfile` (`node:22-alpin
     (self-hosted, as always), or YMove's studio videos on the hosted, paid version, which never
     shows the dataset's media (© Gym visual). `components/Media.jsx` renders either; no video
     means the exercise's text, never an empty box.
-  - `first-run.js` — the guided first run (`views/FirstRun.jsx`): six questions → a plan by rule
-    at once (the Coach, where it fits, is asked in the background and its plan swapped in when it
-    arrives: `coach-first-plan.js`, `components/CoachPlanWatcher.jsx`), starting weights, the
-    week opening on its first session, the first workout's hints (`components/Tip.jsx`) and
-    Home's "First steps". `calibration.js`
+  - `first-run.js` — the guided first run (`views/FirstRun.jsx`), the funnel the hosted app opens
+    with (F12: `FLOW`, `nextStep`): the video's screen, the questions (the ones only the Coach
+    reads are kept for it, in `coachProfile`), starting weights, "putting your plan together",
+    the plan with the main lift's 8-week projection worked out by the progression engine
+    (`plan-projection.js`, shown only from a weight the person gave), then — before the account
+    on the hosted app (App.jsx renders it in place of the sign-in screen) — the sign-up, the
+    paywall (`components/Paywall.jsx` `PaywallScreen`: price a week, the free version's link,
+    one exit offer), the plan applied (the Coach, where it fits, asked in the background and its
+    plan swapped in when it arrives: `coach-first-plan.js`, `components/CoachPlanWatcher.jsx`),
+    the import, reminders, today; the first workout's hints (`components/Tip.jsx`) and Home's
+    "First steps". Screens before the account are reported under an anonymous id
+    (`track.js` `trackStep`, `POST /api/track/anon`). `calibration.js`
     finds a lift's weight in its first session when nobody knew it; `next-time.js` is the
     finish screen's "next time" lines, from `nextPrescription`.
   - `workout-model.js`, `supersetFlow.js` — in-session workout state machine, incl. supersets.

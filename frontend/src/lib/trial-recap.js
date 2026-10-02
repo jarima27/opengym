@@ -1,5 +1,5 @@
 // "What the Coach has done for you" during a trial (spec F7): the changes to the plan the person
-// accepted, the sessions the Coach read, and the clearest rise in a lift — on day 25, before the
+// accepted, the sessions the Coach read, and the clearest rise in a lift — on day 5 of 7, before the
 // trial turns into a charge, and again after it ends without one ("during your trial the Coach…").
 // From the Coach's own log (lib/coach.js appendLog) and the numbers in coach-insights.js, never
 // from anything the model wrote. Pure over S and a window of ISO days.

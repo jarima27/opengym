@@ -29,3 +29,16 @@ export async function maybeAskForReview(finished, { mobile = MOBILE, plugin } = 
     return true
   } catch { return false }
 }
+
+/** Asked once in the guided first run, right after a good answer about one's progress (F12):
+    the store's own sheet, at most once in all — the third workout's moment above then never asks. */
+export async function askForReviewOnce(where, { mobile = MOBILE, plugin } = {}) {
+  if (!mobile || askedBefore()) return false
+  remember()
+  try {
+    const InAppReview = plugin || (await import('@capacitor-community/in-app-review')).InAppReview
+    await InAppReview.requestReview()
+    track('review_prompted', { at: where })
+    return true
+  } catch { return false }
+}

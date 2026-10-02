@@ -31,8 +31,16 @@ export const CLIENT_EVENTS = new Set([
   'onboarding_step', 'onboarding_done', 'first_workout_started', 'first_workout_done', 'calibration_used', 'checklist_done',
   'coach_first_plan',
   // A record shared as an image for stories; an invite link shared.
-  'pr_card_shared', 'invite_shared'
+  'pr_card_shared', 'invite_shared',
+  // The conversion funnel (F12): the paywall after the first plan, its one offer as it is
+  // closed, and the free version chosen instead. Each screen of the guide is an onboarding_step.
+  'exit_offer_viewed', 'exit_offer_accepted', 'continued_free'
 ]);
+// What the guided first run may report before there is an account (POST /api/track/anon): the
+// screens before the sign-up are where most people leave, and they have no profile yet. Under an
+// anonymous id the device made up, joined to the profile when it signs up with it (alias).
+export const ANON_EVENTS = new Set(['onboarding_step']);
+export const isAnonId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{16,40}$/.test(v);
 export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent', 'subscription_paused', 'plan_switched',
   'feedback_sent', 'code_redeemed', 'invite_rewarded', 'email_sent']);
 
@@ -113,6 +121,20 @@ export function createAnalytics(cfg, { fetchImpl = globalThis.fetch, flushMs = c
         timestamp: new Date().toISOString(),
         properties: { distinct_id: user.id, ...sourceProps(user), ...props, ...(set ? { $set: set } : {}), $lib: 'opengym-api' }
       });
+      schedule();
+    },
+    /** One event from the guided first run before the sign-up, under the device's anonymous id. */
+    captureAnon(event, anon, props = {}) {
+      if (!cfg.on || !isAnonId(anon)) return;
+      if (queue.length >= MAX_QUEUE) queue.shift();
+      queue.push({ event, timestamp: new Date().toISOString(), properties: { distinct_id: 'anon_' + anon, ...props, $process_person_profile: false, $lib: 'opengym-api' } });
+      schedule();
+    },
+    /** The profile that just signed up is the device that went through the first run as `anon`. */
+    alias(user, anon) {
+      if (!cfg.on || !user?.id || !isAnonId(anon)) return;
+      if (queue.length >= MAX_QUEUE) queue.shift();
+      queue.push({ event: '$create_alias', timestamp: new Date().toISOString(), properties: { distinct_id: user.id, alias: 'anon_' + anon, $lib: 'opengym-api' } });
       schedule();
     },
     flush,

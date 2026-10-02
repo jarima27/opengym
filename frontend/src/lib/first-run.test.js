@@ -3,7 +3,8 @@ import { EXIDX } from './exercises.js'
 import { isBw } from './history.js'
 import {
   trainingDays, recommendPlan, buildFirstPlan, mainLifts, startingWeight, coachProfile,
-  firstRunState, firstSteps, tipDue, shiftWeekPast, postponeWeek, DEFAULT_DAYS, FIRST_WEEK_DAYS
+  firstRunState, firstSteps, tipDue, shiftWeekPast, postponeWeek, DEFAULT_DAYS, FIRST_WEEK_DAYS,
+  FLOW, QUESTION_STEPS, nextStep, stepShown, feelsGood
 } from './first-run.js'
 
 const DAY = 86400000
@@ -142,6 +143,44 @@ describe('coachProfile', () => {
     expect(p).toMatchObject({ goal: 'fatloss', experience: 'regular', daysPerWeek: 3, preferredDays: [1, 3, 5], sessionMin: 45, equipment: ['dumbbell', 'body weight'], limitations: 'bad knee' })
     expect(p.notes).toMatch(/1 to 3 years/)
     expect(coachProfile({ experience: 'starting', place: 'gym' })).toMatchObject({ experience: 'new', equipment: [] })
+  })
+  it('F12’s questions reach the Coach, which is where they matter: they do not change the plan by rule', () => {
+    const a = { goal: 'muscle', experience: 'lt1', place: 'gym', holdback: 'time', focus: ['chest', 'arms', 'nope'], bw: 82, bwGoal: 78, unit: 'kg', sleep: '6to7', feeling: 'stuck', when: '8w' }
+    const p = coachProfile(a)
+    expect(p.likes).toBe('Wants to prioritise: chest, arms.')
+    expect(p.notes).toBe('Training for less than a year. Finding the time has been the problem so far. Body weight 82 kg, aiming for 78 kg. Sleeps 6 to 7 hours a night. Feels stuck. Wants to notice a change within 8 weeks.')
+    expect(p.notes.length).toBeLessThanOrEqual(600)
+    expect(buildFirstPlan(a, { weekday: 1 }).plan).toBe(buildFirstPlan({ goal: 'muscle', experience: 'lt1', place: 'gym' }, { weekday: 1 }).plan)
+  })
+})
+
+describe('the guided first run’s screens (F12)', () => {
+  it('before an account: the video first, the sign-up last before the paywall', () => {
+    const pre = { pre: true, lifts: 2 }
+    const seen = []
+    for (let s = 'intro'; s; s = nextStep(s, pre)) seen.push(s)
+    expect(seen).toEqual(FLOW)
+    expect(seen.indexOf('account')).toBe(seen.indexOf('paywall') - 1)
+    expect(seen.length).toBeGreaterThanOrEqual(20)
+  })
+  it('signed up already: no video, no sign-up; no weights to ask, no weights screen', () => {
+    const post = { pre: false, lifts: 0 }
+    expect(stepShown('intro', post)).toBe(false)
+    expect(nextStep('limits', post)).toBe('building')
+    expect(nextStep('plan', post)).toBe('paywall')
+    // A first run picked up after signing up, on the sign-up screen it left: on to the paywall.
+    expect(nextStep('account', post)).toBe('paywall')
+    expect(nextStep('today', post)).toBe(null)
+    // No Coach to read them: only the questions that make the plan, and the body weight.
+    const bare = { pre: false, lifts: 2, coach: false }
+    const asked = []
+    for (let s = 'goal'; s !== 'building'; s = nextStep(s, bare)) asked.push(s)
+    expect(asked).toEqual(['goal', 'experience', 'body', 'days', 'place', 'length', 'limits', 'lifts'])
+    expect(QUESTION_STEPS[0]).toBe('goal')
+    expect(QUESTION_STEPS.at(-1)).toBe('lifts')
+  })
+  it('a review is asked after a good answer about their progress, never after a bad one', () => {
+    expect(['great', 'ok', 'stuck', 'new'].map(feelsGood)).toEqual([true, true, false, false])
   })
 })
 

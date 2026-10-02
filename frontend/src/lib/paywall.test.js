@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fill, money, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText } from './paywall.js'
+import { fill, money, annualSaving, planLines, ctaText, fillNamed, titleFor, timelineText, perWeek, badgeText, exitLines } from './paywall.js'
 
 const copy = { perMonth: '{0}/mes', perYear: '{0}/año', cta: 'Empezar {0} días gratis', ctaNoTrial: 'Suscribirme', endCta: 'Seguir con el Coach IA' }
 const plans = { monthly: { amount: 499, currency: 'EUR', interval: 'month' }, annual: { amount: 3499, currency: 'EUR', interval: 'year' } }
@@ -34,6 +34,34 @@ describe('paywall sums', () => {
   })
 })
 
+describe('F12: the price a week, the saving, the offer made once', () => {
+  const c = { ...copy, perWeek: '{0}/semana', annualBadge: 'Ahorra un {0} %', exitTitle: 'Antes de irte: {0} el primer año',
+    exitBody: 'Con la misma prueba de {0} días gratis. Después, {1} el primer año y {2} a partir del segundo.' }
+  const now = { monthly: { amount: 799, currency: 'EUR', interval: 'month' }, annual: { amount: 3999, currency: 'EUR', interval: 'year' } }
+  it('39,99 a year is 0,77 a week and 58 % off twelve months of 7,99 (1,84 a week)', () => {
+    expect(perWeek('annual', now.annual)).toEqual({ amount: 77, currency: 'EUR' })
+    expect(perWeek('monthly', now.monthly)).toEqual({ amount: 184, currency: 'EUR' })
+    expect(annualSaving(now)).toBe(58)
+    expect(badgeText(c, 58)).toBe('Ahorra un 58 %')
+    expect(badgeText(c, null)).toBe('', 'no saving to state, no badge')
+    expect(badgeText({ annualBadge: 'Ahorra más' }, 58)).toBe('Ahorra más · −58%')
+    const y = planLines('annual', now.annual, c, 'es-ES')
+    expect(y.main).toMatch(/^0,77\s€\/semana$/)
+    expect(y.sub).toMatch(/^39,99\s€\/año$/)
+    const m = planLines('monthly', now.monthly, c, 'es-ES')
+    expect(m.main).toMatch(/^1,84\s€\/semana$/)
+    expect(m.sub).toMatch(/^7,99\s€\/mes$/)
+  })
+  it('the exit offer quotes the first year and the full price, and the trial only when there is one', () => {
+    const first = { amount: 2999, currency: 'EUR' }
+    const e = exitLines(c, { first, full: now.annual, trialDays: 7 }, 'es-ES')
+    expect(e.title).toMatch(/^Antes de irte: 29,99\s€ el primer año$/)
+    expect(e.body).toMatch(/^Con la misma prueba de 7 días gratis\. Después, 29,99\s€ el primer año y 39,99\s€ a partir del segundo\.$/)
+    expect(exitLines(c, { first, full: now.annual, trialDays: 0 }, 'es-ES').body).toBe('')
+    expect(exitLines(c, { first: null, full: now.annual }, 'es-ES')).toBe(null)
+  })
+})
+
 describe('the person’s own data on the paywall', () => {
   const c = {
     title: 'Un Coach que revisa tu semana', titleStall: 'Deja de estancarte en {exercise}',
@@ -54,8 +82,8 @@ describe('the person’s own data on the paywall', () => {
     expect(titleFor(c, 'comeback')).toBe('¿Unos días fuera? El Coach puede reajustar tu semana.')
     expect(titleFor(c, 'settings')).toBe('Un Coach que revisa tu semana')
   })
-  it('the trial’s timeline: the reminder three days before the first charge, only with a trial', () => {
-    expect(timelineText(c, 30)).toBe('Hoy: todo Pro desbloqueado · Día 27: te avisamos · Día 30: empieza el pago.')
+  it('the trial’s timeline: the reminder two days before the first charge, only with a trial', () => {
+    expect(timelineText(c, 7)).toBe('Hoy: todo Pro desbloqueado · Día 5: te avisamos · Día 7: empieza el pago.')
     expect(timelineText(c, 0)).toBe(null)
     expect(timelineText({}, 30)).toBe(null)
   })

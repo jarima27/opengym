@@ -13,6 +13,10 @@ import { useLang, getLang } from '../lib/i18n.js'
 import { effectiveLang } from '../lib/default-lang.js'
 import { openPaywall } from './Paywall.jsx'
 import { sellsHere } from './useCoachAccess.js'
+import { REMIND_BEFORE } from '../lib/paywall.js'
+import { OFFER } from '../lib/brand.js'
+
+const TRIAL_LEN = OFFER.trialDays
 
 // The moments the website opens the paywall by itself:
 //
@@ -20,7 +24,8 @@ import { sellsHere } from './useCoachAccess.js'
 //    the offer of that trial, once whatever the welcome opened (an import) has been closed;
 //  - the end-of-trial screen, when a trial or a subscription has run out (plan `expired`) — first,
 //    and then again only when no moment below has something more particular to say;
-//  - day 25 of a trial: what the Coach has done so far (components/TrialRecap.jsx), once;
+//  - day 5 of a 7-day trial: what the Coach has done so far (components/TrialRecap.jsx), once,
+//    the day the reminder of the charge comes;
 //  - the offer moments (lib/offers.js): a week after the free first Coach plan, a stalled lift,
 //    a return after days off — on arriving at Home only, not in the middle of something else.
 //
@@ -55,16 +60,19 @@ export default function BillingPrompts() {
       const today = todayISO()
       const unit = S.unit === 'lb' ? 'lb' : 'kg'
       const days = config?.billing || {}
-      // Day 25 of a trial: what the Coach has done so far, once, before the trial becomes a charge.
+      // Day 5 of a 7-day trial: what the Coach has done so far, once, before the trial becomes a charge.
       const trial = a.plan === 'trial' && a.trialEnds ? { end: a.trialEnds, len: days.trial_days, card: false }
         : a.cardTrial && a.periodEnd && !a.endsAt ? { end: a.periodEnd, len: days.card_trial_days, card: true } : null
-      // The day a trial starts, the Coach starts working on its own: a weekly review on the
-      // week's last evening and a read of every session (spec F7). Once — what the person
-      // changes afterwards in the Coach's settings stays changed.
+      // The day a trial starts, the Coach starts working on its own: a read of every session
+      // (day 2: the first one analysed) and a review on the trial's fourth day, then weekly on
+      // that weekday (spec F7, compressed to seven days by F12). Once — what the person changes
+      // afterwards in the Coach's settings stays changed.
       if (trial && !S.coach?.trialDefaults) {
+        const len = trial.len || TRIAL_LEN
+        const day4 = new Date(Date.parse(trial.end) - (len - 3) * 86400000).getDay()
         useStore.getState().update(s => {
           const c = (s.coach = s.coach || emptyCoach())
-          if (!c.cadence || c.cadence === 'off') c.cadence = { weekly: { day: (weekStartOf(s) + 6) % 7, time: '18:00' } }
+          if (!c.cadence || c.cadence === 'off') c.cadence = { weekly: { day: len <= 7 ? day4 : (weekStartOf(s) + 6) % 7, time: '18:00' } }
           c.autoDebrief = true
           c.trialDefaults = true
         })
@@ -73,8 +81,8 @@ export default function BillingPrompts() {
         const endsOn = isoOf(new Date(trial.end))
         const left = Math.ceil((Date.parse(trial.end) - now) / 86400000)
         const key = 'recap:' + endsOn
-        if (left > 0 && left <= 5 && !offersSeen().includes(key)) {
-          const recap = trialRecap(S, { from: isoOf(new Date(Date.parse(trial.end) - (trial.len || 30) * 86400000)), to: today })
+        if (left > 0 && left <= REMIND_BEFORE && !offersSeen().includes(key)) {
+          const recap = trialRecap(S, { from: isoOf(new Date(Date.parse(trial.end) - (trial.len || TRIAL_LEN) * 86400000)), to: today })
           if (recapHasNews(recap)) {
             markOffer(key, trial.card ? lastOfferAt() : now)
             openTrialRecap(recap, { endsOn, card: trial.card })
@@ -86,7 +94,7 @@ export default function BillingPrompts() {
       if (!offerAllowed({ S, now, lastOfferAt: at })) return
       const ended = a.plan === 'expired'
       // After a trial, the screen says what the Coach did in it — in the person's numbers.
-      const endCtx = () => recapContext(trialRecap(S, { from: isoOf(new Date(now - ((days.card_trial_days || days.trial_days || 30) + 5) * 86400000)), to: today }), { unit, fmt: fmtNum })
+      const endCtx = () => recapContext(trialRecap(S, { from: isoOf(new Date(now - ((days.card_trial_days || days.trial_days || TRIAL_LEN) + 5) * 86400000)), to: today }), { unit, fmt: fmtNum })
       // The end of a trial is said once, first; after that a moment with something of the
       // person's own to say (a stall, a return) goes before the same screen again.
       if (ended && !offersSeen().includes('trial_end')) { markOffer('trial_end', now); openPaywall('trial_end', endCtx()); return }

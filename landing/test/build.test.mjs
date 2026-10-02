@@ -29,8 +29,8 @@ test('the real site builds, in both languages, with nothing broken', () => {
   assert.match(home, /hreflang="x-default" href="https:\/\/tiza\.fit\/"/)
   assert.match(home, /"@type":"FAQPage"/)
   assert.match(home, /"@type":"SoftwareApplication"/)
-  assert.match(home, /34,99\s€/, 'prices come from site.config.json, in the page’s own format')
-  assert.match(read(out, 'en/index.html'), /€34\.99/)
+  assert.match(home, /39,99\s€/, 'prices come from site.config.json, in the page’s own format')
+  assert.match(read(out, 'en/index.html'), /€39\.99/)
   assert.doesNotMatch(home, /\{\{|RELLENAR/)
 
   const sitemap = read(out, 'sitemap.xml')

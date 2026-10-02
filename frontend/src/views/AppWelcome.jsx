@@ -37,6 +37,19 @@ async function signedIn(session) {
 }
 
 export default function AppWelcome() {
+  return (
+    <div className="narrow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '82vh', textAlign: 'center' }}>
+      <img src="icon-180.png" alt="" width="72" height="72" style={{ margin: '0 auto 8px', borderRadius: 18 }} onError={e => { e.currentTarget.style.display = 'none' }} />
+      <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.028em', margin: '6px 0 4px' }}>Tiza</h1>
+      <div className="muted" style={{ marginBottom: 30 }}>{t('Your training, and a Coach that reads it.')}</div>
+      <AccountChoice />
+    </div>
+  )
+}
+
+/** Apple, Google, an e-mail, or no account: this screen's buttons, and the end of the guided first
+    run's (F12), where the account is made just before the paywall. */
+export function AccountChoice({ own = true }) {
   const chooseLocalMode = useStore(s => s.chooseLocalMode)
   const [offer, setOffer] = useState(undefined)   // undefined: asking; null: no answer
   const [os, setOs] = useState('web')
@@ -55,11 +68,7 @@ export default function AppWelcome() {
   const icon = { apple: 'person', google: 'globe' }
 
   return (
-    <div className="narrow" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '82vh', textAlign: 'center' }}>
-      <img src="icon-180.png" alt="" width="72" height="72" style={{ margin: '0 auto 8px', borderRadius: 18 }} onError={e => { e.currentTarget.style.display = 'none' }} />
-      <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.028em', margin: '6px 0 4px' }}>Tiza</h1>
-      <div className="muted" style={{ marginBottom: 30 }}>{t('Your training, and a Coach that reads it.')}</div>
-
+    <>
       {providers.map(p => <div key={p}>
         <Button variant={p === providers[0] ? 'primary' : undefined} icon={icon[p]} disabled={!!busy} onClick={() => withProvider(p)}>
           {busy === p ? t('Signing in…') : label[p]}
@@ -77,9 +86,9 @@ export default function AppWelcome() {
       <div className="dim small" style={{ marginTop: 14, lineHeight: 1.5 }}>
         {t('Without an account everything stays on this phone. With one it is kept safe in Tiza, on every device, and the Coach comes with it.')}
       </div>
-      <button type="button" className="linkish dim small" style={{ marginTop: 22, background: 'none', border: 0, color: 'var(--label-3)' }}
-        onClick={() => ui().openSheet(close => <ConnectSheet close={close} />)}>{t('I have my own Tiza server')}</button>
-    </div>
+      {own && <button type="button" className="linkish dim small" style={{ marginTop: 22, background: 'none', border: 0, color: 'var(--label-3)' }}
+        onClick={() => ui().openSheet(close => <ConnectSheet close={close} />)}>{t('I have my own Tiza server')}</button>}
+    </>
   )
 }
 

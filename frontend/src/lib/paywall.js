@@ -26,9 +26,23 @@ export function annualSaving(plans) {
   return pct > 0 ? pct : null
 }
 
-/** The lines on one plan's card: its price per period, and for the year what that is a month. */
+/** What a plan comes to a week, in minor units: a year over 52 weeks, a month times 12 over 52. */
+export function perWeek(plan, price) {
+  if (!price || !(price.amount > 0)) return null
+  return { amount: Math.round(plan === 'annual' ? price.amount / 52 : price.amount * 12 / 52), currency: price.currency }
+}
+
+/** The lines on one plan's card: with a "per week" in the operator's words, what the plan comes
+    to a week, and under it what is charged; else its price per period, and for the year what
+    that is a month. */
 export function planLines(plan, price, copy, locale) {
   if (!price) return { main: '', sub: '' }
+  if (copy.perWeek) {
+    return {
+      main: fill(copy.perWeek, money(perWeek(plan, price), locale)),
+      sub: fill(plan === 'annual' ? copy.perYear : copy.perMonth, money(price, locale))
+    }
+  }
   if (plan === 'annual') {
     return {
       main: fill(copy.perYear, money(price, locale)),
@@ -36,6 +50,24 @@ export function planLines(plan, price, copy, locale) {
     }
   }
   return { main: fill(copy.perMonth, money(price, locale)), sub: '' }
+}
+
+/** The badge on the recommended plan: "Save {0}%" with the saving worked out from the two real
+    prices — or nothing when there is no saving to state; a badge without a blank as it is. */
+export function badgeText(copy, saving) {
+  const b = copy?.annualBadge || ''
+  if (!b.includes('{0}')) return b + (saving ? `${b ? ' · ' : ''}−${saving}%` : '')
+  return saving ? fill(b, saving) : ''
+}
+
+/** The offer made once as the paywall after the plan is closed (F12): its title and text, from
+    the first year's price and the full one — both from Stripe or the store, never typed in. */
+export function exitLines(copy, { first, full, trialDays = 0 }, locale) {
+  if (!first || !copy?.exitTitle) return null
+  return {
+    title: fill(copy.exitTitle, money(first, locale)),
+    body: trialDays > 0 && full && copy.exitBody ? fill(copy.exitBody, trialDays, money(first, locale), money(full, locale)) : ''
+  }
 }
 
 /** The call to action: the trial's length when checking out starts one, else the plain one. */
@@ -68,11 +100,15 @@ export function titleFor(copy, reason, ctx) {
   return own || fillNamed(copy.title, ctx) || copy.title || ''
 }
 
-/** "Today · Day 27: we remind you · Day 30: billing starts" — only when checking out starts a
-    trial, with the reminder three days before its first charge (the promise the trial makes). */
+// How many days before the first charge the reminder comes (api/coach/core/nudges.js): day 5 of
+// a 7-day trial.
+export const REMIND_BEFORE = 2
+
+/** "Today · Day 5: we remind you · Day 7: billing starts" — only when checking out starts a
+    trial, with the reminder two days before its first charge (the promise the trial makes). */
 export function timelineText(copy, cardTrialDays) {
-  if (!(cardTrialDays > 3) || !copy.timeline) return null
-  return fill(copy.timeline, cardTrialDays - 3, cardTrialDays)
+  if (!(cardTrialDays > REMIND_BEFORE) || !copy.timeline) return null
+  return fill(copy.timeline, cardTrialDays - REMIND_BEFORE, cardTrialDays)
 }
 
 // The paywall of the demo, which has no server to ask: the real offer (lib/brand.js OFFER) in the
@@ -85,6 +121,8 @@ export function demoPaywall(lang = getLang()) {
       monthly: { amount: OFFER.monthly, currency: OFFER.currency, interval: 'month' },
       annual: { amount: OFFER.annual, currency: OFFER.currency, interval: 'year' }
     },
-    cardTrialDays: OFFER.trialDays
+    cardTrialDays: OFFER.trialDays,
+    showFree: true,
+    exit: { plan: 'annual', first: { amount: OFFER.exitAnnual, currency: OFFER.currency, interval: 'year' } }
   }
 }

@@ -97,12 +97,15 @@ export function wantsSignup(href = globalThis.location?.href || '') {
   } catch { return false }
 }
 
+/** The sign-up form, as a sheet: from this screen, and from the end of the guided first run. */
+export const openRegister = () => useUI.getState().openSheet(close => <RegisterSheet close={close} />)
+
 export default function Login() {
   const { setUser, adoptProfile, setGuest } = useStore()
   const config = useStore(s => s.config)
   const canGuest = guestAllowed(config)
   const pwOn = passwordOn(config)
-  const register = () => useUI.getState().openSheet(close => <RegisterSheet close={close} />)
+  const register = openRegister
   useEffect(() => {
     if (DEMO || signupAsked || !wantsSignup()) return
     signupAsked = true

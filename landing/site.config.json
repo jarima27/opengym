@@ -10,9 +10,10 @@
   },
   "prices": {
     "currency": "EUR",
-    "monthly": 4.99,
-    "annual": 34.99,
-    "trialDays": 30
+    "monthly": 7.99,
+    "annual": 39.99,
+    "exitAnnual": 29.99,
+    "trialDays": 7
   },
   "defaultLang": "es",
   "langs": ["es", "en"],

@@ -39,15 +39,15 @@ import { emailConfig, contactOf, dueEmail, firstWeek, renderEmail, unsubscribePa
 import { EMAIL_COPY } from './emails-copy.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import {
-  billingConfig, accessOf, isPaying, storeActive, openTrialEnd, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
+  billingConfig, accessOf, isPaying, storeActive, openTrialEnd, checkoutForm, firstYearPrice, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
   revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber,
   freePlanOpen, claimFreePlan, releaseFreePlan,
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
 import { ymoveConfig, exerciseMediaConfig, createVideoStore, loadMap, YmoveDown } from './ymove.js';
 import { PROVIDERS, socialConfig, createKeySet, verifyIdToken, SocialError, nameFor, appleKeysConfig, appleRefreshToken, appleRevoke } from './social.js';
-import { analyticsConfig, createAnalytics, CLIENT_EVENTS, cleanProps } from './analytics.js';
-import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
+import { analyticsConfig, createAnalytics, CLIENT_EVENTS, ANON_EVENTS, isAnonId, cleanProps } from './analytics.js';
+import { loadPaywall, validatePaywall, PaywallError, variantFor, copyFor, createPriceCache, createCouponCache, DEFAULT_COPY, COPY_FIELDS, PLANS } from './paywall.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -718,7 +718,10 @@ const CSRF_EXEMPT = new Set([
   'POST /api/login/options', 'POST /api/login/verify',
   'POST /api/pair/redeem',
   // Stripe and RevenueCat calling in: no browser, no session, and their own secret is the check.
-  'POST /api/billing/webhook', 'POST /api/billing/revenuecat'
+  'POST /api/billing/webhook', 'POST /api/billing/revenuecat',
+  // The first run's screens before the sign-up, from the store app too: no session to act on,
+  // nothing kept — an event under a made-up id, counted per address.
+  'POST /api/track/anon'
 ]);
 const originsMatch = (a, b) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 function csrfOk(req, key) {
@@ -2066,6 +2069,9 @@ const activeCode = code => db.codes.find(c => c.code === code && !c.revoked) || 
    the friend's reward, a tester's Pro for good); one that does not is kept out of the record, so
    a typo cannot pass for a creator's sign-up. */
 function adoptSource(user, raw) {
+  // The device's anonymous id from the first run's screens before the sign-up: its events and
+  // this profile's are one person from here on.
+  ANALYTICS.alias(user, text(raw?.anon));
   // The app's language at sign-up, for what the server writes before the app has said more
   // (S.lang wins once it is set): the lifecycle emails.
   const lang = text(raw?.lang).trim();
@@ -2172,6 +2178,9 @@ let PAYWALL = loadPaywall(paywallFile);
 // A variant may carry its own Stripe prices (a price test); otherwise the instance's.
 const priceFor = (user, plan) => variantFor(PAYWALL, user.id).prices?.[plan] || BILLING.stripe.prices[plan] || null;
 const priceShown = createPriceCache(id => stripe(BILLING, 'GET', 'prices/' + encodeURIComponent(id)));
+const couponShown = createCouponCache(id => stripe(BILLING, 'GET', 'coupons/' + encodeURIComponent(id)));
+// The coupon of the exit offer for this profile's variant, else the instance's own.
+const exitCouponFor = user => variantFor(PAYWALL, user.id).exitCoupon || BILLING.stripe.exitCoupon || null;
 const SYNC_BUDGET = createWindow({ max: 30, windowMs: 3600000 });
 const FEEDBACK_BUDGET = createWindow({ max: 10, windowMs: 3600000 });
 
@@ -2212,15 +2221,25 @@ const billingRoutes = {
         if (id) plans[p] = await priceShown(id);
       }
     }
+    // The offer made once as the paywall after the first plan is closed (F12): on the website,
+    // the annual plan's first year at what Stripe's coupon takes off it — quoted only when the
+    // coupon gives a price Stripe will charge; in the stores, the operator's offering, priced there.
+    let exit = null;
+    const coupon = BILLING.stripe.on && plans.annual && exitCouponFor(user);
+    if (coupon) {
+      const first = firstYearPrice(plans.annual, await couponShown(coupon));
+      if (first) exit = { plan: 'annual', first: { amount: first, currency: plans.annual.currency, interval: 'year' } };
+    }
     json(res, 200, {
       experiment: PAYWALL.experiment, variant: v.id, highlight: v.highlight, offering: v.offering || null,
-      copy: copyFor(v, lang), plans, cardTrialDays: billingAccess(user).cardTrialDays
+      copy: copyFor(v, lang), plans, cardTrialDays: billingAccess(user).cardTrialDays,
+      showFree: v.showFree !== false, exit, exitOffering: v.exitOffering || null
     });
   },
 
   'GET /api/admin/paywall': async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    json(res, 200, { paywall: PAYWALL, defaults: DEFAULT_COPY, fields: COPY_FIELDS, envPrices: BILLING.stripe.prices });
+    json(res, 200, { paywall: PAYWALL, defaults: DEFAULT_COPY, fields: COPY_FIELDS, envPrices: BILLING.stripe.prices, envExitCoupon: BILLING.stripe.exitCoupon || null });
   },
 
   // Saved, and live on the next paywall anyone opens.
@@ -2281,11 +2300,15 @@ const stripeRoutes = {
     const which = PLANS.includes(body.plan) ? body.plan : 'monthly';
     const price = priceFor(user, which);
     if (!price) return json(res, 400, { error: 'this plan is not offered', code: 'plan' });
+    // The exit offer: the annual plan, with the coupon the paywall quoted.
+    const exit = body.offer === 'exit';
+    const coupon = exit ? (which === 'annual' && exitCouponFor(user)) : null;
+    if (exit && !coupon) return json(res, 400, { error: 'this offer is not available', code: 'offer' });
     let session;
-    try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, price, since: db.billingSince || 0 })); }
+    try { session = await stripe(BILLING, 'POST', 'checkout/sessions', checkoutForm(user, BILLING, { origin: ORIGIN, price, since: db.billingSince || 0, coupon, back: body.back === 'welcome' ? 'welcome' : 'settings' })); }
     catch (e) { console.error('billing: checkout for', user.id, '-', e.message); return json(res, 502, PAYMENT_DOWN); }
-    audit(req, 'billing.checkout', { user, msg: which });
-    ANALYTICS.capture('checkout_started', user, { plan: which, via: 'stripe' });
+    audit(req, 'billing.checkout', { user, msg: which + (exit ? ' · exit offer' : '') });
+    ANALYTICS.capture('checkout_started', user, { plan: which, via: 'stripe', ...(exit ? { offer: 'exit' } : {}) });
     json(res, 200, { url: session.url });
   },
 
@@ -2398,6 +2421,7 @@ const storeRoutes = {
 
 /* ---------- growth: creator codes and the app's own events ---------- */
 const TRACK_BUDGET = createWindow({ max: 120, windowMs: 3600000 });
+const ANON_TRACK_BUDGET = createWindow({ max: 300, windowMs: 3600000 });
 const REDEEM_TRIES = createWindow({ max: 10, windowMs: 3600000 });   // guessing codes is not a game
 const growthRoutes = {
   // Whether a creator code is real, and what it gives — for the sign-up screen to say
@@ -2450,6 +2474,19 @@ const growthRoutes = {
   },
 
   // The app's own events (analytics.js CLIENT_EVENTS), forwarded with the profile's attribution.
+  // The guided first run's screens before the sign-up (analytics.js ANON_EVENTS), under the id
+  // the device made up for them. Counted per address; nothing is kept here.
+  'POST /api/track/anon': async (req, res) => {
+    const body = await readBody(req);
+    const event = text(body.event);
+    if (!ANON_EVENTS.has(event)) return json(res, 400, { error: 'unknown event', code: 'event' });
+    if (!isAnonId(body.anon)) return json(res, 400, { error: 'bad id', code: 'anon' });
+    const wait = ANON_TRACK_BUDGET.take(limitAddress(req));
+    if (wait) return tooMany(res, wait);
+    ANALYTICS.captureAnon(event, body.anon, cleanProps(body.props));
+    json(res, 200, { ok: true });
+  },
+
   'POST /api/track': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });

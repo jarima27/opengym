@@ -154,8 +154,12 @@ In the Cloudflare dashboard, for the `tiza.fit` zone:
    - `RESEND_API_KEY` and `RESEND_FROM` for the lifecycle emails, once `tiza.fit` is verified in
      Resend (its SPF and DKIM records go in Cloudflare's DNS, plus a DMARC record) — SELF_HOSTING.md
      → *Lifecycle emails*.
-   - `TRIAL_DAYS` must match what the website promises (`prices.trialDays` in
-     `landing/site.config.json`).
+   - `STRIPE_TRIAL_DAYS=7` and `TRIAL_DAYS=0` (the 7-day trial with a card, no open trial): the
+     trial must match what the website promises (`prices.trialDays` in
+     `landing/site.config.json`), and so must the prices in Stripe (7,99 €/month, 39,99 €/year).
+   - `STRIPE_EXIT_COUPON`: a Stripe coupon of 10 € off, duration *once*, for the offer made once
+     as the paywall after the first plan is closed (39,99 € → 29,99 € the first year). Without
+     it, the website makes no second offer.
 
    Anything left empty is simply off, and can be added later (step 9).
 

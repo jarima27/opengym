@@ -45,6 +45,8 @@ export function attribution() {
   // The app's language goes too: what the server writes before the app has said more (emails).
   const out = { platform: platform(), lang: getLang() }
   if (saved && typeof saved === 'object') for (const k of ['ref', ...UTM]) if (saved[k]) out[k] = saved[k]
+  // The id the first run's screens were reported under before the sign-up (lib/track.js).
+  try { const anon = storage()?.getItem('tiza_anon'); if (anon) out.anon = anon } catch { /* none */ }
   return out
 }
 export const pendingCode = () => attribution().ref || null

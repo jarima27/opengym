@@ -2,6 +2,7 @@
    operator relies on: a profile always lands in the same variant, the weights are honoured, a
    field left empty still says something in the right language, a variant's own Stripe price is
    what its checkout charges — and nothing malformed is ever saved. */
+import { firstYearPrice } from '../billing.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -18,7 +19,7 @@ const two = validatePaywall({
   experiment: 'price-test',
   variants: [
     { id: 'a', weight: 50, highlight: 'annual', copy: { es: { title: 'Plan A', bullets: ['uno', '', 'dos'] } } },
-    { id: 'b', weight: 50, highlight: 'monthly', prices: { annual: 'price_B' }, copy: { es: { title: 'Plan B' } } }
+    { id: 'b', weight: 50, highlight: 'monthly', prices: { annual: 'price_B' }, showFree: false, exitCoupon: 'FOREVER', exitOffering: 'exit', copy: { es: { title: 'Plan B' } } }
   ]
 });
 
@@ -86,6 +87,12 @@ test('the admin saves a price test; each profile sees its variant, and checks ou
     let b = ''; req.on('data', d => { b += d; }); req.on('end', () => {
       calls.push({ method: req.method, url: req.url, form: new URLSearchParams(b) });
       res.setHeader('Content-Type', 'application/json');
+      if (req.url.startsWith('/v1/coupons/')) {
+        const id = req.url.split('/').pop();
+        if (id === 'EXIT10') return res.end(JSON.stringify({ id, amount_off: 1000, currency: 'eur', duration: 'once', valid: true }));
+        if (id === 'FOREVER') return res.end(JSON.stringify({ id, percent_off: 25, duration: 'forever', valid: true }));
+        res.statusCode = 404; return res.end(JSON.stringify({ error: { message: 'No such coupon' } }));
+      }
       if (req.url.startsWith('/v1/prices/')) {
         const id = req.url.split('/').pop();
         return res.end(JSON.stringify({ id, unit_amount: id === 'price_B' ? 2999 : id === 'price_Y' ? 3499 : 499, currency: 'eur', recurring: { interval: id === 'price_M' ? 'month' : 'year' } }));
@@ -105,7 +112,7 @@ test('the admin saves a price test; each profile sees its variant, and checks ou
     env: {
       ...process.env, PORT: '0', DATA_DIR: dataDir, ORIGIN: 'http://localhost:8080', RP_ID: 'localhost', MEDIA_UPLOADS: '0', ADMIN_UIDS: 'boss',
       STRIPE_SECRET_KEY: 'sk_test', STRIPE_PRICE_MONTHLY: 'price_M', STRIPE_PRICE_ANNUAL: 'price_Y', STRIPE_TRIAL_DAYS: '30', TRIAL_DAYS: '0',
-      STRIPE_API_BASE: `http://127.0.0.1:${fake.address().port}`, STRIPE_WEBHOOK_SECRET: 'whsec'
+      STRIPE_API_BASE: `http://127.0.0.1:${fake.address().port}`, STRIPE_WEBHOOK_SECRET: 'whsec', STRIPE_EXIT_COUPON: 'EXIT10'
     }
   });
   t.after(() => { child.kill('SIGKILL'); fs.rmSync(dataDir, { recursive: true, force: true }); });
@@ -119,6 +126,16 @@ test('the admin saves a price test; each profile sees its variant, and checks ou
   assert.equal(first.copy.cta, 'Empezar {0} días gratis');
   assert.equal(first.cardTrialDays, 30);
   assert.deepEqual(first.plans, { monthly: { amount: 499, currency: 'EUR', interval: 'month' }, annual: { amount: 3499, currency: 'EUR', interval: 'year' } });
+  // F12: the "continue free" link is on until a variant hides it, and the exit offer is the
+  // annual plan's first year at what the coupon takes off it — Stripe's numbers, not ours.
+  assert.equal(first.showFree, true);
+  assert.deepEqual(first.exit, { plan: 'annual', first: { amount: 2499, currency: 'EUR', interval: 'year' } });
+  assert.equal(first.exitOffering, null);
+  await call('/api/billing/checkout', 'p0', { plan: 'annual', offer: 'exit' });
+  const exitForm = calls.filter(c => c.url === '/v1/checkout/sessions').at(-1).form;
+  assert.equal(exitForm.get('discounts[0][coupon]'), 'EXIT10');
+  assert.equal(exitForm.get('allow_promotion_codes'), null, 'Stripe takes a coupon or the promotion code box, never both');
+  assert.equal((await call('/api/billing/checkout', 'p0', { plan: 'monthly', offer: 'exit' })).status, 400, 'the offer is the annual plan');
 
   assert.equal((await call('/api/admin/paywall', 'p0', { paywall: two })).status, 403);
   assert.equal((await call('/api/admin/paywall', 'boss', { paywall: { variants: [] } })).status, 400);
@@ -135,6 +152,12 @@ test('the admin saves a price test; each profile sees its variant, and checks ou
   assert.equal(seen.b.highlight, 'monthly');
   assert.equal(seen.b.plans.annual.amount, 2999, 'variant b’s own annual price');
   assert.equal(seen.a.plans.annual.amount, 3499);
+  // Variant b hides the free link, and its coupon takes 25 % off every year — not a first-year
+  // price, so no exit offer is quoted on the website; the store app has its offering.
+  assert.equal(seen.b.showFree, false);
+  assert.equal(seen.b.exit, null);
+  assert.equal(seen.b.exitOffering, 'exit');
+  assert.equal(seen.a.exit.first.amount, 2499);
 
   // And the checkout charges the variant's price.
   const inB = users.slice(1).find(u => variantFor(two, u.id).id === 'b');
@@ -143,4 +166,17 @@ test('the admin saves a price test; each profile sees its variant, and checks ou
   const inA = users.slice(1).find(u => variantFor(two, u.id).id === 'a');
   await call('/api/billing/checkout', inA.id, { plan: 'annual' });
   assert.equal(calls.filter(c => c.url === '/v1/checkout/sessions').at(-1).form.get('line_items[0][price]'), 'price_Y');
+});
+
+test('the exit offer quotes only a first year Stripe will charge', () => {
+  const year = { amount: 3999, currency: 'EUR', interval: 'year' };
+  assert.equal(firstYearPrice(year, { amountOff: 1000, currency: 'EUR', duration: 'once' }), 2999);
+  assert.equal(firstYearPrice(year, { percentOff: 25, duration: 'repeating', months: 12 }), 2999);
+  assert.equal(firstYearPrice(year, { percentOff: 25, duration: 'forever' }), null, 'every year is not the first year');
+  assert.equal(firstYearPrice(year, { percentOff: 25, duration: 'repeating', months: 24 }), null);
+  assert.equal(firstYearPrice(year, { amountOff: 1000, currency: 'USD', duration: 'once' }), null, 'another currency');
+  assert.equal(firstYearPrice(year, { amountOff: 1000, currency: 'EUR', duration: 'once', valid: false }), null);
+  assert.equal(firstYearPrice(year, { amountOff: 5000, currency: 'EUR', duration: 'once' }), null, 'nothing for free');
+  assert.equal(firstYearPrice({ ...year, interval: 'month' }, { amountOff: 100, currency: 'EUR', duration: 'once' }), null);
+  assert.equal(firstYearPrice(year, null), null);
 });

@@ -12,8 +12,9 @@ export const SITE_HOST = 'tiza.fit'
 export const APP = 'https://app.tiza.fit'
 export const SIGNUP = APP + '/#/?signup=1'
 // Tiza Pro's offer as the website states it (landing/site.config.json, which a test holds this to):
-// what the demo's paywall shows, since the demo has no server to ask. Amounts in cents.
-export const OFFER = { currency: 'EUR', monthly: 499, annual: 3499, trialDays: 30 }
+// what the demo's paywall shows, since the demo has no server to ask. Amounts in cents; exitAnnual
+// is the first year of the annual plan offered once, as the paywall after the plan is closed.
+export const OFFER = { currency: 'EUR', monthly: 799, annual: 3999, exitAnnual: 2999, trialDays: 7 }
 // AGPL §13: people using the hosted service must be able to get its source. This is that link.
 export const SOURCE = 'https://github.com/jarima27/opengym'
 export const UPSTREAM_NAME = 'openGym'

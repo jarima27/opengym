@@ -1,6 +1,6 @@
 ---
 title: Tiza · The gym app with automatic progression
-description: Log your sets in seconds and Tiza tells you what to lift today, and why. Import your Strong or Hevy history in a minute. Free; AI Coach with a 30-day trial.
+description: Log your sets in seconds and Tiza tells you what to lift today, and why. Import your Strong or Hevy history in a minute. Free; AI Coach with a 7-day trial.
 translation: /
 ---
 

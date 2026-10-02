@@ -31,7 +31,11 @@ export function billingCached() {
 export const coachAccess = () => billingCached().then(a => (a === undefined ? null : accessOf(a)))
 export const forgetCoachAccess = () => { statusMemo = null }
 
-export const billingCheckout = plan => api('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: plan || 'monthly' }) })
+// `offer: 'exit'` is the offer made once as the paywall after the plan is closed; `back: 'welcome'`
+// brings Stripe back to the guided first run, which goes on from the screen after the paywall.
+export const billingCheckout = (plan, { offer, back } = {}) => api('/api/billing/checkout', {
+  method: 'POST', body: JSON.stringify({ plan: plan || 'monthly', ...(offer ? { offer } : {}), ...(back ? { back } : {}) })
+})
 export const billingPortal = () => api('/api/billing/portal', { method: 'POST', body: '{}' })
 // The cancel flow (components/CancelFlow.jsx): each answers the profile's access afterwards.
 const post = (path, body = {}) => api(path, { method: 'POST', body: JSON.stringify(body) }).finally(forgetCoachAccess)

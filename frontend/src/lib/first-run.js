@@ -15,6 +15,50 @@ export const EXPERIENCE = ['starting', 'lt1', '1to3', 'gt3']
 export const PLACES = ['gym', 'basic', 'dumbbells', 'bodyweight']
 export const LENGTHS = [30, 45, 60, 90]
 export const DAY_COUNTS = [2, 3, 4, 5, 6]
+// F12: what has held them back, what to bring up first, how they sleep, how they feel about their
+// progress, and by when they want to see it. None of them changes the plan by rule: they are kept
+// for the Coach (coachProfile below), which reads them when it makes or adjusts the plan.
+export const HOLDBACKS = ['time', 'plan', 'results', 'motivation', 'injury', 'none']
+export const FOCUS = ['chest', 'back', 'shoulders', 'arms', 'legs', 'glutes', 'core']
+export const SLEEP = ['lt6', '6to7', '7to8', 'gt8']
+export const FEELINGS = ['great', 'ok', 'stuck', 'new']
+export const WHEN = ['4w', '8w', '3m', 'any']
+/** An answer about their progress that is a good moment to ask for a store review (once). */
+export const feelsGood = feeling => feeling === 'great' || feeling === 'ok'
+
+/*
+ * The guided first run, screen by screen (F11, lengthened by F12). Before an account exists —
+ * the hosted app — it opens with the short video and ends with the sign-up, just before the
+ * paywall; signed up already (a self-hosted instance, a guest), those two are not shown. The
+ * starting weights are asked only for lifts the plan has; the paywall decides for itself whether
+ * there is anything to sell (views/FirstRun.jsx).
+ */
+export const FLOW = [
+  'intro', 'goal', 'experience', 'holdback', 'focus', 'boost1', 'body', 'days', 'place', 'length',
+  'sleep', 'feeling', 'boost2', 'when', 'limits', 'lifts', 'building', 'plan', 'account', 'paywall',
+  'coach', 'import', 'notify', 'today'
+]
+// The screens the progress bar counts: the questions, from the first to the starting weights.
+export const QUESTION_STEPS = FLOW.slice(FLOW.indexOf('goal'), FLOW.indexOf('lifts') + 1)
+
+// The questions only the Coach reads, and the screens between them: not asked where there is no
+// Coach to read them (a self-hosted instance without one).
+const COACH_ONLY = new Set(['holdback', 'focus', 'boost1', 'sleep', 'feeling', 'boost2', 'when'])
+
+/** Whether `step` is shown: `pre` before an account exists, `lifts` how many weights to ask for,
+    `coach` whether there is a Coach to read the answers only it uses. */
+export function stepShown(step, { pre = false, lifts = 1, coach = true } = {}) {
+  if (step === 'intro' || step === 'account') return pre
+  if (step === 'lifts') return lifts > 0
+  if (COACH_ONLY.has(step)) return !!coach
+  return FLOW.includes(step)
+}
+
+/** The screen after `step`, or null at the end. */
+export function nextStep(step, ctx) {
+  for (let i = FLOW.indexOf(step) + 1; i > 0 && i < FLOW.length; i++) if (stepShown(FLOW[i], ctx)) return FLOW[i]
+  return null
+}
 
 // The weekdays (DAYN index, 1 = Monday) a number of days spreads over before the person picks
 // their own: never two days in a row where the week allows it.
@@ -170,6 +214,14 @@ export function coachProfile(answers = {}) {
     bodyweight: ['body weight']
   }
   const YEARS = { starting: 'Just starting to lift.', lt1: 'Training for less than a year.', '1to3': 'Training for 1 to 3 years.', gt3: 'Training for more than 3 years.' }
+  // F12's questions, for the Coach: they do not change the plan by rule.
+  const HELD = { time: 'Finding the time has been the problem so far.', plan: 'Not knowing what to do has been the problem so far.', results: 'Not seeing results has been the problem so far.', motivation: 'Staying consistent has been the problem so far.', injury: 'Injuries or pain have held them back.' }
+  const SLEPT = { lt6: 'Sleeps less than 6 hours a night.', '6to7': 'Sleeps 6 to 7 hours a night.', '7to8': 'Sleeps 7 to 8 hours a night.', gt8: 'Sleeps more than 8 hours a night.' }
+  const FELT = { great: 'Happy with their progress, and wants more.', ok: 'Progressing, but feels it could be better.', stuck: 'Feels stuck.', new: 'Has not started training yet.' }
+  const BY = { '4w': 'Wants to notice a change within 4 weeks.', '8w': 'Wants to notice a change within 8 weeks.', '3m': 'Wants to notice a change within 3 months.', any: 'In no hurry to see a change.' }
+  const unit = answers.unit === 'lb' ? 'lb' : 'kg'
+  const body = answers.bw > 0 ? `Body weight ${answers.bw} ${unit}${answers.bwGoal > 0 ? `, aiming for ${answers.bwGoal} ${unit}` : ''}.` : ''
+  const focus = (answers.focus || []).filter(m => FOCUS.includes(m))
   return {
     goal: answers.goal === 'general' ? 'general' : answers.goal || 'general',
     experience: isNovice(answers.experience) ? 'new' : 'regular',
@@ -178,8 +230,9 @@ export function coachProfile(answers = {}) {
     sessionMin: answers.sessionMin || 60,
     equipment: EQUIPMENT[answers.place] || [],
     limitations: (answers.limits || '').trim(),
-    likes: '', dislikes: '',
-    notes: YEARS[answers.experience] || ''
+    likes: focus.length ? `Wants to prioritise: ${focus.join(', ')}.` : '',
+    dislikes: '',
+    notes: [YEARS[answers.experience], HELD[answers.holdback], body, SLEPT[answers.sleep], FELT[answers.feeling], BY[answers.when]].filter(Boolean).join(' ')
   }
 }
 

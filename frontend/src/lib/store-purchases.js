@@ -84,6 +84,45 @@ export async function storeOffer(userId, offeringId, deps) {
   return { plans, packages, trialDays }
 }
 
+/** The first year's price of a yearly product whose introductory offer is one paid year — the
+    offer made once as the paywall after the plan is closed (spec F12) — or null. Google Play
+    keeps it as a discounted phase of the subscription option (after its free one, if any); the
+    App Store as the product's paid introductory price. */
+export function introYear(product) {
+  const ph = product?.defaultOption?.introPhase
+  const bp = ph?.billingPeriod
+  if (ph?.price?.amountMicros > 0 && bp?.unit === 'YEAR' && Number(bp.value) === 1 && (Number(ph.billingCycleCount) || 1) === 1) {
+    return { amount: Math.round(ph.price.amountMicros / 10000), currency: String(ph.price.currencyCode || product.currencyCode || '').toUpperCase() }
+  }
+  const i = product?.introPrice
+  if (i && i.price > 0 && i.periodUnit === 'YEAR' && Number(i.periodNumberOfUnits) === 1 && (Number(i.cycles) || 1) === 1) {
+    return { amount: Math.round(Number(i.price) * 100), currency: String(product.currencyCode || '').toUpperCase() }
+  }
+  return null
+}
+
+/** Free days before a product's first charge: Google Play's free phase, else a free intro price. */
+export function trialDaysOf(product) {
+  const bp = product?.defaultOption?.freePhase?.billingPeriod
+  if (bp) return (PERIOD_DAYS[bp.unit] || 0) * (Number(bp.value) || 0)
+  return freeDays(product)
+}
+
+/**
+ * The exit offer from the operator's offering for it (GET /api/paywall `exitOffering`): its
+ * yearly package, the first year's price and the full one as the store has them, and its free
+ * days. null when the offering has no yearly product with a one-year introductory price.
+ */
+export async function storeExitOffer(userId, offeringId, deps) {
+  if (!offeringId) return null
+  const { Purchases } = await ready(userId, deps)
+  const all = await Purchases.getOfferings()
+  const pkg = all?.all?.[offeringId]?.annual
+  const first = pkg && introYear(pkg.product)
+  if (!first) return null
+  return { pkg, first: { ...first, interval: 'year' }, full: priceOf(pkg.product, 'year'), trialDays: trialDaysOf(pkg.product) }
+}
+
 async function synced() {
   forgetCoachAccess()
   try { return await api('/api/billing/sync', { method: 'POST', body: '{}' }) } catch { return null }

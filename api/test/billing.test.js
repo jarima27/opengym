@@ -563,6 +563,15 @@ test('the app’s own events: only the listed ones, forwarded with the profile�
   await settle(() => fake.seen.posthog.some(e => e.event === 'import_done'));
   const e = fake.seen.posthog.find(x => x.event === 'import_done');
   assert.deepEqual([e.properties.distinct_id, e.properties.ref, e.properties.source, e.properties.workouts, e.properties.deep], ['u1', 'LUCIA', 'strong', 212, undefined]);
+  // Before the sign-up (F12): the first run's screens, under the device's own anonymous id —
+  // those and nothing else.
+  const anon = 'f3Kq9xY2-vB7nP1s';
+  assert.equal((await h.call('/api/track/anon', { method: 'POST', body: { event: 'onboarding_step', anon, props: { step: 'goal', index: 2 } } })).status, 200);
+  assert.equal((await h.call('/api/track/anon', { method: 'POST', body: { event: 'import_done', anon } })).status, 400);
+  assert.equal((await h.call('/api/track/anon', { method: 'POST', body: { event: 'onboarding_step', anon: 'x' } })).status, 400);
+  await settle(() => fake.seen.posthog.some(x => x.event === 'onboarding_step'));
+  const step = fake.seen.posthog.find(x => x.event === 'onboarding_step');
+  assert.deepEqual([step.properties.distinct_id, step.properties.step, step.properties.index], ['anon_' + anon, 'goal', 2]);
 });
 
 test('without PostHog, no event route and nothing sent', async t => {

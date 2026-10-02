@@ -18,3 +18,9 @@ export function markTrialOffer() { try { store()?.setItem(OFFER, '1') } catch { 
 export function takeTrialOffer() {
   try { const on = store()?.getItem(OFFER) === '1'; store()?.removeItem(OFFER); return on } catch { return false }
 }
+
+// "I already have an account" on the first run's opening screen (F12): the sign-in screen for the
+// rest of this tab, rather than the guided first run again.
+const SIGN_IN = 'tiza_sign_in'
+export function markSignIn() { try { store()?.setItem(SIGN_IN, '1') } catch { /* asked again, at worst */ } }
+export function wantsSignIn() { try { return store()?.getItem(SIGN_IN) === '1' } catch { return false } }

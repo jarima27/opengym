@@ -175,12 +175,19 @@ What has to exist outside this repository before a store build is any use:
 |---|---|---|
 | Apple Developer | App ID `fit.tiza.app` with *Sign in with Apple* and *In-App Purchase* | the entitlement is already in `ios/App/App/App.entitlements` |
 | Google Cloud | OAuth client ids: Web (used by Android) and iOS | `.env.mobile` → `VITE_GOOGLE_WEB_CLIENT_ID`, `VITE_GOOGLE_IOS_CLIENT_ID`; add the iOS id reversed as a URL scheme in `ios/App/App/Info.plist` |
-| App Store Connect / Play Console | Monthly and annual subscriptions (with the free trial as an introductory offer) | — |
-| RevenueCat | The two stores, entitlement `pro`, an offering with *Monthly* and *Annual* packages, webhook to `/api/billing/revenuecat` | `.env.mobile` → `VITE_RC_IOS_KEY`, `VITE_RC_ANDROID_KEY` (public SDK keys) |
+| App Store Connect / Play Console | Monthly (7,99 €) and annual (39,99 €) subscriptions, with the 7-day free trial as an introductory offer; for the exit offer, an annual product whose introductory offer is the first year at 29,99 € (on Google Play, a free week then a discounted first year in one offer; the App Store allows one introductory offer per product, so there it is the first year alone) | — |
+| RevenueCat | The two stores, entitlement `pro`, an offering with *Monthly* and *Annual* packages, and (optional) an `exit` offering with that exit product as its *Annual* package; webhook to `/api/billing/revenuecat` | `.env.mobile` → `VITE_RC_IOS_KEY`, `VITE_RC_ANDROID_KEY` (public SDK keys); the exit offering's id in Admin → Paywall → *Exit offer: app offering* |
 | The hosted server | `PASSWORD_LOGIN=1`, `APPLE_CLIENT_IDS=fit.tiza.app`, `GOOGLE_CLIENT_IDS=<web id>,<iOS id>`, `REVENUECAT_*` | see SELF_HOSTING.md |
 | tiza.fit | the privacy policy and terms published (`landing/content/*/privacidad.md`, `terminos.md` are drafts) | their URLs in `.env.mobile` and in both stores' listings |
 
 How the pieces fit:
+
+- **The first screens.** The store app opens with the guided first run (F12): a short video of
+  the app in use (`frontend/public/intro.mp4`, or `VITE_INTRO_VIDEO` in `.env.mobile`; without
+  one the screen shows the promise alone), the questions, the plan, and only then the account
+  (Apple, Google or e-mail) and the paywall. "I already have an account" on the first screen goes
+  to the sign-in buttons instead. A good answer about one's progress halfway through asks for a
+  store review — once in the life of the install, and never again after the third workout.
 
 - **Signing in.** The provider's own sheet runs natively (`@capgo/capacitor-social-login`, with
   Facebook and Twitter left out of the build in `capacitor.config.json`); the ID token it returns

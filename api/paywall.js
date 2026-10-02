@@ -9,6 +9,10 @@
  *       highlight: 'annual',               the plan drawn as the recommended one
  *       prices: { monthly, annual },       Stripe price ids for this variant (else the env ones)
  *       offering: 'default',               the RevenueCat offering the app shows for it
+ *       showFree: true,                    the "continue with the free version" link (F12)
+ *       exitCoupon: 'coupon_…',            the offer made once as the paywall is closed: a
+ *       exitOffering: 'exit',              Stripe coupon (else STRIPE_EXIT_COUPON) on the website,
+ *                                          a RevenueCat offering in the stores
  *       copy: { es: {...}, en: {...} }     every text on both screens, per language
  *     }] }
  *
@@ -29,7 +33,8 @@ export const PLANS = ['monthly', 'annual'];
 // empty; a title falls back to the general one.
 export const COPY_FIELDS = [
   'title', 'titleStall', 'titleComeback', 'titleDay7', 'subtitle', 'bullets', 'timeline', 'cta', 'ctaNoTrial',
-  'monthlyLabel', 'annualLabel', 'annualBadge', 'perMonth', 'perYear', 'footnote', 'later', 'endTitle', 'endRecap', 'endBody', 'endCta'
+  'monthlyLabel', 'annualLabel', 'annualBadge', 'perMonth', 'perYear', 'perWeek', 'footnote', 'later', 'freeLink',
+  'exitTitle', 'exitBody', 'exitLater', 'endTitle', 'endRecap', 'endBody', 'endCta'
 ];
 const MAX_TEXT = 300;
 const MAX_BULLETS = 6;
@@ -37,7 +42,7 @@ const MAX_BULLETS = 6;
 export { DEFAULT_COPY };
 export const DEFAULTS = {
   experiment: 'launch',
-  variants: [{ id: 'a', weight: 100, highlight: 'annual', prices: {}, offering: '', copy: DEFAULT_COPY }]
+  variants: [{ id: 'a', weight: 100, highlight: 'annual', prices: {}, offering: '', showFree: true, exitCoupon: '', exitOffering: '', copy: DEFAULT_COPY }]
 };
 
 class PaywallError extends Error {}
@@ -66,6 +71,10 @@ export function validatePaywall(raw) {
       if (price) prices[p] = price;
     }
     const offering = str(v.offering, 60);
+    const showFree = v.showFree !== false;
+    const exitCoupon = str(v.exitCoupon, 64);
+    if (exitCoupon && !/^[\w-]{1,64}$/.test(exitCoupon)) throw new PaywallError(`variant ${id}: a Stripe coupon id is letters, digits, - and _`);
+    const exitOffering = str(v.exitOffering, 60);
     const copy = {};
     for (const [lang, c] of Object.entries(v.copy || {})) {
       if (!/^[a-z]{2}(-[A-Z]{2})?$/.test(lang) || !c || typeof c !== 'object') continue;
@@ -78,7 +87,7 @@ export function validatePaywall(raw) {
       }
       if (Object.keys(one).length) copy[lang] = one;
     }
-    return { id, weight, highlight, prices, offering, copy };
+    return { id, weight, highlight, prices, offering, showFree, exitCoupon, exitOffering, copy };
   });
   if (!variants.some(v => v.weight > 0)) throw new PaywallError('at least one variant needs a weight above 0');
   return { experiment, variants };
@@ -125,6 +134,31 @@ export function createPriceCache(fetchPrice, { ttlMs = 600000, now = Date.now } 
       const p = await fetchPrice(id);
       if (Number.isFinite(p?.unit_amount) && p.currency) value = { amount: p.unit_amount, currency: String(p.currency).toUpperCase(), interval: p.recurring?.interval || null };
     } catch { /* shown without an amount; the checkout page still states it */ }
+    cache.set(id, { at: now(), value });
+    return value;
+  };
+}
+
+/* A Stripe coupon as the exit offer needs it, read once and kept for ten minutes like a price. */
+export function createCouponCache(fetchCoupon, { ttlMs = 600000, now = Date.now } = {}) {
+  const cache = new Map();
+  return async id => {
+    const hit = cache.get(id);
+    if (hit && now() - hit.at < ttlMs) return hit.value;
+    let value = null;
+    try {
+      const c = await fetchCoupon(id);
+      if (c && c.id) {
+        value = {
+          amountOff: Number.isFinite(c.amount_off) ? c.amount_off : 0,
+          percentOff: Number.isFinite(c.percent_off) ? c.percent_off : 0,
+          currency: c.currency ? String(c.currency).toUpperCase() : null,
+          duration: c.duration || null,
+          months: Number.isFinite(c.duration_in_months) ? c.duration_in_months : null,
+          valid: c.valid !== false
+        };
+      }
+    } catch { /* no second offer rather than a wrong one */ }
     cache.set(id, { at: now(), value });
     return value;
   };

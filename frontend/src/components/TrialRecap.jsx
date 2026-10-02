@@ -10,8 +10,8 @@ import { openPaywall } from './Paywall.jsx'
 import Icon from './Icon.jsx'
 import { Button } from './ui.jsx'
 
-// Day 25 of a trial (spec F7): what the Coach has done so far, in the person's own numbers, and
-// when the trial ends — before it turns into anything. An open trial is offered the plans; a card
+// Day 5 of a 7-day trial (spec F7, F12): what the Coach has done so far, in the person's own
+// numbers, and when the trial ends — before it turns into anything. An open trial is offered the plans; a card
 // trial is told when its subscription starts and where to manage it (cancelling is one tap away).
 export function openTrialRecap(recap, { endsOn, card }) {
   useUI.getState().openSheet(close => <TrialRecap recap={recap} endsOn={endsOn} card={card} close={close} />)

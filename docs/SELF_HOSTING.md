@@ -365,9 +365,10 @@ STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PRICE_MONTHLY=price_...
 STRIPE_PRICE_ANNUAL=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_TRIAL_DAYS=30        # free days of a first web subscription, card up front
+STRIPE_TRIAL_DAYS=7         # free days of a first web subscription, card up front
 STRIPE_SAVE_COUPON=         # optional: a Stripe coupon offered with the annual plan to someone cancelling
 TRIAL_DAYS=0                # open trial without a card (default 30); 0 = card trials only
+STRIPE_EXIT_COUPON=         # optional: the first year of the annual plan cheaper, offered once (see below)
 REVENUECAT_WEBHOOK_AUTH=Bearer <long random string>
 REVENUECAT_SECRET_KEY=sk_...
 POSTHOG_KEY=phc_...         # optional: product analytics, sent from the server
@@ -379,9 +380,34 @@ How it behaves:
   stores' introductory offer) is a trial taken out with a card: the first charge comes when it
   ends, and a person gets it once. Subscribing early never costs a free day — the card trial
   starts where the open one ends. Profiles that existed before you turned charging on get their
-  open trial from that day.
-- **Paywall.** Settings → Subscription, a Coach request after the trial, and the first screens
-  after sign-up open it. Its words, the recommended plan, each plan's Stripe price and up to four
+  open trial from that day. The hosted Tiza runs a 7-day card trial and no open one
+  (`STRIPE_TRIAL_DAYS=7`, `TRIAL_DAYS=0`): the reminder of the charge comes on day 5 (push), with
+  "what the Coach has done for you" on the same day, and the Coach starts on its own with the
+  trial — every session read, and a review on the trial's fourth day, then weekly.
+- **The first screens (hosted).** On an instance that charges, the website opens with the
+  guided first run instead of the sign-in screen (the store app always does): a short video of
+  the app in use (`frontend/public/intro.mp4`, or the build's `VITE_INTRO_VIDEO`), the
+  questions — the ones that make the plan, and the ones only the Coach reads (what held them
+  back, muscles to prioritise, body weight and goal, sleep, how they feel about their progress,
+  by when they want to see a change) — a few seconds "putting the plan together", and the plan:
+  its days, its first session and, from a weight the person gave, the main lift's estimated
+  one-rep max today and in eight weeks as the progression engine works it out (labelled as an
+  estimate; without a weight, no projection). Then the account, then the paywall, then the plan
+  is applied. "I already have an account" goes to the sign-in screen. Every screen is reported
+  as `onboarding_step` (before the account under an anonymous id the device makes up, joined to
+  the profile at sign-up), and the paywall's `paywall_viewed`, `paywall_dismissed`,
+  `exit_offer_viewed`, `exit_offer_accepted`, `continued_free` and the server's `trial_started`
+  show where people stop.
+- **The paywall after the plan.** The annual plan picked, both shown by the week with what is
+  charged under it, the saving worked out from the two real prices, the trial's timeline (the
+  reminder two days before the first charge), "Start 7 days free", and a small "continue with
+  the free version" link that Admin → Paywall can hide per variant for a test (an X closes it
+  either way). Closed, it makes one offer, once: the annual plan's first year cheaper with the
+  same trial — on the website the variant's *Exit offer: Stripe coupon* (else
+  `STRIPE_EXIT_COUPON`), quoted only when the coupon takes exactly the first year off (duration
+  *once*, or *repeating* up to 12 months) so the price shown is the one charged; in the store app
+  the variant's *Exit offer: app offering* (RevenueCat), priced by the store.
+- **Paywall.** Settings → Subscription, a Coach request after the trial, and the first run open it. Its words, the recommended plan, each plan's Stripe price and up to four
   A/B variants are edited in **Admin → Paywall** and are live on the next paywall anyone opens.
 - **End of trial.** When a trial or subscription runs out, the website shows the end-of-trial
   screen once; Coach jobs answer `402` until they subscribe; a failed card (`past_due`) keeps the
@@ -701,7 +727,7 @@ and a few engagement nudges — at most one a day — that each person can switc
 | *Trained today?* | 20:00 by default (adjustable) on a planned day with nothing logged; skipped when the day reminder is within 3 hours of it, and after 2 weeks without a workout |
 | Comeback | 18:30, 4, 7, 14 and 30 days after the last workout — or 1, 3 and 7 days after signing up, before the first one |
 | Week summary | 19:00 on the last day of the week, when there was at least one workout: count, volume, records, trend |
-| Trial ending | 12:00, 3 days and 1 day before a web trial ends (only when billing is on; the stores remind their own customers) |
+| Trial ending | 12:00, 2 days (day 5 of a 7-day trial) and 1 day before a web trial ends (only when billing is on; the stores remind their own customers) |
 | Coach's weekly report | 09:00 on the first day of the week: the first line of "What your Coach would tell you this week" — the app works it out ahead from rules on the device (`frontend/src/lib/coach-pills.js`, no AI) and keeps it in the profile; someone with the Coach hears from the Coach's own review instead |
 
 The planner is `api/coach/core/nudges.js`, shared with the mobile app, which schedules the same

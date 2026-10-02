@@ -68,6 +68,9 @@ export function billingConfig(env = process.env) {
       webhookSecret: str('STRIPE_WEBHOOK_SECRET'),
       // A coupon offered to someone cancelling a monthly plan, on the annual one (spec F8).
       saveCoupon: str('STRIPE_SAVE_COUPON'),
+      // The first year of the annual plan cheaper, offered once as the paywall after the first
+      // plan is closed (spec F12). Admin → Paywall can set another per variant.
+      exitCoupon: str('STRIPE_EXIT_COUPON'),
       // Only ever changed to point the tests (or stripe-mock) somewhere other than Stripe.
       apiBase: base('STRIPE_API_BASE', 'https://api.stripe.com')
     },
@@ -168,8 +171,9 @@ export function transitions(a, b) {
 /* ------------------------------------ Stripe ------------------------------------ */
 
 /* The Checkout Session for one profile and one price. The card trial, when there is one, starts
-   where the open trial ends, so subscribing early never costs a free day. */
-export function checkoutForm(user, cfg, { origin, price, since = 0, now = Date.now() }) {
+   where the open trial ends, so subscribing early never costs a free day. `coupon`: the offer made
+   when the paywall is closed (Stripe takes a coupon or a promotion code box, never both). */
+export function checkoutForm(user, cfg, { origin, price, since = 0, now = Date.now(), coupon = null, back = 'settings' }) {
   const f = new URLSearchParams();
   f.set('mode', 'subscription');
   f.set('line_items[0][price]', price);
@@ -179,16 +183,33 @@ export function checkoutForm(user, cfg, { origin, price, since = 0, now = Date.n
   // On the subscription as well, so its own events name the profile even when they arrive
   // before checkout.session.completed has told us which customer it is.
   f.set('subscription_data[metadata][uid]', user.id);
-  f.set('allow_promotion_codes', 'true');
-  const back = String(origin || '').replace(/\/+$/, '') + '/#/settings';
-  f.set('success_url', back);
-  f.set('cancel_url', back);
+  if (coupon) f.set('discounts[0][coupon]', coupon);
+  else f.set('allow_promotion_codes', 'true');
+  // Back to Settings, or to the guided first run the checkout was started from (F12).
+  const to = String(origin || '').replace(/\/+$/, '') + (back === 'welcome' ? '/#/welcome' : '/#/settings');
+  f.set('success_url', to);
+  f.set('cancel_url', to);
   if (user.billing?.customer) f.set('customer', user.billing.customer);
   else if (user.email) f.set('customer_email', user.email);
   const cardDays = user.billing?.trialUsed || user.store?.trialUsed ? 0 : cfg.cardTrialDays;
   const trialEnd = Math.max(openTrialEnd(user, cfg, since), now) + cardDays * DAY;
   if (trialEnd - now >= MIN_TRIAL_END_MS) f.set('subscription_data[trial_end]', String(Math.floor(trialEnd / 1000)));
   return f;
+}
+
+/* What the first year of a yearly price comes to with a coupon, in minor units — or null when the
+   coupon does not take exactly the first year off it (a coupon for ever, for longer than a year,
+   in another currency, no longer valid), so the paywall never quotes a price Stripe won't charge. */
+export function firstYearPrice(price, coupon) {
+  if (!price || !(price.amount > 0) || price.interval !== 'year' || !coupon || coupon.valid === false) return null;
+  const once = coupon.duration === 'once' || (coupon.duration === 'repeating' && coupon.months > 0 && coupon.months <= 12);
+  if (!once) return null;
+  let amount = null;
+  if (coupon.amountOff > 0) {
+    if (String(coupon.currency || '').toUpperCase() !== price.currency) return null;
+    amount = price.amount - coupon.amountOff;
+  } else if (coupon.percentOff > 0) amount = Math.round(price.amount * (1 - coupon.percentOff / 100));
+  return amount > 0 && amount < price.amount ? amount : null;
 }
 
 export function portalForm(user, { origin }) {

@@ -2795,7 +2795,11 @@ paths:
         empty falls back to built-in words. A profile always gets the same variant for the
         same `experiment`. `plans` has each plan the website sells, priced as Stripe has it
         (null when Stripe could not be read). `offering` is the RevenueCat offering the mobile
-        app shows for this variant. The app reports `variant` on its paywall events.
+        app shows for this variant. The app reports `variant` on its paywall events. `showFree`
+        says whether the paywall after the first plan shows its "continue with the free version"
+        link; `exit` is the offer made once as that paywall is closed — the annual plan's first
+        year with the exit coupon, only when Stripe's coupon gives that price (else null) — and
+        `exitOffering` the RevenueCat offering the store app makes it with.
       parameters:
         - name: lang
           in: query
@@ -2812,7 +2816,7 @@ paths:
                   variant: { type: string }
                   highlight: { type: string, enum: [monthly, annual] }
                   offering: { type: ['string', 'null'] }
-                  copy: { type: object, description: 'title, subtitle, bullets[], cta, ctaNoTrial, monthlyLabel, annualLabel, annualBadge, perMonth, perYear, footnote, later, endTitle, endBody, endCta' }
+                  copy: { type: object, description: 'title, subtitle, bullets[], cta, ctaNoTrial, monthlyLabel, annualLabel, annualBadge, perMonth, perYear, perWeek, footnote, later, freeLink, exitTitle, exitBody, exitLater, endTitle, endBody, endCta' }
                   plans:
                     type: object
                     additionalProperties:
@@ -2824,6 +2828,15 @@ paths:
                             interval: { type: string }
                         - type: 'null'
                   cardTrialDays: { type: integer }
+                  showFree: { type: boolean }
+                  exit:
+                    oneOf:
+                      - type: object
+                        properties:
+                          plan: { type: string, enum: [annual] }
+                          first: { type: object, properties: { amount: { type: integer }, currency: { type: string }, interval: { type: string } } }
+                      - type: 'null'
+                  exitOffering: { type: ['string', 'null'] }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/admin/paywall:
@@ -2881,7 +2894,9 @@ paths:
         `STRIPE_PRICE_ANNUAL`) and answers its `url`; the app sends the browser there, and Stripe
         sends it back to `/#/settings`. The first charge waits for the open trial to end, and then
         for the card trial (`STRIPE_TRIAL_DAYS`, once per person), when that is at least 48 hours
-        away — Stripe's minimum. Audited as `billing.checkout`.
+        away — Stripe's minimum. `offer: exit` is the offer made once as the paywall after the
+        first plan is closed: the annual plan with the variant's exit coupon (or
+        `STRIPE_EXIT_COUPON`) on its first year. Audited as `billing.checkout`.
       requestBody:
         content:
           application/json:
@@ -2889,6 +2904,8 @@ paths:
               type: object
               properties:
                 plan: { type: string, enum: [monthly, annual], default: monthly }
+                offer: { type: string, enum: [exit] }
+                back: { type: string, enum: [settings, welcome], default: settings, description: 'Where Stripe sends the browser back: Settings, or the guided first run.' }
             example: { plan: annual }
       responses:
         '200':
@@ -2901,7 +2918,7 @@ paths:
                   url: { type: string, format: uri }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '400':
-          description: That plan has no price on this instance (`code: plan`).
+          description: That plan has no price on this instance (`code: plan`), or there is no exit offer (`code: offer`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3265,6 +3282,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /api/track/anon:
+    post:
+      tags: [growth]
+      operationId: trackAnon
+      summary: Report a screen of the guided first run before the sign-up
+      description: |
+        The guided first run's screens before an account exists (`onboarding_step` only), under
+        an anonymous id the device made up (16–40 letters, digits, `-`, `_`). Sent with the sign-up
+        as `src.anon`, the id is joined to the new profile in PostHog. Nothing is kept on this
+        server; a no-op without `POSTHOG_KEY`. Counted per address (300 an hour).
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, anon]
+              properties:
+                event: { type: string, enum: [onboarding_step] }
+                anon: { type: string }
+                props: { type: object }
+            example: { event: onboarding_step, anon: 'f3Kq9xY2-vB7nP1s', props: { step: goal, index: 2 } }
+      responses:
+        '200': { description: Taken. }
+        '400': { description: Not an event taken before the sign-up (`code: event`), or a bad id (`code: anon`). }
+        '429': { description: Too many from this address. }
 
   /api/track:
     post:

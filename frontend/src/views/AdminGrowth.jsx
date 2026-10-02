@@ -116,10 +116,13 @@ const LABELS = {
   titleComeback: 'Title when back after a few days off', titleDay7: 'Title a week after the free Coach plan',
   timeline: 'Trial timeline ({0} = reminder day, {1} = first charge day)', subtitle: 'Subtitle', bullets: 'Bullet points — one per line', cta: 'Button, when checking out starts a trial ({0} = days)',
   ctaNoTrial: 'Button, without a trial', monthlyLabel: 'Monthly plan name', annualLabel: 'Yearly plan name', annualBadge: 'Badge on the recommended plan',
-  perMonth: 'Price per month ({0} = price)', perYear: 'Price per year ({0} = price)', footnote: 'Small print', later: 'Dismiss button',
+  perMonth: 'Price per month ({0} = price)', perYear: 'Price per year ({0} = price)', perWeek: 'Price per week ({0} = price)',
+  footnote: 'Small print', later: 'Dismiss button', freeLink: 'After the first plan: the “continue free” link',
+  exitTitle: 'Exit offer — title ({0} = first year’s price)', exitBody: 'Exit offer — text ({0} = trial days, {1} = first year, {2} = a year after)',
+  exitLater: 'Exit offer — dismiss button',
   endTitle: 'Trial ended — title', endRecap: 'Trial ended — what the Coach did ({adjustments}, {gainKg}, {exercise})', endBody: 'Trial ended — text', endCta: 'Trial ended — button, without a trial'
 }
-const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody', 'endRecap', 'timeline', 'titleDay7'])
+const LONG = new Set(['subtitle', 'bullets', 'footnote', 'endBody', 'endRecap', 'timeline', 'titleDay7', 'exitBody'])
 const clone = o => JSON.parse(JSON.stringify(o))
 
 export function PaywallCard() {
@@ -163,13 +166,14 @@ export function PaywallCard() {
     const copy = {}
     for (const f of d.fields) copy[f] = (f === 'bullets' ? (own.bullets || []).filter(b => b.trim()) : own[f]) || defaults[f]
     if (!copy.bullets.length) copy.bullets = defaults.bullets
-    openPaywallPreview({ copy, highlight: v.highlight, variant: v.id }, reason)
+    openPaywallPreview({ copy, highlight: v.highlight, variant: v.id, showFree: v.showFree !== false }, reason)
   }
 
   return <div className="card">
     <div className="row between"><h2 style={{ margin: 0 }}>Paywall</h2>
       <div className="row" style={{ gap: 6 }}>
         <Button size="sm" onClick={() => preview('preview')}>Preview</Button>
+        <Button size="sm" onClick={() => preview('preview_plan')}>After the plan</Button>
         <Button size="sm" onClick={() => preview('preview_end')}>Trial ended</Button>
         <Button variant="primary" size="sm" onClick={save} disabled={busy}>Save</Button>
       </div></div>
@@ -207,6 +211,17 @@ export function PaywallCard() {
         <input className="input" placeholder={d.envPrices.monthly || 'price_…'} value={v.prices?.monthly || ''} onChange={e => put(x => { x.prices = { ...x.prices, monthly: e.target.value } })} /></label>
       <label className="small" style={{ flex: '1 1 200px' }}>Stripe yearly price
         <input className="input" placeholder={d.envPrices.annual || 'price_…'} value={v.prices?.annual || ''} onChange={e => put(x => { x.prices = { ...x.prices, annual: e.target.value } })} /></label>
+    </div>
+    {/* The paywall right after the first plan (F12): its "continue free" link can be hidden for a
+        test, and closing it makes one second offer — a coupon on the website, an offering in the stores. */}
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'flex-end' }}>
+      <label className="small row" style={{ flex: '1 1 200px', gap: 8, alignItems: 'center' }}>
+        <input type="checkbox" checked={v.showFree !== false} onChange={e => put(x => { x.showFree = e.target.checked })} />
+        Show “continue with the free version” after the first plan</label>
+      <label className="small" style={{ flex: '1 1 160px' }}>Exit offer: Stripe coupon
+        <input className="input" placeholder={d.envExitCoupon || 'none'} value={v.exitCoupon || ''} onChange={e => put(x => { x.exitCoupon = e.target.value })} /></label>
+      <label className="small" style={{ flex: '1 1 160px' }}>Exit offer: app offering
+        <input className="input" placeholder="none" value={v.exitOffering || ''} onChange={e => put(x => { x.exitOffering = e.target.value })} /></label>
     </div>
 
     <div className="chips" style={{ marginBottom: 10 }}>

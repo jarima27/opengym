@@ -42,6 +42,33 @@ describe('store purchases', () => {
     expect(Purchases.configure).toHaveBeenCalledTimes(1)
   })
 
+  it('the exit offer: the first year as the store prices it, after the same free days', async () => {
+    // Google Play: a free week, then a discounted first year, then the full price.
+    const play = {
+      identifier: 'tiza_annual_exit', price: 39.99, currencyCode: 'EUR', introPrice: { price: 0, periodUnit: 'WEEK', periodNumberOfUnits: 1 },
+      defaultOption: {
+        freePhase: { billingPeriod: { unit: 'WEEK', value: 1 }, price: { amountMicros: 0, currencyCode: 'EUR' } },
+        introPhase: { billingPeriod: { unit: 'YEAR', value: 1 }, billingCycleCount: 1, price: { amountMicros: 29990000, currencyCode: 'EUR' } }
+      }
+    }
+    expect(sp.introYear(play)).toEqual({ amount: 2999, currency: 'EUR' })
+    expect(sp.trialDaysOf(play)).toBe(7)
+    // The App Store: a paid introductory year.
+    const ios = product('tiza_annual_exit', 39.99, null, { price: 29.99, periodUnit: 'YEAR', periodNumberOfUnits: 1, cycles: 1 })
+    expect(sp.introYear(ios)).toEqual({ amount: 2999, currency: 'EUR' })
+    // A free trial alone, or a cheaper month, is not a first year.
+    expect(sp.introYear(product('x', 39.99, null, FREE_MONTH))).toBe(null)
+    expect(sp.introYear(product('x', 39.99, null, { price: 1.99, periodUnit: 'MONTH', periodNumberOfUnits: 1 }))).toBe(null)
+    const Purchases = fakePurchases()
+    Purchases.getOfferings.mockResolvedValue({ current: null, all: { exit: { identifier: 'exit', annual: { identifier: 'a', product: play } } } })
+    const o = await sp.storeExitOffer('u1', 'exit', { Purchases, platform: 'android' })
+    expect(o.first).toEqual({ amount: 2999, currency: 'EUR', interval: 'year' })
+    expect(o.full).toEqual({ amount: 3999, currency: 'EUR', interval: 'year' })
+    expect(o.trialDays).toBe(7)
+    expect(await sp.storeExitOffer('u1', 'missing', { Purchases, platform: 'android' })).toBe(null)
+    expect(await sp.storeExitOffer('u1', null, { Purchases, platform: 'android' })).toBe(null)
+  })
+
   it('no free trial promised to someone the store will not give one to', async () => {
     const o = await sp.storeOffer('u1', null, { Purchases: fakePurchases({ eligible: 1 }), platform: 'ios' })
     expect(o.trialDays).toBe(0)

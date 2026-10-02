@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavigationType } from 'react-router-dom'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
@@ -46,7 +46,8 @@ import FirstRun from './views/FirstRun.jsx'
 import BillingPrompts from './components/BillingPrompts.jsx'
 import CoachPlanWatcher from './components/CoachPlanWatcher.jsx'
 import { CoachReportSync } from './components/CoachReport.jsx'
-import { welcomePending } from './lib/welcome.js'
+import { welcomePending, wantsSignIn, markSignIn } from './lib/welcome.js'
+import { DEMO } from './lib/demo.js'
 import { readArrival, listenForNotificationTaps } from './lib/notify.js'
 import { track } from './lib/track.js'
 import { openPaywall } from './components/Paywall.jsx'
@@ -84,6 +85,13 @@ function Shell() {
   useEffect(() => { setVibrate(S.vibrate !== false) }, [S.vibrate])
   const isGuest = useStore(s => s.isGuest())
   const needsMobileOnboarding = useStore(s => s.needsMobileOnboarding)
+  // F12: the hosted app opens with the guided first run, and makes the account at its end, just
+  // before the paywall — the website on an instance that charges, the store app always. "I already
+  // have an account" leads to the sign-in screen instead (for this tab).
+  const charging = !!useStore(s => s.config?.billing)
+  const [signIn, setSignIn] = useState(wantsSignIn)
+  const funnelFirst = !DEMO && !signIn && (MOBILE ? !!DEFAULT_SERVER : charging)
+  const toSignIn = () => { markSignIn(); setSignIn(true) }
   const langV = useLang()   // re-renders the whole shell when the language (pack) changes
   useEffect(() => { setNav(navigate) }, [navigate])
   const lastEditPath = useRef(loc.pathname)
@@ -196,7 +204,8 @@ function Shell() {
           re-mounts the boundary, so the tab bar is always a way out */}
       <div id="app" className="vfade" key={loc.pathname}>
         <ErrorBoundary>
-          {!authed ? <Login /> : needsMobileOnboarding ? (DEFAULT_SERVER ? <Suspense fallback={null}><AppWelcome /></Suspense> : <MobileOnboarding />) : (
+          {!authed ? (funnelFirst ? <FirstRun pre onSignIn={toSignIn} /> : <Login />)
+            : needsMobileOnboarding ? (DEFAULT_SERVER ? (funnelFirst ? <FirstRun pre onSignIn={toSignIn} /> : <Suspense fallback={null}><AppWelcome /></Suspense>) : <MobileOnboarding />) : (
             <Routes>
               <Route path="/home" element={welcomePending() ? <Navigate to="/welcome" replace /> : <Home />} />
               <Route path="/welcome" element={<FirstRun />} />

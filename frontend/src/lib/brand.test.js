@@ -11,6 +11,7 @@ describe('brand', () => {
       currency: site.prices.currency,
       monthly: Math.round(site.prices.monthly * 100),
       annual: Math.round(site.prices.annual * 100),
+      exitAnnual: Math.round(site.prices.exitAnnual * 100),
       trialDays: site.prices.trialDays
     })
     // and the sign-up address is the website's own "Start free"
