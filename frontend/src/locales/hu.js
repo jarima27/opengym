@@ -2054,4 +2054,13 @@ export default {
   'Working out your weights': 'Súlyaid kiszámítása',
   'Your personal AI Coach. It knows what to lift today.': 'A személyes MI-edződ. Tudja, mit emelj ma.',
   'Your progress': 'A fejlődésed',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'Egy alkotó vagy egy barát kódjával extra Pro napokat kapsz.',
+  'Do you have a code?': 'Van kódod?',
+  'I don’t have a code': 'Nincs kódom',
+  'I’ve redeemed it': 'Beváltottam',
+  'Open the App Store': 'App Store megnyitása',
+  'Redeem it in the App Store': 'Váltsd be az App Store-ban',
+  'Your code is redeemed in the App Store.': 'A kódodat az App Store-ban lehet beváltani.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'Az alkotód ajánlatát az App Store-ban lehet beváltani. Ha kész, gyere vissza ide.',
 }

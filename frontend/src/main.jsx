@@ -6,6 +6,7 @@ import { useStore } from './store/useStore.js'
 import { startMediaSync } from './lib/media-sync.js'
 import { startNativeKeyboard } from './lib/native-keyboard.js'
 import { captureAttribution } from './lib/attribution.js'
+import { readInstallReferrer } from './lib/install-referrer.js'
 import './index.css'
 
 // App.jsx restores per-route scroll itself; the browser's own attempt races it.
@@ -13,6 +14,8 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
 
 // A creator code or campaign tags in the link that opened the app, kept for the sign-up.
 captureAttribution()
+// Android: the creator's code a Google Play link carried, read on the first start.
+readInstallReferrer()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode><App /></StrictMode>

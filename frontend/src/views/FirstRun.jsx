@@ -47,6 +47,8 @@ import Icon from '../components/Icon.jsx'
 import { Button, TextArea, NumberField } from '../components/ui.jsx'
 import { Choice, Consent } from './CoachIntake.jsx'
 import { openRegister } from './Login.jsx'
+import { redeemCode, openAppleRedemption } from '../lib/redeem.js'
+import { refusal } from '../components/Invite.jsx'
 import '../coach.css'
 
 // The store app signs up with Apple, Google or an e-mail (views/AppWelcome.jsx), loaded only there.
@@ -66,7 +68,7 @@ const forget = () => { try { sessionStorage.removeItem(SAVED) } catch { /* nothi
 // capitalised label of the week strip.
 const dayName = iso => new Date(iso + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' })
 // The screens there is no going back from: the plan is applied, the account made, the paywall seen.
-const NO_BACK = new Set(['intro', 'building', 'paywall', 'coach', 'import', 'notify', 'today'])
+const NO_BACK = new Set(['intro', 'building', 'code', 'paywall', 'coach', 'import', 'notify', 'today'])
 
 export default function FirstRun({ pre = false, onSignIn }) {
   const nav = useNavigate()
@@ -184,6 +186,7 @@ export default function FirstRun({ pre = false, onSignIn }) {
       {step === 'building' && <BuildingStep onDone={() => setStep(nextStep('building', ctx))} />}
       {step === 'plan' && <PlanReveal a={a} rules={rules} lifts={lifts} unit={S.unit} pre={pre} onNext={() => go()} />}
       {step === 'account' && pre && <AccountStep onSignIn={onSignIn} />}
+      {step === 'code' && <CodeStep onDone={outcome => { said('code', outcome); go() }} />}
       {step === 'paywall' && <PaywallStep onDone={outcome => { said('paywall', outcome); go() }}
         onLeave={() => save({ step: nextStep('paywall', ctx), answers: a, history: [] })} />}
       {step === 'coach' && <CoachStep a={a} rules={rules} lifts={lifts} onDone={() => go()} />}
@@ -499,6 +502,72 @@ function AccountStep({ onSignIn }) {
           {canGuest && <><div style={{ height: 10 }} /><Button variant="ghost" className="dim" onClick={() => { markWelcome(); setGuest(true) }}>{t('Continue without account')}</Button></>}
         </>}
       {onSignIn && <button type="button" className="pw-free" onClick={onSignIn}>{t('I already have an account')}</button>}
+    </div>
+  </>
+}
+
+/* ---------- a creator's or a friend's code, just before the paywall ---------- */
+// Asked where something is sold to this profile and no code counts for it yet — one carried by a
+// link or the Play Store's install referrer is applied at sign-up and needs no asking. Its days
+// show on the paywall that follows (the days to the first charge). On an iPhone a creator's code
+// may be an Apple offer code, redeemed in the App Store (lib/redeem.js).
+function CodeStep({ onDone }) {
+  const charging = !!useStore(s => s.config?.billing)
+  const uid = useStore(s => s.user?.id)
+  const toast = useUI(s => s.toast)
+  const [open, setOpen] = useState(false)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [apple, setApple] = useState(null)
+  useEffect(() => {
+    if (DEMO || !sellsHere(charging, uid)) { onDone('skipped'); return }
+    let live = true
+    billingCached().then(st => {
+      if (!live) return
+      if (st && !st.ref && ['none', 'trial', 'expired'].includes(st.plan)) setOpen(true)
+      else onDone(st?.ref ? 'had' : 'skipped')
+    }).catch(() => { if (live) onDone('skipped') })
+    return () => { live = false }
+  }, [])
+  const redeem = async () => {
+    if (busy || !code.trim()) return
+    setBusy(true); setError('')
+    try {
+      const r = await redeemCode(code)
+      if (r.appleOffer) { setApple(r.appleOffer); setBusy(false); openAppleRedemption(r.appleOffer, uid); return }
+      toast(r.kind === 'tester' ? t('Done! You have Pro free for good.') : t('Done! {0} extra days of Pro free.', r.days))
+      onDone(r.kind)
+    } catch (e) { setBusy(false); setError(refusal(e)) }
+  }
+  // Back from the App Store: the store is asked straight away, so a redeemed offer skips the paywall.
+  const redeemed = async () => {
+    setBusy(true)
+    try { const r = await (await import('../lib/store-purchases.js')).restore(uid); onDone(r.active ? 'apple' : 'apple-later') }
+    catch { onDone('apple-later') }
+  }
+  if (!open) return <div className="ob-wait"><div className="ob-spin"><Icon name="sparkles" /></div></div>
+  if (apple) return <>
+    <div className="ob-big-icon"><Icon name="gift" /></div>
+    <h1 className="ob-h" style={{ textAlign: 'center' }}>{t('Redeem it in the App Store')}</h1>
+    <p className="ob-p" style={{ textAlign: 'center' }}>{t('Your creator’s offer is redeemed in the App Store. Come back here once it’s done.')}</p>
+    <div className="ob-foot" style={{ flexDirection: 'column' }}>
+      <Button variant="primary" disabled={busy} onClick={redeemed}>{t('I’ve redeemed it')}</Button>
+      <Button disabled={busy} onClick={() => openAppleRedemption(apple, uid)}>{t('Open the App Store')}</Button>
+      <button type="button" className="pw-free" onClick={() => onDone('apple-later')}>{t('Continue')}</button>
+    </div>
+  </>
+  return <>
+    <div className="ob-big-icon"><Icon name="gift" /></div>
+    <h1 className="ob-h" style={{ textAlign: 'center' }}>{t('Do you have a code?')}</h1>
+    <p className="ob-p" style={{ textAlign: 'center' }}>{t('A creator’s or a friend’s code gets you extra days of Pro.')}</p>
+    <input className="input ob-code" maxLength={24} value={code} placeholder={t('Code')} aria-label={t('Code')}
+      onChange={e => { setCode(e.target.value.toUpperCase()); setError('') }}
+      onKeyDown={e => { if (e.key === 'Enter') redeem() }} />
+    {error && <div className="small" role="alert" style={{ color: 'var(--red)', marginTop: 8, textAlign: 'center' }}>{error}</div>}
+    <div className="ob-foot" style={{ flexDirection: 'column' }}>
+      <Button variant="primary" disabled={busy || !code.trim()} onClick={redeem}>{busy ? t('Checking…') : t('Redeem')}</Button>
+      <button type="button" className="pw-free" onClick={() => onDone('none')}>{t('I don’t have a code')}</button>
     </div>
   </>
 }

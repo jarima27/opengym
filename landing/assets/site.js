@@ -4,6 +4,8 @@
 //     campaign tags (?utm_*) in this page's address are added to every link into the app and to
 //     every link to another page of the site, so they survive browsing until the sign-up, where
 //     the app records them. A visit with no campaign says which page sent it (utm_content).
+//     Links to Google Play carry them as the install referrer, which the Android app reads on
+//     its first start and signs up with — the creator's code applied on its own.
 //  2. With a creator's code, a banner says what it gives — once the app confirms it exists.
 //  3. The menu on phones, and the button that stays at the bottom once the top one is gone.
 (() => {
@@ -20,6 +22,11 @@
     if (!href || href.startsWith('#') || href.startsWith('mailto:')) continue
     let u
     try { u = new URL(href, location.href) } catch { continue }
+    if (u.hostname === 'play.google.com' && carry.length && !u.searchParams.has('referrer')) {
+      u.searchParams.set('referrer', new URLSearchParams(carry).toString())
+      a.href = u.toString()
+      continue
+    }
     const toApp = app && u.href.startsWith(app)
     const internal = u.origin === location.origin
     if (!toApp && !internal) continue

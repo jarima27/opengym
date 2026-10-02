@@ -51,6 +51,7 @@ const LABELS = {
   // Creator, trainer and tester codes (Admin → Creator codes, Tester codes): `msg` is the code.
   'admin.code.create': 'Created a creator or tester code',
   'admin.code.revoke': 'Revoked a code',
+  'admin.code.apple': 'Set a creator code’s Apple offer code',
   // A code typed into the app (Settings → Subscription → Have a code?): `msg` is the code and its kind.
   'billing.redeem': 'Redeemed a code',
   // The lifecycle emails' unsubscribe link, and its undo (api/emails.js).

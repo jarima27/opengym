@@ -160,16 +160,18 @@ describe('the guided first run’s screens (F12)', () => {
     const seen = []
     for (let s = 'intro'; s; s = nextStep(s, pre)) seen.push(s)
     expect(seen).toEqual(FLOW)
-    expect(seen.indexOf('account')).toBe(seen.indexOf('paywall') - 1)
+    // The account, then the creator's code, then the paywall.
+    expect(seen.slice(seen.indexOf('account'), seen.indexOf('paywall') + 1)).toEqual(['account', 'code', 'paywall'])
     expect(seen.length).toBeGreaterThanOrEqual(20)
   })
   it('signed up already: no video, no sign-up; no weights to ask, no weights screen', () => {
     const post = { pre: false, lifts: 0 }
     expect(stepShown('intro', post)).toBe(false)
     expect(nextStep('limits', post)).toBe('building')
-    expect(nextStep('plan', post)).toBe('paywall')
-    // A first run picked up after signing up, on the sign-up screen it left: on to the paywall.
-    expect(nextStep('account', post)).toBe('paywall')
+    expect(nextStep('plan', post)).toBe('code')
+    // A first run picked up after signing up, on the sign-up screen it left: on to the code.
+    expect(nextStep('account', post)).toBe('code')
+    expect(nextStep('code', post)).toBe('paywall')
     expect(nextStep('today', post)).toBe(null)
     // No Coach to read them: only the questions that make the plan, and the body weight.
     const bare = { pre: false, lifts: 2, coach: false }

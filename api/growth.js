@@ -12,8 +12,10 @@
               friend who signs up with it gets FRIEND_DAYS on the trial, and the owner as many
               days of Pro on top of whatever they have — up to MAX_FRIEND_REWARDS friends.
 
-   A creator's or a friend's code belongs to the sign-up (the store app has no link to carry it
-   through an install), so it can also be typed in during the first REDEEM_WINDOW_DAYS. */
+   A creator's or a friend's code belongs to the sign-up, so it can also be typed in during the
+   first REDEEM_WINDOW_DAYS (the guided first run asks for it just before the paywall). On an
+   iPhone a creator's code can stand for an Apple offer code (`appleOffer`, made in App Store
+   Connect): typed in, it is redeemed in the App Store instead of giving days here. */
 import crypto from 'node:crypto';
 
 const DAY = 86400000;
@@ -52,7 +54,13 @@ export function redeemCheck(row, user, { now = Date.now() } = {}) {
  * marks it Pro for good and counts the use; a creator's or a friend's sets its days and counts
  * the profile under the code. Returns the id of the friend to reward, if any.
  */
-export function applyCode(row, user, { signup = false } = {}) {
+export function applyCode(row, user, { signup = false, apple = false } = {}) {
+  // A creator's Apple offer code, redeemed in the App Store: what it gives is Apple's (free or
+  // cheaper time on the subscription), so the profile is only counted under the creator.
+  if (apple) {
+    user.src = { ...(user.src || {}), ref: row.code };
+    return null;
+  }
   if (kindOf(row) === 'tester') {
     user.comp = true;
     user.compCode = row.code;
@@ -93,6 +101,72 @@ export function makeFriendCode(user, taken, rand = n => crypto.randomBytes(n)) {
     if (!taken(code)) return code;
   }
   throw new Error('no free friend code');
+}
+
+/* ------------------------------ the creator program ------------------------------ */
+/* What each creator's code brought in, month by month, for paying them by hand from a CSV — no
+   payouts, no creator pages. One ledger (db.creatorEvents), one line per event:
+
+     signup   a profile counted under the code: signed up with it (a link, a store install
+              referrer), typed it in, or redeemed the creator's Apple offer code
+     trial    that profile started a subscription's free trial (website or store), once
+     paid     its first paid period, once — a paying customer
+     refund   a payment of its refunded (each one)
+
+   A profile is only ever known here by `who`, a keyed hash of its id: the report counts people,
+   and stays whole when a profile is deleted. Each line carries the code it counted for, so a
+   later change of code does not move history. */
+export const CREATOR_EVENTS = ['signup', 'trial', 'paid', 'refund'];
+export const LEDGER_KEEP = 200000;
+export const whoOf = (uid, secret) => crypto.createHmac('sha256', String(secret)).update('creator:' + uid).digest('base64url').slice(0, 16);
+
+/** The ledger with `ev` ({ code, who, kind, at, id? }) added — or as it was, when the profile
+    already has that milestone under the code (or an event with that id is in). Refunds repeat. */
+export function ledgerAdd(list, ev) {
+  const all = list || [];
+  if (!ev?.code || !ev.who || !CREATOR_EVENTS.includes(ev.kind)) return all;
+  if (ev.id && all.some(e => e.id === ev.id)) return all;
+  if (ev.kind !== 'refund' && all.some(e => e.kind === ev.kind && e.who === ev.who && e.code === ev.code)) return all;
+  const at = ev.at ? new Date(ev.at).toISOString() : new Date().toISOString();
+  return [...all, { code: ev.code, who: ev.who, kind: ev.kind, at, ...(ev.id ? { id: String(ev.id).slice(0, 80) } : {}) }].slice(-LEDGER_KEEP);
+}
+
+const monthOf = at => String(at || '').slice(0, 7);
+/** The months the ledger has anything in, newest first ("2026-10"). */
+export const ledgerMonths = events => [...new Set((events || []).map(e => monthOf(e.at)).filter(m => /^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+
+/**
+ * One row per creator's code: sign-ups, trials started, paying customers and refunds — in
+ * `month` ("2026-10"), or all time without one. Codes with nothing in that month are still
+ * listed, at zero, so a creator who brought nobody is there to see.
+ */
+export function creatorReport(events, codes, { month = null } = {}) {
+  const rows = new Map((codes || []).filter(c => kindOf(c) === 'creator').map(c => [c.code, {
+    code: c.code, label: c.label || '', days: codeDays(c), appleOffer: c.appleOffer || '', revoked: !!c.revoked,
+    signups: 0, trials: 0, paying: 0, refunds: 0
+  }]));
+  const field = { signup: 'signups', trial: 'trials', paid: 'paying', refund: 'refunds' };
+  for (const e of events || []) {
+    if (month && monthOf(e.at) !== month) continue;
+    const r = rows.get(e.code);
+    if (r && field[e.kind]) r[field[e.kind]]++;
+  }
+  return [...rows.values()].sort((a, b) => b.paying - a.paying || b.signups - a.signups || a.code.localeCompare(b.code));
+}
+
+/** The same, month by month: one row per code and month it had anything in, newest month first —
+    what a CSV of the whole program is made of. */
+export function creatorReportByMonth(events, codes) {
+  return ledgerMonths(events).flatMap(month => creatorReport(events, codes, { month })
+    .filter(r => r.signups || r.trials || r.paying || r.refunds)
+    .map(r => ({ month, ...r })));
+}
+
+/** The creator's code an Apple offer code redeemed in the App Store stands for, if any. */
+export function codeForOffer(codes, offer) {
+  const o = normalizeCode(offer);
+  if (!o) return null;
+  return (codes || []).find(c => kindOf(c) === 'creator' && !c.revoked && (normalizeCode(c.appleOffer) === o || c.code === o)) || null;
 }
 
 /* ---------------------------------- feedback ---------------------------------- */

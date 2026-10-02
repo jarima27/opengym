@@ -212,6 +212,16 @@ export function firstYearPrice(price, coupon) {
   return amount > 0 && amount < price.amount ? amount : null;
 }
 
+/* How many days until the first charge if this profile checks out on the website now: what is
+   left of its open trial (a creator's code, a friend's days) and then the card trial — the
+   same sum checkoutForm makes, so the paywall's "7 days free" and its timeline are the days the
+   person really gets. 0 when the first charge would be now. */
+export function firstChargeDays(user, cfg, { since = 0, now = Date.now() } = {}) {
+  const cardDays = user?.billing?.trialUsed || user?.store?.trialUsed ? 0 : cfg.cardTrialDays;
+  const trialEnd = Math.max(openTrialEnd(user, cfg, since), now) + cardDays * DAY;
+  return trialEnd - now >= MIN_TRIAL_END_MS ? Math.ceil((trialEnd - now) / DAY - 1e-9) : 0;
+}
+
 export function portalForm(user, { origin }) {
   const f = new URLSearchParams();
   f.set('customer', user.billing.customer);
@@ -469,6 +479,44 @@ export async function revenueCatSubscriber(cfg, uid, fetchImpl = globalThis.fetc
   try { body = await r.json(); } catch { /* the status says enough */ }
   if (!r.ok) throw Object.assign(new Error(body?.message || `revenuecat answered ${r.status}`), { status: r.status });
   return body?.subscriber || null;
+}
+
+/* The creator's code a profile counts under, as RevenueCat's campaign attribute — so RevenueCat's
+   own charts split the store's trials and revenue by creator too. (POST /v1/subscribers/{id}/
+   attributes, with the secret key; reserved attributes start with $.) */
+export const campaignAttributes = (code, now = Date.now()) => ({
+  attributes: { $campaign: { value: String(code), updated_at_ms: now }, $mediaSource: { value: 'creator', updated_at_ms: now } }
+});
+export async function revenueCatSetAttributes(cfg, uid, body, fetchImpl = globalThis.fetch) {
+  const r = await fetchImpl(`${cfg.rc.apiBase}/v1/subscribers/${encodeURIComponent(uid)}/attributes`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + cfg.rc.secretKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!r.ok) throw Object.assign(new Error(`revenuecat answered ${r.status}`), { status: r.status });
+}
+
+/* What a store event says for the creator program (growth.js): a refund, and the offer code a
+   purchase was made with — an Apple offer code a creator gave out, redeemed in the App Store. */
+export function revenueCatCreatorFacts(users, body) {
+  const ev = body?.event;
+  if (!ev || typeof ev !== 'object') return null;
+  const user = [ev.app_user_id, ev.original_app_user_id, ...(Array.isArray(ev.aliases) ? ev.aliases : [])]
+    .map(id => (typeof id === 'string' ? users.find(u => u.id === id) : null)).find(Boolean);
+  if (!user) return null;
+  // RevenueCat reports a refund as a cancellation "by customer support".
+  const refund = ev.type === 'CANCELLATION' && ev.cancel_reason === 'CUSTOMER_SUPPORT';
+  const offer = typeof ev.offer_code === 'string' && ev.offer_code.trim() ? ev.offer_code.trim() : null;
+  return { user, refund, offer, id: typeof ev.id === 'string' ? ev.id : null, at: +ev.event_timestamp_ms || Date.now() };
+}
+
+/* A refunded charge on Stripe, and whose it was. */
+export function stripeRefundOf(users, event) {
+  if (event?.type !== 'charge.refunded') return null;
+  const o = event.data?.object;
+  const user = typeof o?.customer === 'string' ? users.find(u => u.billing?.customer === o.customer) : null;
+  return user ? { user, id: event.id || null, at: (+event.created || 0) * 1000 || Date.now() } : null;
 }
 
 /* The one Coach plan a profile may ask for without paying, once in the life of the account

@@ -5,6 +5,8 @@ import { t } from '../lib/i18n.js'
 import { SITE, NAME } from '../lib/brand.js'
 import { shareLink } from '../lib/share.js'
 import { track } from '../lib/track.js'
+import { redeemCode, openAppleRedemption } from '../lib/redeem.js'
+import { useStore } from '../store/useStore.js'
 import Icon from './Icon.jsx'
 import { Button } from './ui.jsx'
 
@@ -69,7 +71,7 @@ export function openRedeem(done) {
   useUI.getState().openSheet(close => <RedeemSheet close={close} done={done} />)
 }
 
-const REFUSED = {
+export const REFUSED = {
   unknown: () => t('That code doesn’t exist or no longer works.'),
   revoked: () => t('That code doesn’t exist or no longer works.'),
   full: () => t('That code has no places left.'),
@@ -78,6 +80,9 @@ const REFUSED = {
   used: () => t('A code already counts for your account.'),
   late: () => t('That code only works in your first week. Codes for testers work any time.')
 }
+
+/** What a refused code is said as, in the person's words, whatever the server's reason. */
+export const refusal = e => (e?.status === 429 ? t('Too many tries. Try again in an hour.') : (REFUSED[e?.data?.code] || (() => t('Could not check the code. Check your connection and try again.')))())
 
 function RedeemSheet({ close, done }) {
   const toast = useUI(s => s.toast)
@@ -88,14 +93,15 @@ function RedeemSheet({ close, done }) {
     if (busy || !code.trim()) return
     setBusy(true); setError('')
     try {
-      const r = await api('/api/redeem', { method: 'POST', body: JSON.stringify({ code: code.trim() }) })
+      const r = await redeemCode(code)
       close()
-      toast(r.kind === 'tester' ? t('Done! You have Pro free for good.') : t('Done! {0} extra days of Pro free.', r.days))
-      import('../lib/billing.js').then(m => m.forgetCoachAccess?.()).catch(() => {})
+      // A creator's Apple offer code (iPhone): redeemed in the App Store, which says what it gives.
+      if (r.appleOffer) { toast(t('Your code is redeemed in the App Store.')); openAppleRedemption(r.appleOffer, useStore.getState().user?.id) }
+      else toast(r.kind === 'tester' ? t('Done! You have Pro free for good.') : t('Done! {0} extra days of Pro free.', r.days))
       done?.(r.access)
     } catch (e) {
       setBusy(false)
-      setError(e?.status === 429 ? t('Too many tries. Try again in an hour.') : (REFUSED[e?.data?.code] || (() => t('Could not check the code. Check your connection and try again.')))())
+      setError(refusal(e))
     }
   }
   return <>

@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': 'Calcul de tes charges',
   'Your personal AI Coach. It knows what to lift today.': 'Ton Coach personnel avec IA. Il sait quoi soulever aujourd’hui.',
   'Your progress': 'Tes progrès',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'Le code d’un créateur ou d’un ami te donne des jours de Pro en plus.',
+  'Do you have a code?': 'Tu as un code ?',
+  'I don’t have a code': 'Je n’ai pas de code',
+  'I’ve redeemed it': 'Je l’ai utilisé',
+  'Open the App Store': 'Ouvrir l’App Store',
+  'Redeem it in the App Store': 'Utilise-le dans l’App Store',
+  'Your code is redeemed in the App Store.': 'Ton code s’utilise dans l’App Store.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'L’offre de ton créateur s’utilise dans l’App Store. Reviens ici une fois que c’est fait.',
 }

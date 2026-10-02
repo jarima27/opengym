@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': 'Рассчитываем веса',
   'Your personal AI Coach. It knows what to lift today.': 'Твой личный ИИ-тренер. Знает, что поднимать сегодня.',
   'Your progress': 'Твой прогресс',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'Код автора или друга даёт тебе дополнительные дни Pro.',
+  'Do you have a code?': 'У тебя есть код?',
+  'I don’t have a code': 'У меня нет кода',
+  'I’ve redeemed it': 'Код активирован',
+  'Open the App Store': 'Открыть App Store',
+  'Redeem it in the App Store': 'Активируй его в App Store',
+  'Your code is redeemed in the App Store.': 'Твой код активируется в App Store.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'Предложение автора активируется в App Store. Вернись сюда, когда закончишь.',
 }

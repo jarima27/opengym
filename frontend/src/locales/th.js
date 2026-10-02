@@ -2062,4 +2062,13 @@ export default {
   'Working out your weights': 'กำลังคำนวณน้ำหนักของคุณ',
   'Your personal AI Coach. It knows what to lift today.': 'โค้ช AI ส่วนตัวของคุณ รู้ว่าวันนี้ต้องยกอะไร',
   'Your progress': 'ความก้าวหน้าของคุณ',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'โค้ดจากครีเอเตอร์หรือเพื่อนช่วยให้คุณได้วันใช้ Pro เพิ่ม',
+  'Do you have a code?': 'มีโค้ดไหม?',
+  'I don’t have a code': 'ไม่มีโค้ด',
+  'I’ve redeemed it': 'แลกแล้ว',
+  'Open the App Store': 'เปิด App Store',
+  'Redeem it in the App Store': 'แลกใน App Store',
+  'Your code is redeemed in the App Store.': 'โค้ดของคุณใช้แลกใน App Store',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'ข้อเสนอจากครีเอเตอร์ของคุณใช้แลกใน App Store เสร็จแล้วกลับมาที่นี่',
 }

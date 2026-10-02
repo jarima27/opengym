@@ -349,7 +349,8 @@ working when a trial ends or a card fails.
 
 1. Create a product with two **recurring prices** (monthly and yearly) and copy their ids.
 2. Add a webhook endpoint at `https://<your domain>/api/billing/webhook` with the events
-   `checkout.session.completed`, `customer.subscription.created`, `.updated` and `.deleted`.
+   `checkout.session.completed`, `customer.subscription.created`, `.updated` and `.deleted`,
+   and `charge.refunded` (the creator program counts refunds).
    Copy its signing secret.
 3. Turn on the **customer portal** so people can change their card and cancel on their own.
 
@@ -429,11 +430,33 @@ How it behaves:
   when what was paid for (or the card trial) ends, and can be taken back until then. A store
   subscription is sent to the App Store's or Google Play's own page. The card trial's last
   reminder opens this flow directly.
-- **Creator codes.** Admin → Creator codes makes a code per creator or trainer. A sign-up
-  through `https://<your domain>/?ref=CODE` gets the extra days on top of the trial, and the card
-  shows how many signed up and how many pay. `utm_*` tags in the link are recorded too. A
-  creator's (or a friend's) code can also be typed in during the first week, in Settings →
-  Subscription → *Have a code?* — the store app has no link to carry it through an install.
+- **Creator codes (the creator program).** Admin → Creator codes makes a code per creator or
+  trainer — no payouts and no creator pages: the commissions are worked out by hand from the CSV.
+  A profile counts under a code when it:
+  - signs up through `https://<your domain>/?ref=CODE` (`utm_*` tags are recorded too);
+  - installs the Android app from the code's **Google Play link** (Admin copies it:
+    `…/details?id=fit.tiza.app&referrer=ref%3DCODE`) — the app reads the install referrer on its
+    first start and signs up with the code, nobody types it; the website's Play buttons carry
+    the code of the visit the same way;
+  - types it in the guided first run, on the screen just before the paywall (*Have a code? Get
+    extra days*), or later in Settings → Subscription → *Have a code?* (the first week);
+  - on an iPhone, redeems the creator's **Apple offer code**: a custom offer code made in App
+    Store Connect (one per creator, e.g. free or cheaper time on the annual plan), set on the
+    code in Admin. Typed into the app, the creator's code opens the App Store's redemption with
+    the offer code filled in (`VITE_APPLE_APP_ID` in `.env.mobile`; without it, Apple's sheet,
+    where it is typed) and gives no days of its own; redeemed straight in the App Store,
+    RevenueCat's webhook says which offer code it was (`offer_code`) and the profile is counted
+    under its creator all the same.
+
+  Everywhere else the code gives its extra days on top of the trial (the paywall then counts
+  them in its "N days free"). The code also goes to RevenueCat as the profile's `$campaign`
+  attribute (`$mediaSource: creator`; needs `REVENUECAT_SECRET_KEY`), so RevenueCat's own charts
+  split by creator too. Admin shows, per code and per month (or all time), the **sign-ups**,
+  **trials started** (website or store), **paying customers** (first paid period) and
+  **refunds** (Stripe's `charge.refunded`, RevenueCat's cancellations by customer support), and
+  exports them as CSV — one month, or every month row by row. They come from a ledger in
+  `db.json` (`creatorEvents`) that knows each profile only by a keyed hash, so deleting a
+  profile does not change what a creator brought in.
 - **Tester codes.** Admin → Tester codes makes a code that gives Pro for good: whoever redeems it
   (Settings → Subscription → *Have a code?*, at any time, or through its sign-up link) is marked
   `comp` and never charged. Each code counts its uses and can have a cap; revoking it stops new

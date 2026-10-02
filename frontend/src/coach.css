@@ -343,3 +343,4 @@
 .ob-proj-svg{width:100%;height:auto;display:block;margin:8px 0 6px}
 .ob-account{display:flex;flex-direction:column;margin-top:22px;text-align:center}
 @media (prefers-reduced-motion: reduce){.ob-build-bar i{animation:none}}
+.ob-code{width:100%;margin-top:14px;letter-spacing:.14em;font-weight:600;text-align:center;font-size:18px}

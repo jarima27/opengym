@@ -93,14 +93,15 @@ describe('before the account', () => {
 })
 
 describe('after the account: the paywall after the plan', () => {
-  const signedUp = async (pw = paywall()) => {
-    answers['/api/billing'] = { on: true, plan: 'none', ai: false, cardTrialDays: 7, freePlan: false }
+  const signedUp = async (pw = paywall(), { skipCode = true, ref = null } = {}) => {
+    answers['/api/billing'] = { on: true, plan: 'none', ai: false, cardTrialDays: 7, freePlan: false, ref }
     answers['/api/paywall'] = pw
     useStore.setState({ S: { ...JSON.parse(JSON.stringify(DEF)), unit: 'kg' }, user: { id: 'u1', name: 'Ana' }, guest: false, config: { billing: { trial_days: 0, card_trial_days: 7, web: true } } })
     // Where the first run was when the account was made.
     sessionStorage.setItem('tiza_first_run', JSON.stringify({ step: 'account', answers: { goal: 'general', experience: 'starting', place: 'gym', sessionMin: 60, count: 3, days: [1, 3, 5] }, history: [] }))
     await render(<FirstRun />)
     await act(async () => {}); await act(async () => {})
+    if (skipCode) { await tap('I don’t have a code'); await act(async () => {}); await act(async () => {}) }
   }
 
   it('the year by the week, the saving, the trial’s timeline; the free version, then the offer once', async () => {
@@ -121,6 +122,30 @@ describe('after the account: the paywall after the plan', () => {
     expect(text()).toContain('Coming from another app?')
     expect(useStore.getState().S.routines.length).toBe(3)
     expect(tracked.find(([n, p]) => n === 'onboarding_step' && p.step === 'paywall' && p.answer)[1].answer).toBe('free')
+  })
+
+  it('just before the paywall, a creator’s code: its days are the paywall’s days', async () => {
+    answers['/api/redeem'] = () => { answers['/api/paywall'] = paywall({ cardTrialDays: 21 }); return { ok: true, kind: 'creator', days: 14, access: { plan: 'trial' } } }
+    await signedUp(paywall(), { skipCode: false })
+    expect(text()).toContain('Do you have a code?')
+    expect(text()).toContain('A creator’s or a friend’s code gets you extra days of Pro.')
+    await act(async () => {
+      const el = host.querySelector('input.ob-code')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, 'lucia')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await tap('Redeem')
+    await act(async () => {}); await act(async () => {})
+    expect(calls.find(([p]) => p === '/api/redeem')[1]).toEqual({ code: 'LUCIA', platform: 'web' })
+    expect(useUI.getState().toastMsg).toBe('Done! 14 extra days of Pro free.')
+    expect(text()).toContain('Start 21 days free')
+    expect(text()).toContain('Day 19: we remind you · Day 21: billing starts')
+  })
+
+  it('a code that already counts (a link, the Play Store’s referrer) is not asked for again', async () => {
+    await signedUp(paywall(), { skipCode: false, ref: 'LUCIA' })
+    expect(text()).not.toContain('Do you have a code?')
+    expect(text()).toContain('Start 7 days free')
   })
 
   it('the offer is made once: closed a second time, straight on to the free version', async () => {

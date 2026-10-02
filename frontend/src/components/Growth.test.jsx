@@ -100,7 +100,7 @@ describe('Have a code?', () => {
     const done = vi.fn()
     openRedeem(done); renderSheet()
     await redeem('beta')
-    expect(calls.at(-1)).toEqual(['/api/redeem', { code: 'BETA' }])
+    expect(calls.at(-1)).toEqual(['/api/redeem', { code: 'BETA', platform: 'web' }])
     expect(useUI.getState().toastMsg).toBe('Done! You have Pro free for good.')
     expect(done).toHaveBeenCalledWith(access)
   })

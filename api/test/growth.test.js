@@ -18,9 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
 import {
   kindOf, codeDays, redeemCheck, applyCode, rewardOwner, makeFriendCode, cleanFeedback, addFeedback,
-  FRIEND_DAYS, MAX_FRIEND_REWARDS, FEEDBACK_KEEP
+  FRIEND_DAYS, MAX_FRIEND_REWARDS, FEEDBACK_KEEP, whoOf, ledgerAdd, ledgerMonths, creatorReport, creatorReportByMonth, codeForOffer
 } from '../growth.js';
-import { accessOf, billingConfig } from '../billing.js';
+import { accessOf, billingConfig, campaignAttributes, revenueCatCreatorFacts, stripeRefundOf } from '../billing.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-05T12:00:00Z');
@@ -119,6 +119,61 @@ const mint = uid => {
   return payload + '.' + crypto.createHmac('sha256', SECRET).update(payload).digest('base64url');
 };
 
+/* ------------------------------ the creator program ------------------------------ */
+
+test('the creator ledger: each milestone once per profile and code, refunds each time, retries once', () => {
+  const who = whoOf('u1', 'k')
+  assert.equal(who, whoOf('u1', 'k'));
+  assert.notEqual(who, whoOf('u2', 'k'));
+  assert.ok(!who.includes('u1'), 'the profile is a keyed hash, not its id');
+  let l = [];
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'signup', at: '2026-09-20T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'signup', at: '2026-09-21T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'trial', at: '2026-09-21T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'paid', at: '2026-10-01T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'paid', at: '2026-11-01T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'refund', at: '2026-10-03T10:00:00Z', id: 'evt_1' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'refund', at: '2026-10-03T10:00:00Z', id: 'evt_1' });
+  l = ledgerAdd(l, { code: 'LUCIA', who: whoOf('u2', 'k'), kind: 'signup', at: '2026-10-02T10:00:00Z' });
+  l = ledgerAdd(l, { code: 'LUCIA', who, kind: 'bogus' });
+  assert.deepEqual(l.map(e => e.kind), ['signup', 'trial', 'paid', 'refund', 'signup']);
+  assert.deepEqual(ledgerMonths(l), ['2026-10', '2026-09']);
+  const codes = [{ code: 'LUCIA', label: 'Lucía (IG)', days: 14, appleOffer: 'LUCIA30' }, { code: 'PACO', days: 7 }, { code: 'BETA', kind: 'tester' }, { code: 'ANA-7K3P', kind: 'friend' }];
+  const all = creatorReport(l, codes);
+  assert.deepEqual(all.map(r => r.code), ['LUCIA', 'PACO'], 'creators only; one who brought nobody is listed at zero');
+  assert.deepEqual(all[0], { code: 'LUCIA', label: 'Lucía (IG)', days: 14, appleOffer: 'LUCIA30', revoked: false, signups: 2, trials: 1, paying: 1, refunds: 1 });
+  const oct = creatorReport(l, codes, { month: '2026-10' })[0];
+  assert.deepEqual([oct.signups, oct.trials, oct.paying, oct.refunds], [1, 0, 1, 1]);
+  const sep = creatorReport(l, codes, { month: '2026-09' })[0];
+  assert.deepEqual([sep.signups, sep.trials, sep.paying, sep.refunds], [1, 1, 0, 0]);
+  // Every month at once: only the months a code had anything in.
+  assert.deepEqual(creatorReportByMonth(l, codes).map(r => [r.month, r.code, r.signups, r.paying]), [['2026-10', 'LUCIA', 1, 1], ['2026-09', 'LUCIA', 1, 0]]);
+});
+
+test('an Apple offer code stands for its creator, and gives nothing here — Apple gives it', () => {
+  const codes = [{ code: 'LUCIA', days: 14, appleOffer: 'LUCIA30' }, { code: 'OLD', appleOffer: 'OLD1', revoked: true }, { code: 'BETA', kind: 'tester' }];
+  assert.equal(codeForOffer(codes, 'lucia30').code, 'LUCIA');
+  assert.equal(codeForOffer(codes, 'LUCIA').code, 'LUCIA', 'or the creator’s own code, made the same in App Store Connect');
+  assert.equal(codeForOffer(codes, 'OLD1'), null);
+  assert.equal(codeForOffer(codes, 'BETA'), null);
+  assert.equal(codeForOffer(codes, ''), null);
+  const u = { id: 'u', created: iso(NOW) };
+  applyCode(codes[0], u, { apple: true });
+  assert.deepEqual([u.src.ref, u.bonusDays], ['LUCIA', undefined]);
+});
+
+test('what a store says for the program: a refund, the offer code; RevenueCat’s campaign attribute', () => {
+  const users = [{ id: 'u1', billing: { customer: 'cus_1' } }];
+  const f = revenueCatCreatorFacts(users, { event: { id: 'e1', type: 'CANCELLATION', cancel_reason: 'CUSTOMER_SUPPORT', app_user_id: 'u1', event_timestamp_ms: NOW } });
+  assert.deepEqual([f.user.id, f.refund, f.offer, f.id, f.at], ['u1', true, null, 'e1', NOW]);
+  assert.equal(revenueCatCreatorFacts(users, { event: { type: 'CANCELLATION', cancel_reason: 'UNSUBSCRIBE', app_user_id: 'u1' } }).refund, false);
+  assert.equal(revenueCatCreatorFacts(users, { event: { type: 'INITIAL_PURCHASE', offer_code: ' LUCIA30 ', app_user_id: 'u1' } }).offer, 'LUCIA30');
+  assert.equal(revenueCatCreatorFacts(users, { event: { type: 'INITIAL_PURCHASE', app_user_id: 'nobody' } }), null);
+  assert.equal(stripeRefundOf(users, { id: 'evt_9', type: 'charge.refunded', created: NOW / 1000, data: { object: { customer: 'cus_1' } } }).user.id, 'u1');
+  assert.equal(stripeRefundOf(users, { type: 'charge.succeeded', data: { object: { customer: 'cus_1' } } }), null);
+  assert.deepEqual(campaignAttributes('LUCIA', NOW), { attributes: { $campaign: { value: 'LUCIA', updated_at_ms: NOW }, $mediaSource: { value: 'creator', updated_at_ms: NOW } } });
+});
+
 async function fakeStripe(t) {
   const calls = [];
   const srv = http.createServer((req, res) => {
@@ -156,7 +211,7 @@ async function startServer(t, { env = {}, users }) {
     ...(body != null ? { body: JSON.stringify(body) } : {})
   });
   const stored = () => JSON.parse(fs.readFileSync(path.join(dataDir, 'db.json'), 'utf8'));
-  return { call, stored };
+  return { call, stored, base: `http://127.0.0.1:${port}` };
 }
 const json = r => r.json();
 const settle = async (cond, ms = 3000) => { for (let i = 0; i < ms / 25 && !cond(); i++) await new Promise(r => setTimeout(r, 25)); };
@@ -277,4 +332,67 @@ test('feedback: sent from the app, read and closed in Admin, gone with the profi
   // Deleting the account takes what they wrote with it.
   assert.equal((await h.call('/api/account/delete', { uid: 'u1', method: 'POST', body: { confirm: 'Uma' } })).status, 200);
   assert.equal(h.stored().feedback.length, 0);
+});
+
+test('the creator program: counted at sign-up, typed in or redeemed at Apple; trials, payments and refunds by month', async t => {
+  // RevenueCat's API: what the server tells it about each profile's campaign.
+  const rc = [];
+  const rcApi = http.createServer((req, res) => {
+    let b = ''; req.on('data', d => { b += d; }); req.on('end', () => {
+      rc.push({ method: req.method, url: req.url, auth: req.headers.authorization, body: b ? JSON.parse(b) : null });
+      res.setHeader('Content-Type', 'application/json'); res.end('{}');
+    });
+  });
+  await new Promise(r => rcApi.listen(0, '127.0.0.1', r));
+  t.after(() => rcApi.close());
+  const h = await startServer(t, {
+    env: {
+      ADMIN_UIDS: 'boss', PASSWORD_LOGIN: '1', REVENUECAT_WEBHOOK_AUTH: 'Bearer hook', REVENUECAT_SECRET_KEY: 'sk_rc',
+      REVENUECAT_API_BASE: `http://127.0.0.1:${rcApi.address().port}`
+    },
+    users: [{ id: 'boss', name: 'Boss', created: iso(Date.now() - 400 * DAY) }, { id: 'old', name: 'Olga', created: iso(Date.now() - 40 * DAY) },
+      { id: 'ios1', name: 'Iris', created: iso(Date.now()) }]
+  });
+  assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'lucia', label: 'Lucía', days: 14, appleOffer: 'lucia30' } })).status, 200);
+  assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'PACO', days: 7, appleOffer: 'no spaces' } })).status, 400);
+  assert.equal((await h.call('/api/admin/codes/apple', { uid: 'boss', method: 'POST', body: { code: 'LUCIA', appleOffer: 'LUCIA30' } })).status, 200);
+
+  // 1. A sign-up through her link (or the Play Store's install referrer): counted, and her code
+  //    goes to RevenueCat as the profile's campaign.
+  const r = await h.call('/api/register/password', { method: 'POST', body: { name: 'Carla', password: 'correct horse battery staple', src: { ref: 'LUCIA', platform: 'android' } } });
+  assert.equal(r.status, 200);
+  const carla = h.stored().users.find(u => u.name === 'Carla');
+  assert.deepEqual([carla.src.ref, carla.bonusDays], ['LUCIA', 14]);
+  await settle(() => rc.length > 0);
+  assert.deepEqual(rc[0], { method: 'POST', url: `/v1/subscribers/${carla.id}/attributes`, auth: 'Bearer sk_rc', body: { attributes: { $campaign: { value: 'LUCIA', updated_at_ms: rc[0].body.attributes.$campaign.updated_at_ms }, $mediaSource: { value: 'creator', updated_at_ms: rc[0].body.attributes.$campaign.updated_at_ms } } } });
+
+  // 2. Her trial in the store, its first paid period, and a refund (a retried webhook once).
+  const hook = event => fetch(h.base + '/api/billing/revenuecat', { method: 'POST', headers: { Authorization: 'Bearer hook', 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) });
+  const at = Date.now();
+  const base = { app_user_id: carla.id, entitlement_ids: ['pro'], store: 'PLAY_STORE', product_id: 'tiza_annual' };
+  assert.equal((await hook({ ...base, id: 'e1', type: 'INITIAL_PURCHASE', period_type: 'TRIAL', expiration_at_ms: at + 7 * DAY, event_timestamp_ms: at })).status, 200);
+  await hook({ ...base, id: 'e2', type: 'RENEWAL', period_type: 'NORMAL', expiration_at_ms: at + 372 * DAY, event_timestamp_ms: at + 1000 });
+  await hook({ ...base, id: 'e3', type: 'CANCELLATION', cancel_reason: 'CUSTOMER_SUPPORT', period_type: 'NORMAL', expiration_at_ms: at + 2000, event_timestamp_ms: at + 2000 });
+  await hook({ ...base, id: 'e3', type: 'CANCELLATION', cancel_reason: 'CUSTOMER_SUPPORT', period_type: 'NORMAL', expiration_at_ms: at + 2000, event_timestamp_ms: at + 2000 });
+
+  // 3. Her Apple offer code, redeemed straight in the App Store by someone already signed up.
+  await hook({ app_user_id: 'old', entitlement_ids: ['pro'], store: 'APP_STORE', id: 'e4', type: 'INITIAL_PURCHASE', period_type: 'TRIAL', offer_code: 'LUCIA30', expiration_at_ms: at + 30 * DAY, event_timestamp_ms: at });
+  const olga = h.stored().users.find(u => u.id === 'old');
+  assert.deepEqual([olga.src?.ref, olga.bonusDays], ['LUCIA', undefined], 'Apple gave the free time; here she is only counted');
+
+  // 4. Her code typed in on an iPhone: redeemed at Apple, counted here, no days here.
+  const red = await json(await h.call('/api/redeem', { uid: 'ios1', method: 'POST', body: { code: 'lucia', platform: 'ios' } }));
+  assert.deepEqual([red.kind, red.days, red.appleOffer], ['creator', 0, 'LUCIA30']);
+  assert.equal((await json(await h.call('/api/billing', { uid: 'ios1' }))).ref, 'LUCIA');
+  assert.equal(h.stored().users.find(u => u.id === 'ios1').bonusDays, undefined);
+
+  // The report: three people under her code, one trial (Olga's came with the code), one payer, one refund.
+  const month = new Date().toISOString().slice(0, 7);
+  const rep = await json(await h.call('/api/admin/creators?month=' + month, { uid: 'boss' }));
+  assert.deepEqual(rep.months, [month]);
+  const row = rep.rows.find(x => x.code === 'LUCIA');
+  assert.deepEqual([row.signups, row.trials, row.paying, row.refunds, row.appleOffer], [3, 2, 1, 1, 'LUCIA30']);
+  assert.deepEqual((await json(await h.call('/api/admin/creators?month=1999-01', { uid: 'boss' }))).rows.find(x => x.code === 'LUCIA').signups, 0);
+  assert.equal((await h.call('/api/admin/creators', { uid: 'ios1' })).status, 403);
+  assert.ok(!JSON.stringify(h.stored().creatorEvents).includes(carla.id), 'the ledger knows people only by a keyed hash');
 });

@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': '무게를 계산하는 중',
   'Your personal AI Coach. It knows what to lift today.': '나만의 AI 코치. 오늘 무엇을 들지 알고 있어요.',
   'Your progress': '내 진행 상황',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': '크리에이터나 친구의 코드로 Pro를 며칠 더 받을 수 있어요.',
+  'Do you have a code?': '코드가 있나요?',
+  'I don’t have a code': '코드가 없어요',
+  'I’ve redeemed it': '코드를 사용했어요',
+  'Open the App Store': 'App Store 열기',
+  'Redeem it in the App Store': 'App Store에서 사용하세요',
+  'Your code is redeemed in the App Store.': '코드는 App Store에서 사용해요.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': '크리에이터의 혜택은 App Store에서 사용해요. 다 되면 여기로 돌아오세요.',
 }

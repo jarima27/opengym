@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk, freePlanOpen, claimFreePlan, releaseFreePlan, retentionOffers, pauseForm, annualForm, applySubscription, PAUSE_DAYS } from '../billing.js';
+import { firstChargeDays, billingConfig, accessOf, checkoutForm, verifyWebhook, applyEvent, TOLERANCE_S, snapshot, transitions, applyRevenueCat, storeFromSubscriber, revenueCatAuthOk, freePlanOpen, claimFreePlan, releaseFreePlan, retentionOffers, pauseForm, annualForm, applySubscription, PAUSE_DAYS } from '../billing.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-01T12:00:00Z');
@@ -714,4 +714,14 @@ test('cancel with a reason, take it back, pause, and switch to annual — agains
   assert.equal(sent.get('discounts[0][coupon]'), 'STAY20');
   assert.equal((await status()).offers.annual, null, 'already annual');
   assert.equal((await post('/api/billing/annual')).status, 409);
+});
+
+test('the days until the first charge: a code’s extra days, then the 7-day card trial — what the paywall says', () => {
+  const cfg = { on: true, trialDays: 0, cardTrialDays: 7 };
+  const now = Date.parse('2026-10-05T12:00:00Z');
+  assert.equal(firstChargeDays({ id: 'a', created: new Date(now).toISOString() }, cfg, { now }), 7);
+  assert.equal(firstChargeDays({ id: 'b', created: new Date(now).toISOString(), bonusDays: 14 }, cfg, { now }), 21);
+  assert.equal(firstChargeDays({ id: 'c', created: new Date(now - 3 * DAY).toISOString(), bonusDays: 14 }, cfg, { now }), 18);
+  assert.equal(firstChargeDays({ id: 'd', created: new Date(now).toISOString(), billing: { trialUsed: true } }, cfg, { now }), 0, 'a second checkout pays at once');
+  assert.equal(firstChargeDays({ id: 'e', created: new Date(now - DAY).toISOString(), bonusDays: 2, billing: { trialUsed: true } }, cfg, { now }), 0, 'under Stripe’s 48 hours, no trial at all');
 });

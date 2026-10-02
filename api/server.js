@@ -33,14 +33,16 @@ import {
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } from './device-link.js';
 import {
   kindOf, normalizeCode, codeDays, redeemCheck, applyCode, rewardOwner, makeFriendCode, CODE_RE,
-  FRIEND_DAYS, MAX_FRIEND_REWARDS, cleanFeedback, addFeedback
+  FRIEND_DAYS, MAX_FRIEND_REWARDS, cleanFeedback, addFeedback,
+  whoOf, ledgerAdd, ledgerMonths, creatorReport, creatorReportByMonth, codeForOffer
 } from './growth.js';
 import { emailConfig, contactOf, dueEmail, firstWeek, renderEmail, unsubscribePage, unsubToken, unsubOk, resendBody } from './emails.js';
 import { EMAIL_COPY } from './emails-copy.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import {
-  billingConfig, accessOf, isPaying, storeActive, openTrialEnd, checkoutForm, firstYearPrice, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
+  billingConfig, accessOf, isPaying, storeActive, openTrialEnd, checkoutForm, firstYearPrice, firstChargeDays, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
   revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber,
+  campaignAttributes, revenueCatSetAttributes, revenueCatCreatorFacts, stripeRefundOf,
   freePlanOpen, claimFreePlan, releaseFreePlan,
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
 } from './billing.js';
@@ -133,6 +135,7 @@ const GROWTH_ON = BILLING.on || ANALYTICS.on;
 // Codes (growth.js): { code, label, days, created, revoked } for a creator's; `kind: 'tester'`
 // with `uses` and `max`; `kind: 'friend'` with its `owner`.
 db.codes = db.codes || [];
+db.creatorEvents = db.creatorEvents || [];   // what each creator's code brought in (growth.js)
 db.feedback = db.feedback || [];   // what people sent from the app (growth.js cleanFeedback)
 /* Lifecycle emails (emails.js): Resend, off unless RESEND_API_KEY. Only profiles created after
    they were switched on get them (db.emailsSince), so the key never mails everyone at once. */
@@ -2084,6 +2087,27 @@ function adoptSource(user, raw) {
   if (!code || (kindOf(code) === 'tester' && redeemCheck(code, user))) return;
   const owner = applyCode(code, user, { signup: true });
   if (owner) rewardFriend(owner);
+  attributed(user, code);
+}
+
+/* A profile now counts under `row` (a sign-up with the code, the code typed in, the creator's
+   Apple offer redeemed): for a creator's code, a line in the program's ledger and the code as
+   RevenueCat's campaign attribute, so the store's side is split by creator too. The caller saves. */
+function attributed(user, row, at = Date.now()) {
+  if (!row || kindOf(row) !== 'creator') return;
+  db.creatorEvents = ledgerAdd(db.creatorEvents, { code: row.code, who: whoOf(user.id, SECRET), kind: 'signup', at });
+  if (BILLING.rc.on && BILLING.rc.secretKey) {
+    revenueCatSetAttributes(BILLING, user.id, campaignAttributes(row.code, at))
+      .catch(e => console.error('creators: could not set the campaign of', user.id, 'in RevenueCat -', e.message));
+  }
+}
+/* A milestone of a profile counted under a creator's code: a trial started, its first payment, a refund. */
+function creatorMilestone(user, kind, { at = Date.now(), id = null } = {}) {
+  const row = user?.src?.ref ? db.codes.find(c => c.code === user.src.ref) : null;
+  if (!row || kindOf(row) !== 'creator') return false;
+  const before = db.creatorEvents.length;
+  db.creatorEvents = ledgerAdd(db.creatorEvents, { code: row.code, who: whoOf(user.id, SECRET), kind, at, id });
+  return db.creatorEvents.length !== before;
 }
 
 /* A friend signed up with `ownerId`'s code. The owner's 30 days go where they are worth
@@ -2169,6 +2193,11 @@ function billingChanged(req, before, users) {
     const moved = transitions(before.get(user.id) || snapshot(null), after);
     if (!moved.length) continue;
     for (const ev of moved) ANALYTICS.capture(ev, user, { via: after.via || before.get(user.id)?.via || null }, { plan: billingAccess(user).plan });
+    // The creator program counts the first trial and the first paid period, once each.
+    let counted = false;
+    if (moved.includes('trial_started')) counted = creatorMilestone(user, 'trial') || counted;
+    if (moved.includes('subscribed')) counted = creatorMilestone(user, 'paid') || counted;
+    if (counted) saveDb();
     audit(req, 'billing.change', { user, msg: moved.join(' ') + (after.via || before.get(user.id)?.via ? ' · ' + (after.via || before.get(user.id).via) : '') });
   }
 }
@@ -2203,7 +2232,7 @@ const billingRoutes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const a = billingAccess(user);
-    json(res, 200, { ...a, freePlan: !a.ai && FREE_PLAN.open(user), freePlanAt: user.freePlanUsedAt || null, offers: await saveOffers(user) });
+    json(res, 200, { ...a, freePlan: !a.ai && FREE_PLAN.open(user), freePlanAt: user.freePlanUsedAt || null, offers: await saveOffers(user), ref: user.src?.ref || null });
   },
 
   // The paywall this profile sees: its variant's words in the app's language, which plan is
@@ -2232,7 +2261,9 @@ const billingRoutes = {
     }
     json(res, 200, {
       experiment: PAYWALL.experiment, variant: v.id, highlight: v.highlight, offering: v.offering || null,
-      copy: copyFor(v, lang), plans, cardTrialDays: billingAccess(user).cardTrialDays,
+      // The days until the first charge on the website: a code's extra days, then the card trial.
+      copy: copyFor(v, lang), plans,
+      cardTrialDays: BILLING.stripe.on ? firstChargeDays(user, BILLING, { since: db.billingSince || 0 }) : billingAccess(user).cardTrialDays,
       showFree: v.showFree !== false, exit, exitOffering: v.exitOffering || null
     });
   },
@@ -2377,6 +2408,9 @@ const stripeRoutes = {
     const before = snapshots();
     const user = applyEvent(db.users, event);
     if (user) { saveDb(); billingChanged(req, before, [user]); }
+    // A refund, for the creator program's ledger (a retried event is counted once, by its id).
+    const refund = stripeRefundOf(db.users, event);
+    if (refund && creatorMilestone(refund.user, 'refund', refund)) saveDb();
     json(res, 200, { received: true });
   }
 };
@@ -2398,7 +2432,20 @@ const storeRoutes = {
         } catch (e) { console.error('billing: revenuecat read-back for', u.id, '-', e.message); }
       }
     }
+    // The creator program: a creator's Apple offer code redeemed in the App Store counts the
+    // profile under that creator (when nothing else does yet), and a refund is a line of its own.
+    const facts = revenueCatCreatorFacts(db.users, body);
+    if (facts?.offer && !facts.user.src?.ref) {
+      const row = codeForOffer(db.codes, facts.offer);
+      if (row) {
+        applyCode(row, facts.user, { apple: true });
+        attributed(facts.user, row, facts.at);
+        audit(req, 'billing.redeem', { user: facts.user, msg: row.code + ' · apple offer ' + facts.offer });
+        if (!changed.includes(facts.user)) changed.push(facts.user);
+      }
+    }
     if (changed.length) { saveDb(); billingChanged(req, before, [...new Set(changed)]); }
+    if (facts?.refund && creatorMilestone(facts.user, 'refund', facts)) saveDb();
     json(res, 200, { received: true });
   },
 
@@ -2423,6 +2470,8 @@ const storeRoutes = {
 const TRACK_BUDGET = createWindow({ max: 120, windowMs: 3600000 });
 const ANON_TRACK_BUDGET = createWindow({ max: 300, windowMs: 3600000 });
 const REDEEM_TRIES = createWindow({ max: 10, windowMs: 3600000 });   // guessing codes is not a game
+// Apple's custom offer codes: letters and digits (App Store Connect allows up to 64).
+const APPLE_OFFER_RE = /^[A-Z0-9]{1,64}$/;
 const growthRoutes = {
   // Whether a creator code is real, and what it gives — for the sign-up screen to say
   // "code LUCIA: one month extra" before anyone commits to anything. Who the creator is stays
@@ -2446,12 +2495,16 @@ const growthRoutes = {
     const row = activeCode(normalizeCode(body.code)) || db.codes.find(c => c.code === normalizeCode(body.code)) || null;
     const why = redeemCheck(row, user);
     if (why) return json(res, why === 'unknown' || why === 'revoked' ? 404 : 409, { error: 'this code cannot be used here', code: why });
-    const owner = applyCode(row, user);
+    // On an iPhone, a creator's code with an Apple offer code behind it is redeemed in the App
+    // Store (the app opens it there): here it only counts the profile under the creator.
+    const apple = body.platform === 'ios' && kindOf(row) === 'creator' && !!row.appleOffer;
+    const owner = applyCode(row, user, { apple });
     if (owner) rewardFriend(owner);
+    attributed(user, row);
     saveDb();
-    audit(req, 'billing.redeem', { user, msg: row.code + ' · ' + kindOf(row) });
-    ANALYTICS.capture('code_redeemed', user, { kind: kindOf(row), ref: row.code });
-    json(res, 200, { ok: true, kind: kindOf(row), days: codeDays(row), access: billingAccess(user) });
+    audit(req, 'billing.redeem', { user, msg: row.code + ' · ' + kindOf(row) + (apple ? ' · apple offer' : '') });
+    ANALYTICS.capture('code_redeemed', user, { kind: kindOf(row), ref: row.code, ...(apple ? { via: 'apple' } : {}) });
+    json(res, 200, { ok: true, kind: kindOf(row), days: apple ? 0 : codeDays(row), ...(apple ? { appleOffer: row.appleOffer } : {}), access: billingAccess(user) });
   },
 
   // "Invite a friend": the profile's own code, made the first time it is asked for, and how many
@@ -2529,12 +2582,42 @@ const growthRoutes = {
     if (!(days >= 0 && days <= 365)) return json(res, 400, { error: 'days must be 0 to 365', code: 'days' });
     const max = tester ? Math.round(+body.max || 0) : 0;
     if (!(max >= 0 && max <= 100000)) return json(res, 400, { error: 'max must be 0 (no cap) or more', code: 'max' });
-    const row = { code, label: text(body.label).trim().slice(0, 80), days, created: new Date().toISOString(), revoked: false };
+    const appleOffer = tester ? '' : text(body.appleOffer).trim().toUpperCase();
+    if (appleOffer && !APPLE_OFFER_RE.test(appleOffer)) return json(res, 400, { error: 'an Apple offer code is 1 to 64 letters and digits', code: 'apple' });
+    const row = { code, label: text(body.label).trim().slice(0, 80), days, created: new Date().toISOString(), revoked: false, ...(appleOffer ? { appleOffer } : {}) };
     if (tester) Object.assign(row, { kind: 'tester', uses: 0, max });
     db.codes.push(row);
     saveDb();
     audit(req, 'admin.code.create', { user: admin, msg: code });
     json(res, 200, { code: row });
+  },
+
+  // The Apple offer code (made in App Store Connect) a creator's code stands for on an iPhone —
+  // set, changed or cleared ('').
+  'POST /api/admin/codes/apple': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const row = db.codes.find(c => c.code === text(body.code).trim().toUpperCase() && kindOf(c) === 'creator');
+    if (!row) return json(res, 404, { error: 'no such creator code' });
+    const appleOffer = text(body.appleOffer).trim().toUpperCase();
+    if (appleOffer && !APPLE_OFFER_RE.test(appleOffer)) return json(res, 400, { error: 'an Apple offer code is 1 to 64 letters and digits', code: 'apple' });
+    if (appleOffer && db.codes.some(c => c !== row && c.appleOffer === appleOffer)) return json(res, 409, { error: 'another code has that Apple offer code', code: 'taken' });
+    if (appleOffer) row.appleOffer = appleOffer; else delete row.appleOffer;
+    saveDb();
+    audit(req, 'admin.code.apple', { user: admin, msg: row.code + ' · ' + (appleOffer || '—') });
+    json(res, 200, { code: row });
+  },
+
+  // The creator program, by code: sign-ups, trials started, paying customers and refunds, in a
+  // month or all time — what the commissions are worked out from (Admin exports it as CSV).
+  'GET /api/admin/creators': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const q = new URL(req.url, 'http://x').searchParams;
+    const m = text(q.get('month')).trim();
+    const month = /^\d{4}-\d{2}$/.test(m) ? m : null;
+    // by=month: every month at once, one row per code and month (the whole program as a CSV).
+    const rows = q.get('by') === 'month' ? creatorReportByMonth(db.creatorEvents, db.codes) : creatorReport(db.creatorEvents, db.codes, { month });
+    json(res, 200, { month, months: ledgerMonths(db.creatorEvents), rows });
   },
 
   // Revoked codes stop giving days to new sign-ups; the profiles that used one keep what it gave

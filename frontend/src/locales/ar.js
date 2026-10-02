@@ -2104,4 +2104,13 @@ export default {
   'Working out your weights': 'نحسب أوزانك',
   'Your personal AI Coach. It knows what to lift today.': 'مدربك الشخصي بالذكاء الاصطناعي. يعرف ما ترفعه اليوم.',
   'Your progress': 'تقدمك',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'رمز من صانع محتوى أو من صديق يمنحك أيامًا إضافية من Pro.',
+  'Do you have a code?': 'هل لديك رمز؟',
+  'I don’t have a code': 'ليس لدي رمز',
+  'I’ve redeemed it': 'استبدلته',
+  'Open the App Store': 'افتح App Store',
+  'Redeem it in the App Store': 'استبدله في App Store',
+  'Your code is redeemed in the App Store.': 'يُستبدل رمزك في App Store.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'يُستبدل عرض صانع المحتوى في App Store. عُد إلى هنا بعد الانتهاء.',
 }

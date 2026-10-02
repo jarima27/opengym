@@ -148,6 +148,12 @@ export async function restore(userId, deps) {
   return { active, access: await synced() }
 }
 
+/** Apple's own sheet for redeeming an offer code, where it is typed in (iPhone). */
+export async function presentCodeRedemption(userId, deps) {
+  const { Purchases } = await ready(userId, deps)
+  await Purchases.presentCodeRedemptionSheet()
+}
+
 /** Signing out: the next person on this phone is somebody else to RevenueCat too. */
 export async function forgetStoreUser(deps) {
   if (configuredFor === null) return

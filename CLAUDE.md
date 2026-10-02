@@ -158,7 +158,8 @@ notification code; it documents the exact env-var contract (`RP_ID`, `ORIGIN`, `
 `AUDIT_*`, `VAPID_SUBJECT`, and for a hosted instance that sells access `STRIPE_*`, `TRIAL_DAYS`,
 `REVENUECAT_*`, `POSTHOG_*`, `YMOVE_*`, `DATASET_MEDIA`, `RESEND_*` — see `api/billing.js`,
 `api/paywall.js`, `api/analytics.js`, `api/ymove.js`, `api/growth.js` (creator, tester and friend
-codes, feedback), `api/emails.js` (lifecycle emails)) that real deployments depend on.
+codes, the creator program's ledger and monthly report, feedback), `api/emails.js` (lifecycle
+emails)) that real deployments depend on.
 
 ### Docker / deploy
 

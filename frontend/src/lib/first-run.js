@@ -30,12 +30,13 @@ export const feelsGood = feeling => feeling === 'great' || feeling === 'ok'
  * The guided first run, screen by screen (F11, lengthened by F12). Before an account exists —
  * the hosted app — it opens with the short video and ends with the sign-up, just before the
  * paywall; signed up already (a self-hosted instance, a guest), those two are not shown. The
- * starting weights are asked only for lifts the plan has; the paywall decides for itself whether
- * there is anything to sell (views/FirstRun.jsx).
+ * starting weights are asked only for lifts the plan has; the code screen ("Have a code? Get
+ * extra days", just before the paywall) and the paywall decide for themselves whether there is
+ * anything to sell, and the code screen whether a code already counts (views/FirstRun.jsx).
  */
 export const FLOW = [
   'intro', 'goal', 'experience', 'holdback', 'focus', 'boost1', 'body', 'days', 'place', 'length',
-  'sleep', 'feeling', 'boost2', 'when', 'limits', 'lifts', 'building', 'plan', 'account', 'paywall',
+  'sleep', 'feeling', 'boost2', 'when', 'limits', 'lifts', 'building', 'plan', 'account', 'code', 'paywall',
   'coach', 'import', 'notify', 'today'
 ]
 // The screens the progress bar counts: the questions, from the first to the starting weights.

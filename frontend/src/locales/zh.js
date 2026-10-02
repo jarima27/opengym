@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': '正在计算你的重量',
   'Your personal AI Coach. It knows what to lift today.': '你的私人 AI 教练。知道今天该举什么。',
   'Your progress': '你的进步',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': '创作者或朋友的兑换码可让你获得额外的 Pro 天数。',
+  'Do you have a code?': '有兑换码吗？',
+  'I don’t have a code': '我没有兑换码',
+  'I’ve redeemed it': '我已兑换',
+  'Open the App Store': '打开 App Store',
+  'Redeem it in the App Store': '在 App Store 中兑换',
+  'Your code is redeemed in the App Store.': '你的兑换码需在 App Store 中兑换。',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': '你的创作者优惠需在 App Store 中兑换。完成后回到这里。',
 }

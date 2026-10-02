@@ -3209,8 +3209,12 @@ paths:
         A tester code makes the profile Pro for good (`comp`), at any time, and counts a use. A
         creator's or a friend's code still counts during the profile's first 7 days (the store
         app has no link to carry one through an install): its days go on the trial, and a
-        friend's owner is rewarded as at sign-up. Only where the instance sells access. At most
-        10 tries an hour per profile. Audited as `billing.redeem`.
+        friend's owner is rewarded as at sign-up. From an iPhone (`platform: ios`), a creator's
+        code with an Apple offer code behind it only counts the profile under the creator and
+        answers `appleOffer`, which the app redeems in the App Store. A creator's code also goes
+        to RevenueCat as the profile's `$campaign` and into the creator program's ledger. Only
+        where the instance sells access. At most 10 tries an hour per profile. Audited as
+        `billing.redeem`.
       requestBody:
         required: true
         content:
@@ -3220,6 +3224,7 @@ paths:
               required: [code]
               properties:
                 code: { type: string, example: BETA-TESTERS }
+                platform: { type: string, enum: [web, ios, android] }
       responses:
         '200':
           description: Redeemed; `access` is the profile's access after it.
@@ -3231,6 +3236,7 @@ paths:
                   ok: { type: boolean }
                   kind: { type: string, enum: [creator, friend, tester] }
                   days: { type: integer }
+                  appleOffer: { type: string, description: 'The Apple offer code to redeem in the App Store (iPhone only).' }
                   access: { type: object }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
@@ -3464,6 +3470,84 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/codes/apple:
+    post:
+      tags: [admin]
+      operationId: adminCodeApple
+      summary: "Admin: the Apple offer code a creator's code stands for"
+      description: |
+        The custom offer code made in App Store Connect for this creator (letters and digits). On
+        an iPhone, the creator's code typed into the app is redeemed in the App Store with it;
+        redeemed straight in the App Store, RevenueCat's `offer_code` counts the profile under
+        the creator. An empty one clears it. Audited as `admin.code.apple`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: LUCIA }
+                appleOffer: { type: string, example: LUCIA30 }
+      responses:
+        '200':
+          description: Saved; the code's row.
+          content:
+            application/json:
+              schema: { type: object, properties: { code: { type: object } } }
+        '400': { description: Not an Apple offer code (`code: apple`). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No such creator code. }
+        '409': { description: Another code has that Apple offer code (`code: taken`). }
+
+  /api/admin/creators:
+    get:
+      tags: [admin]
+      operationId: adminCreators
+      summary: 'Admin: the creator program by code'
+      description: |
+        One row per creator's code: profiles counted under it (`signups`: signed up with it,
+        typed it in, or redeemed the creator's Apple offer code), subscription trials started,
+        paying customers (first paid period) and refunds — in `month`, or all time. From the
+        program's ledger, which keeps each profile only as a keyed hash, so deleted profiles
+        still count. `months` lists the months with anything in them, newest first.
+      parameters:
+        - name: month
+          in: query
+          schema: { type: string, example: '2026-10' }
+        - name: by
+          in: query
+          description: '`month`: every month at once, one row per code and month with anything in it (each row has its `month`).'
+          schema: { type: string, enum: [month] }
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  month: { type: ['string', 'null'] }
+                  months: { type: array, items: { type: string } }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string }
+                        label: { type: string }
+                        days: { type: integer }
+                        appleOffer: { type: string }
+                        revoked: { type: boolean }
+                        signups: { type: integer }
+                        trials: { type: integer }
+                        paying: { type: integer }
+                        refunds: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /api/coach/disclosure:
     get:

@@ -176,12 +176,19 @@ What has to exist outside this repository before a store build is any use:
 | Apple Developer | App ID `fit.tiza.app` with *Sign in with Apple* and *In-App Purchase* | the entitlement is already in `ios/App/App/App.entitlements` |
 | Google Cloud | OAuth client ids: Web (used by Android) and iOS | `.env.mobile` → `VITE_GOOGLE_WEB_CLIENT_ID`, `VITE_GOOGLE_IOS_CLIENT_ID`; add the iOS id reversed as a URL scheme in `ios/App/App/Info.plist` |
 | App Store Connect / Play Console | Monthly (7,99 €) and annual (39,99 €) subscriptions, with the 7-day free trial as an introductory offer; for the exit offer, an annual product whose introductory offer is the first year at 29,99 € (on Google Play, a free week then a discounted first year in one offer; the App Store allows one introductory offer per product, so there it is the first year alone) | — |
+| App Store Connect (creators) | One custom **offer code** per creator on the subscription (Offer Codes → custom codes), its name set on the creator's code in Admin | `.env.mobile` → `VITE_APPLE_APP_ID` (the app's numeric App Store id), so the app opens the redemption with the code filled in |
 | RevenueCat | The two stores, entitlement `pro`, an offering with *Monthly* and *Annual* packages, and (optional) an `exit` offering with that exit product as its *Annual* package; webhook to `/api/billing/revenuecat` | `.env.mobile` → `VITE_RC_IOS_KEY`, `VITE_RC_ANDROID_KEY` (public SDK keys); the exit offering's id in Admin → Paywall → *Exit offer: app offering* |
 | The hosted server | `PASSWORD_LOGIN=1`, `APPLE_CLIENT_IDS=fit.tiza.app`, `GOOGLE_CLIENT_IDS=<web id>,<iOS id>`, `REVENUECAT_*` | see SELF_HOSTING.md |
 | tiza.fit | the privacy policy and terms published (`landing/content/*/privacidad.md`, `terminos.md` are drafts) | their URLs in `.env.mobile` and in both stores' listings |
 
 How the pieces fit:
 
+- **Creators' codes.** On Android, a creator's Google Play link carries their code as the install
+  referrer: the app reads it once, on its first start (`InstallReferrerPlugin.java`, Google's
+  `installreferrer` library; `lib/install-referrer.js`), and signs up with it. On an iPhone, a
+  creator's code typed in (the first run's screen before the paywall, or Settings → *Have a
+  code?*) opens the App Store's redemption of the creator's Apple offer code; one redeemed
+  straight in the App Store reaches the server through RevenueCat's webhook (`offer_code`).
 - **The first screens.** The store app opens with the guided first run (F12): a short video of
   the app in use (`frontend/public/intro.mp4`, or `VITE_INTRO_VIDEO` in `.env.mobile`; without
   one the screen shows the promise alone), the questions, the plan, and only then the account

@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': 'Ağırlıkların hesaplanıyor',
   'Your personal AI Coach. It knows what to lift today.': 'Kişisel Yapay Zekâ Koçun. Bugün ne kaldıracağını bilir.',
   'Your progress': 'İlerlemen',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'Bir içerik üreticinin ya da arkadaşının kodu sana ekstra Pro günleri kazandırır.',
+  'Do you have a code?': 'Kodun var mı?',
+  'I don’t have a code': 'Kodum yok',
+  'I’ve redeemed it': 'Kullandım',
+  'Open the App Store': 'App Store’u aç',
+  'Redeem it in the App Store': 'App Store’da kullan',
+  'Your code is redeemed in the App Store.': 'Kodun App Store’da kullanılır.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'İçerik üreticinin teklifi App Store’da kullanılır. Bitince buraya geri dön.',
 }

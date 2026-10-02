@@ -1285,6 +1285,13 @@ export const PT_BR_OVERRIDES = {
   'Working out your weights': 'Calculando seus pesos',
   'Your personal AI Coach. It knows what to lift today.': 'Seu Treinador pessoal com IA. Sabe o que levantar hoje.',
   'Your progress': 'Seu progresso',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'Um código de um criador ou de um amigo te dá dias extras de Pro.',
+  'Do you have a code?': 'Você tem um código?',
+  'I’ve redeemed it': 'Já resgatei',
+  'Redeem it in the App Store': 'Resgate na App Store',
+  'Your code is redeemed in the App Store.': 'Seu código é resgatado na App Store.',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'A oferta do seu criador é resgatada na App Store. Volte aqui quando terminar.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

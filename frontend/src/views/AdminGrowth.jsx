@@ -5,6 +5,7 @@ import { confirmSheet } from '../sheets.jsx'
 import { openPaywallPreview } from '../components/Paywall.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
+import { creatorCsv, playLink } from '../lib/creator-csv.js'
 
 // The operator's side of selling the app: creator codes, and the paywall's words and prices.
 // English-only like the rest of the dashboard. Each card hides itself on an instance where its
@@ -15,46 +16,81 @@ import { Button } from '../components/ui.jsx'
 export function CodesCard() {
   const toast = useUI(s => s.toast)
   const [data, setData] = useState(null)
-  const [form, setForm] = useState({ code: '', label: '', days: 30 })
+  const [report, setReport] = useState(null)
+  const [month, setMonth] = useState('')
+  const [form, setForm] = useState({ code: '', label: '', days: 30, appleOffer: '' })
   const load = () => api('/api/admin/codes').then(setData).catch(e => setData(e.status === 404 ? false : { codes: [] }))
+  const loadReport = (m = month) => api('/api/admin/creators' + (m ? '?month=' + m : '')).then(setReport).catch(() => setReport(null))
   useEffect(() => { load() }, [])
+  useEffect(() => { loadReport(month) }, [month])
   if (data === null || data === false) return null
   const codes = data.codes.filter(c => c.kind !== 'tester')
+  const stats = Object.fromEntries((report?.rows || []).map(r => [r.code, r]))
 
   const link = code => `${location.origin}${location.pathname}?ref=${code}`
   const copy = text => { navigator.clipboard?.writeText(text).catch(() => {}); toast('Copied') }
+  const reload = () => { load(); loadReport() }
   const create = () => api('/api/admin/codes', { method: 'POST', body: JSON.stringify(form) })
-    .then(({ code }) => { copy(link(code.code)); setForm({ code: '', label: '', days: 30 }); load() })
+    .then(({ code }) => { copy(link(code.code)); setForm({ code: '', label: '', days: 30, appleOffer: '' }); reload() })
     .catch(e => toast(e.message))
   const revoke = code => confirmSheet({
     title: 'Revoke ' + code + '?', message: 'New sign-ups with it stop getting the extra days. Everyone who already used it keeps them, and still counts under it.',
     confirmText: 'Revoke', danger: true,
-    onConfirm: () => api('/api/admin/codes/revoke', { method: 'POST', body: JSON.stringify({ code }) }).then(load).catch(e => toast(e.message))
+    onConfirm: () => api('/api/admin/codes/revoke', { method: 'POST', body: JSON.stringify({ code }) }).then(reload).catch(e => toast(e.message))
   })
+  const setApple = c => {
+    const v = prompt(`Apple offer code for ${c.code} (made in App Store Connect; empty to clear)`, c.appleOffer || '')
+    if (v === null) return
+    api('/api/admin/codes/apple', { method: 'POST', body: JSON.stringify({ code: c.code, appleOffer: v.trim() }) }).then(reload).catch(e => toast(e.message))
+  }
+  // The CSV the commissions are worked out from: this month, or every month row by row.
+  const exportCsv = async () => {
+    try {
+      const r = month ? report : await api('/api/admin/creators?by=month')
+      const blob = new Blob([creatorCsv(r.rows, month || null)], { type: 'text/csv;charset=utf-8' })
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tiza-creators-${month || 'by-month'}.csv`; a.click(); URL.revokeObjectURL(a.href)
+    } catch (e) { toast(e.message) }
+  }
   const f = data.friends
 
   return <div className="card">
     <h2 style={{ margin: 0 }}>Creator codes</h2>
     <div className="adm-lead">
-      One code per creator or trainer. A sign-up through their link (<code>?ref=CODE</code>) gets the extra days on top of the trial and is counted
-      under the code here and in your analytics. Creating a code copies its link.
+      One code per creator or trainer. A sign-up through their link (<code>?ref=CODE</code>), their Google Play link (the code rides as the install
+      referrer) or with the code typed in just before the paywall gets the extra days on top of the trial, and is counted under the code — here, in
+      your analytics and as the profile's campaign in RevenueCat. On an iPhone, a code with an Apple offer code behind it is redeemed in the App
+      Store instead. Creating a code copies its link. Commissions are worked out by hand from the CSV.
     </div>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
       <input className="input" style={{ flex: '1 1 110px', textTransform: 'uppercase' }} placeholder="CODE" maxLength={24} value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
       <input className="input" style={{ flex: '2 1 160px' }} placeholder="Who it is for" maxLength={80} value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
       <input className="input" style={{ flex: '0 1 80px' }} type="number" min={0} max={365} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} aria-label="extra days" />
+      <input className="input" style={{ flex: '1 1 130px', textTransform: 'uppercase' }} placeholder="Apple offer code" maxLength={64} value={form.appleOffer} onChange={e => setForm({ ...form, appleOffer: e.target.value })} />
       <Button variant="primary" size="sm" icon="plus" onClick={create} disabled={!form.code.trim()}>Create</Button>
     </div>
-    {codes.length ? codes.map(c => <div key={c.code} className={'row between' + (c.revoked ? ' dim' : '')} style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)', gap: 10 }}>
-      <div style={{ minWidth: 0 }}>
-        <button className="adm-code" onClick={() => copy(link(c.code))} aria-label={'copy link for ' + c.code}>{c.code}</button>
-        <span className="small muted" style={{ marginInlineStart: 8 }}>{c.label || '—'} · +{c.days} days{c.revoked ? ' · revoked' : ''}</span>
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+      <select className="input" style={{ flex: '0 1 160px' }} value={month} onChange={e => setMonth(e.target.value)} aria-label="month">
+        <option value="">All time</option>
+        {(report?.months || []).map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+      <span className="small muted" style={{ flex: 1 }}>sign-ups · trials started · paying customers · refunds</span>
+      <Button size="sm" icon="download" onClick={exportCsv} disabled={!report}>Export CSV</Button>
+    </div>
+    {codes.length ? codes.map(c => {
+      const st = stats[c.code] || { signups: 0, trials: 0, paying: 0, refunds: 0 }
+      return <div key={c.code} className={'row between' + (c.revoked ? ' dim' : '')} style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <button className="adm-code" onClick={() => copy(link(c.code))} aria-label={'copy link for ' + c.code}>{c.code}</button>
+          <span className="small muted" style={{ marginInlineStart: 8 }}>{c.label || '—'} · +{c.days} days{c.appleOffer ? ' · Apple: ' + c.appleOffer : ''}{c.revoked ? ' · revoked' : ''}</span>
+        </div>
+        <div className="row" style={{ gap: 8, flex: 'none' }}>
+          <span className="small"><strong>{st.signups}</strong> · <strong>{st.trials}</strong> · <strong>{st.paying}</strong> · <strong>{st.refunds}</strong></span>
+          <button className="iconbtn adm-iconbtn" onClick={() => copy(playLink(c.code))} aria-label={'copy Google Play link for ' + c.code} title="Copy the Google Play link"><Icon name="link" /></button>
+          <button className="iconbtn adm-iconbtn" onClick={() => setApple(c)} aria-label={'Apple offer code for ' + c.code} title="Apple offer code"><Icon name="pencil" /></button>
+          {!c.revoked && <button className="iconbtn adm-iconbtn" style={{ color: 'var(--red)' }} onClick={() => revoke(c.code)} aria-label="revoke"><Icon name="trash" /></button>}
+        </div>
       </div>
-      <div className="row" style={{ gap: 10, flex: 'none' }}>
-        <span className="small"><strong>{c.signups}</strong> sign-ups · <strong>{c.paying}</strong> paying</span>
-        {!c.revoked && <button className="iconbtn adm-iconbtn" style={{ color: 'var(--red)' }} onClick={() => revoke(c.code)} aria-label="revoke"><Icon name="trash" /></button>}
-      </div>
-    </div>) : <div className="adm-empty">No codes yet.</div>}
+    }) : <div className="adm-empty">No codes yet.</div>}
     {/* "Invite a friend": one code per person who opened it, summed up rather than listed. */}
     {f && <div className="small" style={{ marginTop: 12 }}>
       <strong>Friend invites</strong> · {f.codes} people sharing · <strong>{f.signups}</strong> sign-ups · <strong>{f.paying}</strong> paying · {f.rewarded} rewards of 30 days given

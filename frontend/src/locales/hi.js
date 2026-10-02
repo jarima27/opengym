@@ -2051,4 +2051,13 @@ export default {
   'Working out your weights': 'आपके वज़न तय किए जा रहे हैं',
   'Your personal AI Coach. It knows what to lift today.': 'आपका पर्सनल AI कोच। जानता है कि आज क्या उठाना है।',
   'Your progress': 'आपकी प्रगति',
+  // Creator program: the code before the paywall, Apple offer codes
+  'A creator’s or a friend’s code gets you extra days of Pro.': 'किसी क्रिएटर या दोस्त का कोड आपको Pro के अतिरिक्त दिन देता है।',
+  'Do you have a code?': 'क्या आपके पास कोड है?',
+  'I don’t have a code': 'मेरे पास कोड नहीं है',
+  'I’ve redeemed it': 'मैंने इसे रिडीम कर लिया',
+  'Open the App Store': 'App Store खोलें',
+  'Redeem it in the App Store': 'इसे App Store में रिडीम करें',
+  'Your code is redeemed in the App Store.': 'आपका कोड App Store में रिडीम होता है।',
+  'Your creator’s offer is redeemed in the App Store. Come back here once it’s done.': 'आपके क्रिएटर का ऑफ़र App Store में रिडीम होता है। हो जाने पर यहां वापस आएं।',
 }
