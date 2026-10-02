@@ -36,7 +36,7 @@ describe('paywall sums', () => {
 
 describe('the person’s own data on the paywall', () => {
   const c = {
-    title: 'Un entrenador que revisa tu semana', titleStall: 'Deja de estancarte en {exercise}',
+    title: 'Un Coach que revisa tu semana', titleStall: 'Deja de estancarte en {exercise}',
     titleComeback: '¿Unos días fuera? El Coach puede reajustar tu semana.', titleDay7: 'Tu plan ha funcionado esta semana.',
     timeline: 'Hoy: todo Pro desbloqueado · Día {0}: te avisamos · Día {1}: empieza el pago.'
   }
@@ -50,9 +50,9 @@ describe('the person’s own data on the paywall', () => {
   it('the moment’s own title when it can be filled, the general one otherwise', () => {
     expect(titleFor(c, 'stall', { exercise: 'Sentadilla' })).toBe('Deja de estancarte en Sentadilla')
     expect(titleFor(c, 'pill:stall', { exercise: 'Press banca' })).toBe('Deja de estancarte en Press banca')
-    expect(titleFor(c, 'stall', {})).toBe('Un entrenador que revisa tu semana')
+    expect(titleFor(c, 'stall', {})).toBe('Un Coach que revisa tu semana')
     expect(titleFor(c, 'comeback')).toBe('¿Unos días fuera? El Coach puede reajustar tu semana.')
-    expect(titleFor(c, 'settings')).toBe('Un entrenador que revisa tu semana')
+    expect(titleFor(c, 'settings')).toBe('Un Coach que revisa tu semana')
   })
   it('the trial’s timeline: the reminder three days before the first charge, only with a trial', () => {
     expect(timelineText(c, 30)).toBe('Hoy: todo Pro desbloqueado · Día 27: te avisamos · Día 30: empieza el pago.')

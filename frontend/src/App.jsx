@@ -44,6 +44,7 @@ import Settings from './views/Settings.jsx'
 import Admin from './views/Admin.jsx'
 import FirstRun from './views/FirstRun.jsx'
 import BillingPrompts from './components/BillingPrompts.jsx'
+import CoachPlanWatcher from './components/CoachPlanWatcher.jsx'
 import { CoachReportSync } from './components/CoachReport.jsx'
 import { welcomePending } from './lib/welcome.js'
 import { readArrival, listenForNotificationTaps } from './lib/notify.js'
@@ -234,6 +235,8 @@ function Shell() {
       <RestTimer />
       <BillingPrompts />
       {authed && <CoachReportSync />}
+      {/* The Coach's first plan, asked in the background by the first run (F11). */}
+      {authed && <CoachPlanWatcher />}
       <Modals />
       <Toast />
       <TimerFlash />

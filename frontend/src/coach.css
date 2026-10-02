@@ -96,6 +96,8 @@
 .ob-lift-f input{width:100%;text-align:center;font-size:17px;padding:9px 6px;border-radius:10px;border:0;background:var(--surface-2);color:var(--label)}
 .ob-lift .chip{white-space:nowrap;text-transform:none}
 .ob-lift .chip.on{background:var(--acc-soft);color:var(--acc)}
+.ob-coaching{display:flex;gap:10px;align-items:flex-start;margin:-10px 0 18px;padding:11px 13px;border-radius:var(--r-lg);background:var(--acc-soft);color:var(--label);font-size:14px;line-height:1.45}
+.ob-coaching svg{flex:none;color:var(--acc);font-size:17px;margin-top:1px}
 .ob-wait{display:flex;flex-direction:column;align-items:center;padding-top:12vh}
 .ob-spin{font-size:46px;color:var(--acc);margin-bottom:18px;animation:ob-pulse 1.4s ease-in-out infinite}
 @keyframes ob-pulse{0%,100%{opacity:.45;transform:scale(.92)}50%{opacity:1;transform:scale(1.05)}}

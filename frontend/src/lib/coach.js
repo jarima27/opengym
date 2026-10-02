@@ -62,12 +62,14 @@ export const coachAvailable = (config, user, { demo, mobile, coachMode } = {}) =
 
 // What each data category means, in the user's words. Rendered from the same list the payload
 // builder uses (api/coach/core/categories.js), so the screen cannot promise less than leaves.
+// Getters, so each read is in the current language — and literal t() calls, so
+// check-source-strings.mjs sees every one of them (a t(variable) at the call site it cannot).
 export const CATEGORY_TEXT = {
-  plan: ['Your plan', 'Routines, exercises, sets and reps, your weekly schedule and progression settings.'],
-  training: ['Your logged training', 'Sets you logged in the review window — weights, reps, times, effort ratings and how long sessions took.'],
-  bodyweight: ['Body weight', 'Weigh-ins from the same window, and your goal weight if you set one.'],
-  profile: ['What you tell the Coach', 'Your intake answers, including any limitations or injuries you describe.'],
-  prefs: ['A few preferences', 'Your unit, your language and which effort scale you log.']
+  get plan() { return [t('Your plan'), t('Routines, exercises, sets and reps, your weekly schedule and progression settings.')] },
+  get training() { return [t('Your logged training'), t('Sets you logged in the review window — weights, reps, times, effort ratings and how long sessions took.')] },
+  get bodyweight() { return [t('Body weight'), t('Weigh-ins from the same window, and your goal weight if you set one.')] },
+  get profile() { return [t('What you tell the Coach'), t('Your intake answers, including any limitations or injuries you describe.')] },
+  get prefs() { return [t('A few preferences'), t('Your unit, your language and which effort scale you log.')] }
 }
 export const hasConsent = S => !!S?.coach?.consent?.agreedAt && S.coach.consent.version === CONSENT_VERSION
 

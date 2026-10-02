@@ -87,8 +87,10 @@ Node 22, the same version as `web/Dockerfile` / `api/Dockerfile` (`node:22-alpin
     shows the dataset's media (© Gym visual). `components/Media.jsx` renders either; no video
     means the exercise's text, never an empty box.
   - `first-run.js` — the guided first run (`views/FirstRun.jsx`): six questions → a plan by rule
-    (or the Coach's free first plan), starting weights, the week opening on its first session,
-    the first workout's hints (`components/Tip.jsx`) and Home's "First steps". `calibration.js`
+    at once (the Coach, where it fits, is asked in the background and its plan swapped in when it
+    arrives: `coach-first-plan.js`, `components/CoachPlanWatcher.jsx`), starting weights, the
+    week opening on its first session, the first workout's hints (`components/Tip.jsx`) and
+    Home's "First steps". `calibration.js`
     finds a lift's weight in its first session when nobody knew it; `next-time.js` is the
     finish screen's "next time" lines, from `nextPrescription`.
   - `workout-model.js`, `supersetFlow.js` — in-session workout state machine, incl. supersets.

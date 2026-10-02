@@ -1167,7 +1167,6 @@ export const PT_BR_OVERRIDES = {
   'Start your workout': 'Comece seu treino',
   'Starting out, the whole body three times a week is the quickest way to progress.': 'No começo, o corpo todo três vezes por semana é o jeito mais rápido de progredir.',
   'Tap here when you finish the set.': 'Toque aqui quando terminar a série.',
-  'The Coach could not answer just now: here is a plan to start with, and it will be there when you want to ask.': 'O Treinador não conseguiu responder agora: aqui está um plano para começar, e ele vai estar aqui quando você quiser perguntar.',
   'The rest runs on its own; we’ll let you know when it’s over.': 'O descanso corre sozinho; a gente avisa quando acabar.',
   'Tiza works this weight out. Complete every rep and next time it goes up.': 'Este peso é calculado pelo Tiza. Se completar tudo, na próxima vez ele sobe.',
   'Too hard': 'Pesado demais',
@@ -1178,11 +1177,9 @@ export const PT_BR_OVERRIDES = {
   'Yes, let’s start': 'Sim, bora',
   'You already train: a day each for pushing, pulling and legs gives every muscle more work.': 'Você já treina: um dia para empurrar, outro para puxar e outro para pernas dá mais trabalho a cada músculo.',
   'You can change it whenever you like.': 'Você pode mudar quando quiser.',
-  'Your Coach is building your plan…': 'Seu Treinador está montando seu plano…',
   'Your best weight on each exercise will show here, next to its name.': 'Seu melhor peso em cada exercício aparece aqui, ao lado do nome.',
   'Your body weight': 'Seu peso corporal',
   'Your days': 'Seus dias',
-  'Your first Coach plan, free. It takes about a minute.': 'Seu primeiro plano do Treinador, grátis. Leva cerca de um minuto.',
   'Your first record will appear here': 'Seu primeiro recorde vai aparecer aqui',
   'Your first workout': 'Seu primeiro treino',
   'Your history': 'Seu histórico',
@@ -1197,6 +1194,29 @@ export const PT_BR_OVERRIDES = {
   'Do your {0} sets with it. Tiza keeps it for next time.': 'Faça suas {0} séries com ele. O Tiza guarda para a próxima vez.',
   // Home: a streak of one week (singular)
   // Starter routines' names, given when the plan is made
+  // The Coach's consent categories and job errors, translated at last
+  'Routines, exercises, sets and reps, your weekly schedule and progression settings.': 'Rotinas, exercícios, séries e repetições, sua agenda semanal e as configurações de progressão.',
+  'Sets you logged in the review window — weights, reps, times, effort ratings and how long sessions took.': 'As séries que você registrou no período revisado: pesos, repetições, tempos, esforço e quanto duraram as sessões.',
+  'Something went wrong on the server.': 'Algo deu errado no servidor.',
+  'Something went wrong on this phone.': 'Algo deu errado neste celular.',
+  'The Coach answered with something the app couldn’t use.': 'O Treinador respondeu com algo que o app não consegue usar.',
+  'The Coach couldn’t read your training data.': 'O Treinador não conseguiu ler seus dados de treino.',
+  'The Coach couldn’t run — the instance owner needs to check its setup.': 'O Treinador não conseguiu funcionar — o dono do servidor precisa verificar a configuração.',
+  'The Coach couldn’t sign in to its provider — the instance owner needs to check its setup.': 'O Treinador não conseguiu se conectar ao provedor — o dono do servidor precisa verificar a configuração.',
+  'The Coach is resting — try again tomorrow.': 'O Treinador está descansando — tente de novo amanhã.',
+  'The Coach isn’t set up on this phone — check Settings → AI Coach.': 'O Treinador não está configurado neste celular — confira em Configurações → Treinador IA.',
+  'The Coach took too long and gave up.': 'O Treinador demorou demais e desistiu.',
+  'Weigh-ins from the same window, and your goal weight if you set one.': 'As pesagens do mesmo período, e seu peso-meta se você definiu um.',
+  'What you tell the Coach': 'O que você conta ao Treinador',
+  'Your AI provider couldn’t answer.': 'Seu provedor de IA não conseguiu responder.',
+  'Your AI provider rejected the key on this phone — check it under Settings → AI Coach.': 'Seu provedor de IA recusou a chave deste celular — confira em Configurações → Treinador IA.',
+  'Your intake answers, including any limitations or injuries you describe.': 'Suas respostas iniciais, incluindo limitações ou lesões que você descrever.',
+  'Your logged training': 'Seu treino registrado',
+  'Your unit, your language and which effort scale you log.': 'Sua unidade, seu idioma e a escala de esforço que você usa.',
+  // F11: the Coach's first plan, in the background
+  'Your Coach is fine-tuning this plan with your answers. Start now; we’ll let you know when it’s ready.': 'Seu Treinador está ajustando este plano com suas respostas. Comece agora; avisamos quando estiver pronto.',
+  'Your Coach has improved your plan': 'Seu Treinador melhorou seu plano',
+  'See my plan': 'Ver meu plano',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

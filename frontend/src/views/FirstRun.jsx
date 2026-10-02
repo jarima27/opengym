@@ -22,8 +22,8 @@ import {
 import { clearWelcome, markTrialOffer } from '../lib/welcome.js'
 import { track } from '../lib/track.js'
 import { importFromApp, importFromHevy, beginWorkout, PLAN_COPY, namedStarter } from '../sheets.jsx'
-import { emptyCoach, coachAvailable, hasConsent, appendChat, applyCreatedPlan, CONSENT_VERSION } from '../lib/coach.js'
-import { requestPlan, coachStatus, resolvePending } from '../lib/coach-api.js'
+import { emptyCoach, coachAvailable, hasConsent, appendChat, CONSENT_VERSION } from '../lib/coach.js'
+import { requestPlan } from '../lib/coach-api.js'
 import { useCoachAccess, useFreePlan } from '../components/useCoachAccess.js'
 import { canAsk, turnOnReminders } from '../components/NotifyOffer.jsx'
 import { declineOffer } from '../lib/notify.js'
@@ -42,12 +42,9 @@ const SAVED = 'tiza_first_run'
 const readSaved = () => { try { return JSON.parse(sessionStorage.getItem(SAVED) || 'null') } catch { return null } }
 const save = v => { try { sessionStorage.setItem(SAVED, JSON.stringify(v)) } catch { /* private mode */ } }
 const forget = () => { try { sessionStorage.removeItem(SAVED) } catch { /* nothing kept */ } }
-const sleep = ms => new Promise(r => setTimeout(r, ms))
 // The weekday as a sentence says it ("on Thursday", "el jueves"): the browser's own word, not the
 // capitalised label of the week strip.
 const dayName = iso => new Date(iso + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' })
-// How long the Coach gets to write the first plan before the rule-made one is offered instead.
-const COACH_WAIT_MS = 150000
 
 export default function FirstRun() {
   const nav = useNavigate()
@@ -56,7 +53,6 @@ export default function FirstRun() {
   const config = useStore(s => s.config)
   const coachMode = useStore(s => s.coachLocal?.mode)
   const update = useStore(s => s.update)
-  const toast = useUI(s => s.toast)
   const access = useCoachAccess()
   const freePlan = useFreePlan()
   const kept = useMemo(readSaved, [])
@@ -113,7 +109,7 @@ export default function FirstRun() {
       {step === 'import' && <ImportStep onDone={() => go('plan')} />}
       {step === 'plan' && <PlanStep a={a} access={access} freePlan={freePlan}
         coachOn={coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })}
-        onApplied={lifts => go(lifts.length ? 'weights' : 'notify')} toast={toast} />}
+        onApplied={lifts => go(lifts.length ? 'weights' : 'notify')} />}
       {step === 'weights' && <WeightsStep onNext={() => go('notify')} />}
       {step === 'notify' && <NotifyStep user={user} onNext={() => go('today')} />}
       {step === 'today' && <TodayStep onDone={dest => { forget(); clearWelcome(); track('onboarding_done'); nav(dest, { replace: true }) }} />}
@@ -203,7 +199,7 @@ const REASON = {
   'five-six': () => t('Push, pull and legs in turn: every muscle twice a week, with the volume you are used to.')
 }
 
-function PlanStep({ a, access, freePlan, coachOn, onApplied, toast }) {
+function PlanStep({ a, access, freePlan, coachOn, onApplied }) {
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const rules = useMemo(() => {
@@ -211,97 +207,78 @@ function PlanStep({ a, access, freePlan, coachOn, onApplied, toast }) {
     return { ...plan, routines: namedStarter(plan.routines) }
   }, [a])
   // The Coach makes the first plan where it can: there for this account (free, Pro, trial, or an
-  // instance that does not charge), and with its gift still unused when it is the gift.
+  // instance that does not charge), and with its gift still unused when it is the gift. Nobody
+  // waits for it: the plan by rule is shown and started at once, and the Coach is asked in the
+  // background (components/CoachPlanWatcher.jsx swaps its plan in when it arrives).
   const coachFits = coachOn && (access === 'open' || access === 'pro' || (access === 'free' && freePlan))
-  const [mode, setMode] = useState(null)   // 'consent' | 'wait' | 'coach' | 'rules'
-  const [proposal, setProposal] = useState(null)
-  const [fellBack, setFellBack] = useState(false)
-  const live = useRef(true)
-  useEffect(() => () => { live.current = false }, [])
+  const [mode, setMode] = useState(null)   // 'consent' | 'rules'
+  const [coaching, setCoaching] = useState(false)
   useEffect(() => {
     if (mode || access === null) return
-    if (!coachFits) { setMode('rules'); return }
-    if (!hasConsent(S)) { setMode('consent'); return }
-    askCoach()
+    if (coachFits && !hasConsent(S)) { setMode('consent'); return }
+    setCoaching(coachFits)
+    setMode('rules')
   }, [access, coachFits, mode])
 
-  async function askCoach() {
-    setMode('wait')
+  const agree = () => {
+    update(s => { s.coach = { ...(s.coach || emptyCoach()), consent: { agreedAt: new Date().toISOString(), version: CONSENT_VERSION } } })
+    setCoaching(true)
+    setMode('rules')
+  }
+
+  // Asked once per first run, with the same answers: the watcher takes it from here.
+  const askCoach = () => {
+    if (useStore.getState().S.firstRun?.coach) return
     const profile = coachProfile(a)
     update(s => {
       const c = (s.coach = s.coach || emptyCoach())
       c.profile = profile
       if (!(c.chat || []).some(m => m.kind === 'intake')) appendChat(s, { role: 'user', kind: 'intake' })
+      s.firstRun = { ...(s.firstRun || firstRunState()), coach: { state: 'asking' } }
     })
-    try {
-      await requestPlan(profile)
-      const until = Date.now() + COACH_WAIT_MS
-      while (live.current && Date.now() < until) {
-        await sleep(DEMO ? 300 : 2500)
-        const st = await coachStatus().catch(() => null)
-        if (st?.pending?.kind === 'create') { if (live.current) { setProposal(st.pending); setMode('coach') } return }
-        if (st && !st.job && !st.pending) break
-      }
-    } catch { /* the plan by rule below */ }
-    if (live.current) { setFellBack(true); setMode('rules') }
-  }
-
-  const agree = () => {
-    update(s => { s.coach = { ...(s.coach || emptyCoach()), consent: { agreedAt: new Date().toISOString(), version: CONSENT_VERSION } } })
-    askCoach()
+    const mark = state => update(s => { s.firstRun = { ...s.firstRun, coach: { ...(s.firstRun?.coach || {}), state, askedAt: Date.now() } } })
+    // 'asked' only once the job exists, so the watcher's first look cannot find nothing running.
+    requestPlan(profile).then(() => mark('asked'), () => mark('failed'))
   }
 
   const start = () => {
-    let ids = []
-    if (mode === 'coach') {
-      update(s => {
-        const before = new Set((s.routines || []).map(r => r.id))
-        const res = applyCreatedPlan(s, proposal, { schedule: true })
-        appendChat(s, { role: 'coach', kind: 'applied', ref: res.logId, text: t('Imported — {0} routines are in your plan and your week is set. See you at the next session.', res?.routines?.length || proposal.bundle.routines.length) })
-        ids = s.routines.filter(r => !before.has(r.id)).map(r => r.id)
-      })
-      resolvePending({ accepted: ['plan'] }).catch(() => {})
-    } else {
-      update(s => {
-        s.routines.push(...rules.routines)
-        rules.schedule.forEach(({ day, routineId }) => { s.week[day] = [routineId] })
-      })
-      ids = rules.routines.map(r => r.id)
-    }
-    update(s => { markUnknownLifts(s.routines.filter(r => ids.includes(r.id)), id => bestWeightFor(s, id) > 0) })
-    track('onboarding_step', { step: 'plan', answer: mode === 'coach' ? 'coach' : rules.plan })
+    update(s => {
+      s.routines.push(...rules.routines)
+      rules.schedule.forEach(({ day, routineId }) => { s.week[day] = [routineId] })
+    })
+    const ids = rules.routines.map(r => r.id)
+    update(s => {
+      markUnknownLifts(s.routines.filter(r => ids.includes(r.id)), id => bestWeightFor(s, id) > 0)
+      s.firstRun = { ...(s.firstRun || firstRunState()), routineIds: ids }
+    })
+    track('onboarding_step', { step: 'plan', answer: rules.plan, coach: coaching })
+    if (coaching) askCoach()
     const st = useStore.getState().S
     const routines = st.routines.filter(r => ids.includes(r.id))
     onApplied(mainLifts(routines).filter(id => !(bestWeightFor(st, id) > 0)))
   }
 
-  if (!mode || mode === 'wait') return <div className="ob-wait">
+  // Only while this account's access to the Coach is being looked up — a moment, not the Coach.
+  if (!mode) return <div className="ob-wait">
     <div className="ob-spin"><Icon name="sparkles" /></div>
-    <h1 className="ob-h" style={{ textAlign: 'center' }}>{mode === 'wait' ? t('Your Coach is building your plan…') : t('Putting your plan together…')}</h1>
-    {mode === 'wait' && <p className="ob-p" style={{ textAlign: 'center' }}>{t('Your first Coach plan, free. It takes about a minute.')}</p>}
+    <h1 className="ob-h" style={{ textAlign: 'center' }}>{t('Putting your plan together…')}</h1>
   </div>
   if (mode === 'consent') return <Consent onAgree={agree} onDecline={() => setMode('rules')} />
 
   // What the summary shows: the plan's name and reason, its days, and the first session.
-  const coach = mode === 'coach' && proposal?.bundle
-  const days = coach ? Object.keys(coach.week || {}).map(Number) : rules.schedule.map(s => s.day)
-  const routineOn = d => {
-    if (!coach) return rules.routines.find(r => r.id === rules.schedule.find(s => s.day === d)?.routineId)
-    const ref = [].concat(coach.week[d] ?? [])[0]
-    return coach.routines.find((r, i) => r.id === ref || i === ref) || coach.routines[0]
-  }
+  const days = rules.schedule.map(x => x.day)
+  const routineOn = d => rules.routines.find(r => r.id === rules.schedule.find(x => x.day === d)?.routineId)
   const today = new Date().getDay()
   const order = [0, 1, 2, 3, 4, 5, 6].map(i => (today + i) % 7)
-  const firstDay = order.find(d => days.includes(d))
-  const first = routineOn(firstDay)
-  const name = coach ? (coach.name || t('Coach plan')) : PLAN_COPY[rules.plan]().name
-  const why = coach ? coach.summary : REASON[recommendPlan(a).reason]?.()
+  const first = routineOn(order.find(d => days.includes(d)))
+  const name = PLAN_COPY[rules.plan]().name
+  const why = REASON[recommendPlan(a).reason]?.()
 
   return <>
     <div className="ob-eyebrow">{t('Your plan')}</div>
     <h1 className="ob-h">{name}</h1>
     {why && <p className="ob-p">{why}</p>}
-    {fellBack && <div className="ob-note" style={{ marginTop: -14, marginBottom: 16 }}>{t('The Coach could not answer just now: here is a plan to start with, and it will be there when you want to ask.')}</div>}
+    {coaching && <div className="ob-coaching"><Icon name="sparkles" /><span>{t('Your Coach is fine-tuning this plan with your answers. Start now; we’ll let you know when it’s ready.')}</span></div>}
     <div className="ob-sub" style={{ marginTop: 0 }}>{t('Your days')}</div>
     <div className="ob-week static">
       {[1, 2, 3, 4, 5, 6, 0].map(d => <span key={d} className={'ob-wd' + (days.includes(d) ? ' on' : '')}>{t(DAYN[d]).slice(0, 2)}</span>)}
@@ -341,6 +318,9 @@ function WeightsStep({ onNext }) {
   const done = () => {
     let calibrated = 0
     update(s => {
+      // Kept for the Coach's plan, should it arrive: it starts these lifts from the same sets.
+      const sets = Object.fromEntries(Object.entries(known).filter(([, k]) => k?.w > 0 && k?.r > 0))
+      if (Object.keys(sets).length) s.firstRun = { ...(s.firstRun || firstRunState()), known: sets }
       for (const id of lifts) {
         const k = known[id]
         for (const r of s.routines) for (const e of r.ex) {

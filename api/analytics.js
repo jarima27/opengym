@@ -26,8 +26,10 @@ export const CLIENT_EVENTS = new Set([
   'pill_shown', 'pill_locked_tapped', 'weekly_report_viewed', 'coach_free_plan_created',
   'trial_recap_viewed', 'cancel_reason',
   // The guided first run (spec F11): each answer, the end of it, the first workout started and
-  // finished, a lift calibrated instead of guessed, the first-steps checklist completed.
-  'onboarding_step', 'onboarding_done', 'first_workout_started', 'first_workout_done', 'calibration_used', 'checklist_done'
+  // finished, a lift calibrated instead of guessed, the first-steps checklist completed, and the
+  // Coach's plan adopted in the background (or not: failed, unusable).
+  'onboarding_step', 'onboarding_done', 'first_workout_started', 'first_workout_done', 'calibration_used', 'checklist_done',
+  'coach_first_plan'
 ]);
 export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent', 'subscription_paused', 'plan_switched']);
 

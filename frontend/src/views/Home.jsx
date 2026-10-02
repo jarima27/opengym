@@ -116,6 +116,9 @@ export default function Home() {
       </div>}
     </div>
 
+    {/* The Coach's first plan, adopted in the background after the first run (F11). */}
+    <CoachImproved />
+
     {/* The first week's checklist (F11): until it is all done, closed, or two weeks have passed. */}
     <FirstSteps />
 
@@ -240,5 +243,28 @@ function FirstSteps() {
         {!i.done && <Button size="sm" variant="tinted" onClick={act}>{t('Go')}</Button>}
       </div>
     })}
+  </div>
+}
+
+// "Your Coach has improved your plan": the plan by rule the first run started on has made way for
+// the Coach's (lib/coach-first-plan.js). Said with a toast when it happens and here until seen,
+// with the Coach's own name and reason for it.
+function CoachImproved() {
+  const nav = useNavigate()
+  const c = useStore(s => s.S.firstRun?.coach)
+  const update = useStore(s => s.update)
+  if (c?.state !== 'applied' || c.seen) return null
+  const seen = () => update(s => { s.firstRun = { ...s.firstRun, coach: { ...s.firstRun.coach, seen: true } } })
+  return <div className="card">
+    <div className="row between" style={{ marginBottom: 6 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <span className="lrow-i"><Icon name="sparkles" /></span>
+        <h2 style={{ margin: 0 }}>{t('Your Coach has improved your plan')}</h2>
+      </div>
+      <button className="iconbtn" aria-label={t('Close')} onClick={seen}><Icon name="xmark" /></button>
+    </div>
+    {c.name && <div className="tt" style={{ fontWeight: 600, marginBottom: 2 }}>{c.name}</div>}
+    {c.summary && <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.45 }}>{c.summary}</div>}
+    <Button variant="tinted" icon="calendar" onClick={() => { seen(); nav('/plan') }}>{t('See my plan')}</Button>
   </div>
 }

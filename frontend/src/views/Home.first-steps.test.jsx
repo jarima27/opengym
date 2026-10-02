@@ -76,3 +76,17 @@ describe('Home — first steps', () => {
     expect(text()).not.toContain('First steps')
   })
 })
+
+describe('Home — the Coach’s improved plan', () => {
+  it('says the Coach has improved the plan, with its reason, until seen', () => {
+    setS({ firstRun: { ...firstRunState(NOW.getTime()), coach: { state: 'applied', appliedAt: NOW.getTime(), name: 'Strength base', summary: 'Squat and bench first.' } } })
+    mount()
+    expect(text()).toContain('Your Coach has improved your plan')
+    expect(text()).toContain('Strength base')
+    expect(text()).toContain('Squat and bench first.')
+    act(() => [...host.querySelectorAll('button')].find(b => b.textContent.includes('See my plan')).click())
+    expect(nav).toHaveBeenCalledWith('/plan')
+    expect(useStore.getState().S.firstRun.coach.seen).toBe(true)
+    expect(text()).not.toContain('Your Coach has improved your plan')
+  })
+})

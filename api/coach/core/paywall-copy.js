@@ -3,7 +3,7 @@
 // shows the real offer in these words (frontend/src/lib/paywall.js demoPaywall).
 export const DEFAULT_COPY = {
   es: {
-    title: 'Un entrenador que revisa tu semana',
+    title: 'Un Coach que revisa tu semana',
     titleStall: 'Deja de estancarte en {exercise}',
     titleComeback: '¿Unos días fuera? El Coach puede reajustar tu semana.',
     titleDay7: 'Tu plan ha funcionado esta semana. ¿Quieres que el Coach lo ajuste cada lunes?',

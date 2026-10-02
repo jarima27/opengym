@@ -205,6 +205,35 @@ How the pieces fit:
   sign-in, the server exchanges it for a refresh token and revokes it on deletion — with
   `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (a *Sign in with Apple* key) set.
 
+### Privacy manifest (iOS)
+
+`ios/App/App/PrivacyInfo.xcprivacy` is in the app target's resources. App Store review rejects a
+build that calls a *required-reason API* without declaring why, so it lists the ones the app's
+own code and its Capacitor plugins call. The plugins ship no manifest of their own; Capacitor's
+core does, and it declares nothing:
+
+| API category | Reason | Who calls it |
+|---|---|---|
+| File timestamp | `C617.1` — files inside the app's own container | `@capacitor/filesystem` (its `IONFilesystemLib` reads creation and modification dates, for `stat`) |
+| User defaults | `CA92.1` — the app's own defaults only | `@capgo/capacitor-social-login` (keeps the Apple sign-in details it was given) |
+
+The SDKs that bring their own manifest are not repeated in the app's: RevenueCat
+(`PurchasesHybridCommon`), GoogleSignIn, Alamofire, Google ML Kit and KeychainSwift.
+
+The same file lists the data the app collects: e-mail, name and user id (the account), fitness
+(the training), health (body weight, and injuries told to the Coach), photos or videos (added to a
+workout), other user content (notes, messages to the Coach), purchase history (the
+subscription) — all for the app's functionality — and product interaction (the server's own
+analytics events, `api/analytics.js`). All of it linked to the account, none of it used for
+tracking. **The App Privacy answers in App Store Connect have to say the same.**
+
+Adding a plugin or native code: search its iOS sources for the
+[required-reason APIs](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files/describing-use-of-required-reason-api)
+(`UserDefaults`, file creation/modification dates, `systemUptime`/`mach_absolute_time`, free
+disk space, `activeInputModes`) and add what it uses here, unless it ships its own manifest.
+After an archive, Xcode's Organizer (*Generate Privacy Report* on the archive) shows everything the app
+and its SDKs declare together.
+
 ## Distribution of openGym's own app — deliberately no app stores
 
 openGym's mobile app is not on the Play Store or App Store, and that's a choice: no store

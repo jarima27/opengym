@@ -28,6 +28,7 @@ import {
   changeTitle, changeValues, exName, canRevert, revertLast
 } from '../lib/coach.js'
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
+import { coachAsk, adoptCoachPlan } from '../lib/coach-first-plan.js'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -303,6 +304,15 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
   const accept = () => {
     try {
       let n = 0
+      // The first run's plan, imported from here before the watcher got to it: it takes the plan
+      // by rule's place the same way (lib/coach-first-plan.js), not a second plan beside it.
+      if (schedule && coachAsk(S) === 'wait') {
+        update(s => { adoptCoachPlan(s, p) })
+        resolvePending({ accepted: ['plan'] }).catch(() => {})
+        toast(t('Your plan is live'))
+        refresh()
+        return
+      }
       update(s => {
         const res = applyCreatedPlan(s, p, { schedule })
         n = res?.routines?.length || b.routines.length

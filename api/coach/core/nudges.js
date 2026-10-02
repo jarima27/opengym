@@ -218,7 +218,7 @@ const swissGerman = () => deCH || (deCH = JSON.parse(JSON.stringify(COPY.de).rep
 export const NUDGE_LANGS = () => Object.keys(COPY);
 
 // Each language is written in the register its app pack already uses (tú, du, tu, você, вы, ти…)
-// and names things the way the pack does ("Entrenador IA", "Einstellungen → Abonnement").
+// and names things the way the pack does ("Coach IA", "Einstellungen → Abonnement").
 const COPY = {
   en: {
     today: [['Trained today?', '{routine} is on today’s plan. There’s still time 💪'],
@@ -265,8 +265,8 @@ const COPY = {
     records: { one: '1 récord', other: '{n} récords' },
     up: 'Más que la semana pasada 🔥', same: 'Igual que la semana pasada. La constancia gana 💪', down: 'La semana que viene, a por uno más.',
     trial: {
-      open3: ['Te quedan 3 días de prueba', 'Elige un plan para seguir con el Entrenador IA. Tu historial es tuyo pase lo que pase.'],
-      open1: ['Tu prueba termina mañana', 'Elige un plan hoy para no perder el Entrenador IA.'],
+      open3: ['Te quedan 3 días de prueba', 'Elige un plan para seguir con el Coach IA. Tu historial es tuyo pase lo que pase.'],
+      open1: ['Tu prueba termina mañana', 'Elige un plan hoy para no perder el Coach IA.'],
       card3: ['Tu prueba termina en 3 días', 'Después empieza tu suscripción. ¿No es para ti? Cancélala en Ajustes → Suscripción.'],
       card3p: ['Tu prueba de Tiza Pro termina en 3 días', 'Si no haces nada, el {date} se cobra {price}. Cancela aquí en un toque.'],
       card1: ['Tu prueba termina mañana', 'Mañana empieza tu suscripción. Puedes cancelarla en Ajustes → Suscripción.']
