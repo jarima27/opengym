@@ -33,6 +33,8 @@ import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } fro
 import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 import SubscriptionSection from '../components/Subscription.jsx'
+import { openInvite } from '../components/Invite.jsx'
+import { openFeedback } from '../components/Feedback.jsx'
 import DeleteAccountSheet from '../components/DeleteAccount.jsx'
 import { exerciseMediaMode } from '../lib/exercise-media.js'
 import { DEFAULT_SERVER } from '../lib/app-account.js'
@@ -341,6 +343,14 @@ export default function Settings() {
 
     {/* ---------- subscription: only on an instance that charges (api/billing.js) ---------- */}
     {user && !DEMO && (!MOBILE || DEFAULT_SERVER) && <SubscriptionSection />}
+
+    {/* ---------- talking to us: invite a friend (where there is Pro to give), send feedback ---------- */}
+    {user && !DEMO && <Section title={NAME}>
+      {config?.billing && <Row icon="gift" iconTint="var(--acc)" title={t('Invite a friend')}
+        subtitle={t('You both get {0} days of Pro free.', 30)} accessory="chevron" onClick={openInvite} />}
+      <Row icon="chat" iconTint="var(--blue)" title={t('Send feedback')}
+        subtitle={t('What you like, what fails, what you miss.')} accessory="chevron" onClick={() => openFeedback('settings')} />
+    </Section>}
 
     {/* ---------- the Coach on a phone: through the paired server, or with the user's own key ----------
         Not in the store app: its Coach comes with the account (and the subscription). */}

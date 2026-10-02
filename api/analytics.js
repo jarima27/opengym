@@ -29,9 +29,12 @@ export const CLIENT_EVENTS = new Set([
   // finished, a lift calibrated instead of guessed, the first-steps checklist completed, and the
   // Coach's plan adopted in the background (or not: failed, unusable).
   'onboarding_step', 'onboarding_done', 'first_workout_started', 'first_workout_done', 'calibration_used', 'checklist_done',
-  'coach_first_plan'
+  'coach_first_plan',
+  // A record shared as an image for stories; an invite link shared.
+  'pr_card_shared', 'invite_shared'
 ]);
-export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent', 'subscription_paused', 'plan_switched']);
+export const SERVER_EVENTS = new Set(['signup', 'trial_started', 'subscribed', 'cancelled', 'notification_sent', 'subscription_paused', 'plan_switched',
+  'feedback_sent', 'code_redeemed', 'invite_rewarded', 'email_sent']);
 
 const MAX_QUEUE = 1000;
 const BATCH = 100;

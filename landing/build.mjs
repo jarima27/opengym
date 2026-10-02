@@ -166,7 +166,7 @@ ${noindex || !others.length ? '' : `<link rel="alternate" hreflang="x-default" h
 ${jsonLd(cfg, page, words, faq)}
 ${cfg.headHtml || ''}
 </head>
-<body data-app="${escapeHtml(cfg.appUrl)}" data-code-text="${t('code_banner')}" data-page="${escapeHtml(page.slug)}">
+<body data-app="${escapeHtml(cfg.appUrl)}" data-code-text="${t('code_banner')}" data-friend-text="${t('code_banner_friend')}" data-tester-text="${t('code_banner_tester')}" data-page="${escapeHtml(page.slug)}">
 <a class="skip" href="#main">${t('skip')}</a>
 <div class="code-banner" role="status" hidden></div>
 <header class="top">

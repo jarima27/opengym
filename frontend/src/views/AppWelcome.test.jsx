@@ -61,7 +61,7 @@ describe('AppWelcome', () => {
     await mount()
     const apple = () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Continue with Apple')
     await act(async () => { apple().click() })
-    expect(mocks.provider).toHaveBeenCalledWith('https://app.tiza.fit', 'apple', { src: { platform: 'ios' } })
+    expect(mocks.provider).toHaveBeenCalledWith('https://app.tiza.fit', 'apple', { src: { platform: 'ios', lang: 'en' } })
     expect(mocks.connect).toHaveBeenCalledWith(session, expect.any(Function))
     expect(mocks.toast).toHaveBeenCalledWith('Welcome, Ada')
     mocks.toast.mockClear()

@@ -1796,3 +1796,14 @@ body.chips-dragging *{cursor:inherit}
 .coach-report .pill-locked{cursor:pointer}
 .coach-report .pill-locked:active{opacity:.8}
 .blurred{filter:blur(5px);user-select:none;-webkit-user-select:none;pointer-events:none}
+
+/* Invite a friend: the code, big enough to read out (components/Invite.jsx) */
+.invite-code{display:inline-block;padding:12px 22px;border-radius:var(--r-lg);border:1.5px dashed var(--acc);background:var(--acc-soft);color:var(--acc);font-size:24px;font-weight:800;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+/* A record's card for stories, previewed before it is shared (components/PrCard.jsx) */
+.pr-card-preview{display:flex;justify-content:center;margin:4px 0 16px}
+.pr-card-preview img,.pr-card-wait{width:min(62vw,240px);aspect-ratio:9/16;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.pr-card-wait{background:var(--surface-2);animation:pr-wait 1.4s ease-in-out infinite}
+@keyframes pr-wait{0%,100%{opacity:.5}50%{opacity:1}}
+.pr-line{flex-wrap:wrap}
+.pr-share{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;padding:3px 10px;border-radius:99px;background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:600}
+.pr-share svg{font-size:13px}

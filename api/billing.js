@@ -28,8 +28,9 @@
  *
  * `status` is Stripe's own subscription status, copied as it arrives. `at` is the time of the
  * last event applied, so a retried or late event never undoes a newer one. `user.comp === true`
- * is a profile the operator does not charge (a coach, a partner) — set by hand in db.json;
- * admins are never charged either.
+ * is a profile the operator does not charge (a coach, a partner, a tester) — set by a tester
+ * code (growth.js) or by hand in db.json; admins are never charged either. `user.bonusUntil` is
+ * free time earned after signing up (a friend's sign-up, growth.js), read as open trial.
  */
 import crypto from 'node:crypto';
 
@@ -87,7 +88,11 @@ export function billingConfig(env = process.env) {
    a sign-up date that would have it expire the moment the operator turned charging on. */
 export function openTrialEnd(user, cfg, since = 0) {
   const days = cfg.trialDays + (Number.isFinite(+user?.bonusDays) ? Math.max(0, +user.bonusDays) : 0);
-  return Math.max(Date.parse(user?.created) || 0, since) + days * DAY;
+  const base = Math.max(Date.parse(user?.created) || 0, since) + days * DAY;
+  // Days earned later — a friend who signed up with this profile's invite (growth.js) — run on
+  // from whichever ends last, and read as more of the same free time.
+  const earned = Number.isFinite(+user?.bonusUntil) ? +user.bonusUntil : 0;
+  return Math.max(base, earned);
 }
 
 /* Where a profile stands.

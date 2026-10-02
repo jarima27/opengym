@@ -149,8 +149,9 @@ when neither is available). Read `docs/SELF_HOSTING.md` before touching auth, se
 notification code; it documents the exact env-var contract (`RP_ID`, `ORIGIN`, `PORT`,
 `WEB_PORT`, `NGINX_PORT`, `BACKEND`, `SESSION_DAYS`, `ADMIN_UIDS`, `INVITE_ONLY`, `ALLOW_GUEST`,
 `AUDIT_*`, `VAPID_SUBJECT`, and for a hosted instance that sells access `STRIPE_*`, `TRIAL_DAYS`,
-`REVENUECAT_*`, `POSTHOG_*`, `YMOVE_*`, `DATASET_MEDIA` — see `api/billing.js`, `api/paywall.js`,
-`api/analytics.js`, `api/ymove.js`) that real deployments depend on.
+`REVENUECAT_*`, `POSTHOG_*`, `YMOVE_*`, `DATASET_MEDIA`, `RESEND_*` — see `api/billing.js`,
+`api/paywall.js`, `api/analytics.js`, `api/ymove.js`, `api/growth.js` (creator, tester and friend
+codes, feedback), `api/emails.js` (lifecycle emails)) that real deployments depend on.
 
 ### Docker / deploy
 

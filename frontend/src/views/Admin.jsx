@@ -10,7 +10,7 @@ import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import AdminCoach from './AdminCoach.jsx'
-import { CodesCard, PaywallCard } from './AdminGrowth.jsx'
+import { CodesCard, TesterCodesCard, PaywallCard } from './AdminGrowth.jsx'
 import '../admin.css'
 
 // Admin-only operator dashboard (owner passkey + admin flag; guarded again server-side).
@@ -258,6 +258,36 @@ function AuditCard({ tick }) {
   </div>
 }
 
+// What people sent with "Send feedback" (Settings, the first workout's summary): newest first,
+// with who, from which version, platform and screen. Marked done when dealt with; the done ones
+// come back with "Show done".
+function FeedbackCard({ tick }) {
+  const toast = useUI(s => s.toast)
+  const [all, setAll] = useState(false)
+  const [d, setD] = useState(null)
+  const load = () => api('/api/admin/feedback' + (all ? '?all=1' : '')).then(setD).catch(() => setD(false))
+  useEffect(() => { load() }, [all, tick])
+  if (d === false) return null
+  const mark = (f, done) => api('/api/admin/feedback/done', { method: 'POST', body: JSON.stringify({ id: f.id, done }) }).then(load).catch(e => toast(e.message))
+  const rows = d?.feedback || []
+  return <div className="card">
+    <div className="row between"><h2 style={{ margin: 0 }}>Feedback{d?.open ? <span className="adm-pill acc" style={{ marginInlineStart: 6 }}>{d.open}</span> : null}</h2>
+      <Button size="sm" variant="ghost" onClick={() => setAll(a => !a)}>{all ? 'Hide done' : 'Show done'}</Button></div>
+    <div className="adm-lead">What people sent from the app — Settings, or the summary of their first workout.</div>
+    {d === null && <div className="adm-empty">Loading…</div>}
+    {d && !rows.length && <div className="adm-empty">{all ? 'Nothing sent yet.' : 'Nothing open.'}</div>}
+    {rows.map(f => <div key={f.id} className={'adm-feedback' + (f.done ? ' dim' : '')}>
+      <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{f.text}</div>
+      <div className="row between" style={{ gap: 8, marginTop: 6 }}>
+        <div className="dim" style={{ fontSize: '.72rem' }}>
+          {f.name || 'deleted profile'}{f.email ? ' · ' + f.email : ''}{f.plan ? ' · ' + f.plan : ''} · v{f.version || '?'} · {f.platform || '?'} · {f.screen || '?'}{f.lang ? ' · ' + f.lang : ''} · {fmtDate(f.at.slice(0, 10))} {f.at.slice(11, 16)}
+        </div>
+        <Button size="sm" variant={f.done ? 'ghost' : 'tinted'} icon={f.done ? 'reset' : 'check'} onClick={() => mark(f, !f.done)}>{f.done ? 'Reopen' : 'Done'}</Button>
+      </div>
+    </div>)}
+  </div>
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const user = useStore(s => s.user)
@@ -324,12 +354,15 @@ export default function Admin() {
       </div>)}
     </div>}
 
+    <FeedbackCard tick={tick} />
+
     {/* The Coach setup. Renders nothing at all unless the instance offers the Coach, so an admin
         page on a box that never enabled it is byte-for-byte the page it was before. */}
     <AdminCoach />
 
     <InvitesCard invites={invites} reload={loadInvites} inviteOnly={inviteOnly} />
     <CodesCard />
+    <TesterCodesCard />
     <PaywallCard />
 
     <div className="card">

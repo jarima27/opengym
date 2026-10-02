@@ -518,7 +518,7 @@ test('creator codes: the admin makes one, a sign-up with it gets the bonus, the 
   assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'lucia', label: 'Lucía — PT', days: 30 } })).status, 200);
   assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'LUCIA', days: 30 } })).status, 409);
   assert.equal((await h.call('/api/admin/codes', { uid: 'boss', method: 'POST', body: { code: 'x', days: 30 } })).status, 400);
-  assert.deepEqual(await (await h.call('/api/code?c=lucia')).json(), { code: 'LUCIA', days: 30 });
+  assert.deepEqual(await (await h.call('/api/code?c=lucia')).json(), { code: 'LUCIA', days: 30, kind: 'creator' });
   assert.equal((await h.call('/api/code?c=NOPE')).status, 404);
 
   const signup = async (name, src) => {

@@ -2249,6 +2249,156 @@ paths:
               schema: { $ref: '#/components/schemas/Ok' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/feedback:
+    post:
+      tags: [meta]
+      operationId: sendFeedback
+      summary: Send feedback to the operator
+      description: |
+        "Send feedback" in Settings and on the first workout's summary. Kept in db.json (the
+        newest 1,000) and shown in the admin dashboard, with the app's version, the platform and
+        the screen it was sent from. At most 10 an hour per profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 2000 }
+                version: { type: string, example: 1.4.0 }
+                platform: { type: string, enum: [web, ios, android] }
+                screen: { type: string, example: settings }
+                lang: { type: string, example: es }
+      responses:
+        '200':
+          description: Received.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '400':
+          description: Nothing to send (`code: empty`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429':
+          description: Too much feedback in an hour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/email/unsubscribe:
+    get:
+      tags: [meta]
+      operationId: emailUnsubscribe
+      summary: The lifecycle emails' unsubscribe link
+      description: |
+        Every lifecycle email (welcome, day 3, first week — only where RESEND_API_KEY is set)
+        carries this link, signed for one profile with the server's secret (`t`). Following it
+        unsubscribes and answers an HTML page in the profile's language that offers to undo it.
+        A link that does not verify changes nothing (404).
+      security: []
+      parameters:
+        - { name: u, in: query, required: true, schema: { type: string } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Unsubscribed; an HTML page., content: { text/html: { schema: { type: string } } } }
+        '404': { description: Not a valid link., content: { text/plain: { schema: { type: string } } } }
+    post:
+      tags: [meta]
+      operationId: emailUnsubscribeOneClick
+      summary: One-click unsubscribe (RFC 8058)
+      description: What a mail client sends for the `List-Unsubscribe-Post` header. Same link, plain `ok`.
+      security: []
+      parameters:
+        - { name: u, in: query, required: true, schema: { type: string } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Unsubscribed., content: { text/plain: { schema: { type: string } } } }
+        '404': { description: Not a valid link., content: { text/plain: { schema: { type: string } } } }
+
+  /api/email/resubscribe:
+    post:
+      tags: [meta]
+      operationId: emailResubscribe
+      summary: Undo an unsubscribe, from its own page
+      security: []
+      parameters:
+        - { name: u, in: query, required: true, schema: { type: string } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Subscribed again; an HTML page., content: { text/html: { schema: { type: string } } } }
+        '404': { description: Not a valid link., content: { text/plain: { schema: { type: string } } } }
+
+  /api/admin/feedback:
+    get:
+      tags: [admin]
+      operationId: adminFeedback
+      summary: 'Admin: the feedback people sent'
+      description: Newest first, the ones not marked done (all of them with `?all=1`), at most 300.
+      parameters:
+        - name: all
+          in: query
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: The feedback, with who sent it, and how many are still open.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  open: { type: integer }
+                  feedback:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        at: { type: string, format: date-time }
+                        text: { type: string }
+                        version: { type: string }
+                        platform: { type: string }
+                        screen: { type: string }
+                        lang: { type: string }
+                        done: { type: boolean }
+                        name: { type: string, nullable: true }
+                        email: { type: string, nullable: true }
+                        plan: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/admin/feedback/done:
+    post:
+      tags: [admin]
+      operationId: adminFeedbackDone
+      summary: 'Admin: mark feedback done (or open again)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string }
+                done: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Marked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such feedback.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /api/admin/users:
     get:
       tags: [admin]
@@ -3005,7 +3155,11 @@ paths:
     get:
       tags: [growth]
       operationId: creatorCode
-      summary: Whether a creator code exists, and how many days it gives
+      summary: Whether a code exists, what kind it is and how many days it gives
+      description: |
+        `kind`: `creator` (days on top of the trial), `friend` (someone's invite: days on the
+        trial for the new profile, the same for whoever shared it) or `tester` (Pro for good,
+        `days: 0`). A tester code at its cap answers 404 like an unknown one.
       security: []
       parameters:
         - name: c
@@ -3022,8 +3176,92 @@ paths:
                 properties:
                   code: { type: string, example: LUCIA }
                   days: { type: integer, example: 30 }
+                  kind: { type: string, enum: [creator, friend, tester] }
         '404':
           description: No such code, or revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/redeem:
+    post:
+      tags: [growth]
+      operationId: redeemCode
+      summary: Redeem a code after signing up
+      description: |
+        A tester code makes the profile Pro for good (`comp`), at any time, and counts a use. A
+        creator's or a friend's code still counts during the profile's first 7 days (the store
+        app has no link to carry one through an install): its days go on the trial, and a
+        friend's owner is rewarded as at sign-up. Only where the instance sells access. At most
+        10 tries an hour per profile. Audited as `billing.redeem`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: BETA-TESTERS }
+      responses:
+        '200':
+          description: Redeemed; `access` is the profile's access after it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  kind: { type: string, enum: [creator, friend, tester] }
+                  days: { type: integer }
+                  access: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such code (`unknown`), or revoked (`revoked`); or nothing is sold here.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Not for this profile: `full` (a tester code at its cap), `already` (Pro for good
+            already), `own` (one's own invite), `used` (a sign-up code already counts), `late`
+            (past the first week).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many tries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/invite:
+    get:
+      tags: [growth]
+      operationId: inviteCode
+      summary: The profile's own invite code, and the friends it brought
+      description: |
+        Made the first time it is asked for: the person's name and four random characters
+        (`ANA-7K3P`). A friend who signs up with it gets `days` on the trial, and so does the
+        owner — added to their free time, or as a Stripe charge moved back `days` — for up to
+        `max` friends. Only where the instance sells access.
+      responses:
+        '200':
+          description: The code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, example: ANA-7K3P }
+                  active: { type: boolean }
+                  days: { type: integer, example: 30 }
+                  max: { type: integer, example: 12 }
+                  signups: { type: integer }
+                  rewarded: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Nothing is sold here.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3040,8 +3278,11 @@ paths:
         `onboarding_import_shown`, `onboarding_import_picked`, `onboarding_import_skipped`,
         `review_prompted`, `notification_opened`, `notifications_prompted`,
         `notifications_enabled`, `pill_shown`, `pill_locked_tapped`, `weekly_report_viewed`,
-        `coach_free_plan_created`, `trial_recap_viewed`, `cancel_reason`. `signup`, `trial_started`, `subscribed`, `cancelled` and
-        `notification_sent` come from the server alone. `props` keeps
+        `coach_free_plan_created`, `trial_recap_viewed`, `cancel_reason`, `onboarding_step`,
+        `onboarding_done`, `first_workout_started`, `first_workout_done`, `calibration_used`,
+        `checklist_done`, `coach_first_plan`, `pr_card_shared`, `invite_shared`. `signup`,
+        `trial_started`, `subscribed`, `cancelled`, `notification_sent`, `feedback_sent`,
+        `code_redeemed`, `invite_rewarded` and `email_sent` come from the server alone. `props` keeps
         at most 12 short scalar values; anything else is dropped. At most 120 an hour per profile.
       requestBody:
         required: true
@@ -3075,10 +3316,12 @@ paths:
     get:
       tags: [admin]
       operationId: adminCodes
-      summary: 'Admin: creator codes, and what each brought in'
+      summary: 'Admin: creator and tester codes, and what each brought in'
       responses:
         '200':
-          description: Every code, with its sign-ups and how many of them pay now.
+          description: |
+            Every creator's and tester's code, with its sign-ups (for a tester's: the profiles it
+            made Pro) and how many of them pay now; `friends` sums up the invite codes.
           content:
             application/json:
               schema:
@@ -3094,17 +3337,29 @@ paths:
                         days: { type: integer }
                         created: { type: string, format: date-time }
                         revoked: { type: boolean }
+                        kind: { type: string, enum: [creator, tester] }
+                        uses: { type: integer }
+                        max: { type: integer }
                         signups: { type: integer }
                         paying: { type: integer }
+                  friends:
+                    type: object
+                    properties:
+                      codes: { type: integer }
+                      signups: { type: integer }
+                      paying: { type: integer }
+                      rewarded: { type: integer }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [admin]
       operationId: adminCodeCreate
-      summary: 'Admin: create a creator code'
+      summary: 'Admin: create a creator or tester code'
       description: |
-        A sign-up that arrives with the code (`?ref=CODE` on any link to the app) gets `days` on
-        top of the open trial and is counted under it. Audited as `admin.code.create`.
+        A creator's: a sign-up that arrives with it (`?ref=CODE` on any link to the app) gets
+        `days` on top of the open trial and is counted under it. A tester's (`kind: tester`):
+        whoever redeems it is Pro for good; `max` caps the uses (0: no cap). Audited as
+        `admin.code.create`.
       requestBody:
         required: true
         content:
@@ -3116,6 +3371,8 @@ paths:
                 code: { type: string, pattern: '^[A-Za-z0-9_-]{2,24}$' }
                 label: { type: string, description: Who it is for — only the admin sees it. }
                 days: { type: integer, minimum: 0, maximum: 365 }
+                kind: { type: string, enum: [creator, tester] }
+                max: { type: integer, minimum: 0 }
       responses:
         '200':
           description: Created.
@@ -3123,7 +3380,7 @@ paths:
             application/json:
               schema: { type: object }
         '400':
-          description: A malformed code (`format`) or day count (`days`).
+          description: A malformed code (`format`), day count (`days`) or cap (`max`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

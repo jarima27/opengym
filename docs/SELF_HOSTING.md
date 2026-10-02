@@ -405,17 +405,61 @@ How it behaves:
   reminder opens this flow directly.
 - **Creator codes.** Admin → Creator codes makes a code per creator or trainer. A sign-up
   through `https://<your domain>/?ref=CODE` gets the extra days on top of the trial, and the card
-  shows how many signed up and how many pay. `utm_*` tags in the link are recorded too.
+  shows how many signed up and how many pay. `utm_*` tags in the link are recorded too. A
+  creator's (or a friend's) code can also be typed in during the first week, in Settings →
+  Subscription → *Have a code?* — the store app has no link to carry it through an install.
+- **Tester codes.** Admin → Tester codes makes a code that gives Pro for good: whoever redeems it
+  (Settings → Subscription → *Have a code?*, at any time, or through its sign-up link) is marked
+  `comp` and never charged. Each code counts its uses and can have a cap; revoking it stops new
+  redemptions, and nobody who already has Pro loses it.
+- **Invite a friend.** Settings → *Invite a friend* gives each person their own code (their name
+  and four letters, `ANA-7K3P`) and a link to share. A friend who signs up with it gets 30 days on
+  top of the trial, and so does whoever shared it — added to their free time, or, on a Stripe
+  subscription, as the next charge moved back 30 days; a store subscription keeps renewing and
+  the 30 days start when it ends. Up to 12 friends each. Admin → Creator codes sums the invites up.
 - **Analytics.** With `POSTHOG_KEY`, the server sends `signup`, `trial_started`, `subscribed`
   and `cancelled`, and forwards the app's `import_done`, `workout_completed`, `paywall_viewed`
   and a few others — each with the creator code and campaign it came from, keyed by profile id.
   Names and e-mails are never sent. Say so in your privacy policy.
-- **Free profiles.** Admins, and any profile you mark with `"comp": true` in `db.json`, are never
-  charged. The admin dashboard shows each profile's plan.
+- **Free profiles.** Admins, profiles that redeemed a tester code, and any profile you mark with
+  `"comp": true` in `db.json` are never charged. The admin dashboard shows each profile's plan.
 - **Deleting.** A person can delete their own account from Settings (the App Store requires it);
   a web subscription is cancelled with it. A store subscription has to be cancelled in the store.
 - The subscription state lives on the user in `db.json`, and the paywall in `paywall.json`, so
   the backup below already covers both. Stripe and the stores stay the record of what was paid.
+
+### Feedback
+
+*Send feedback* (Settings, and the summary of someone's first workout) reaches **Admin →
+Feedback**: what they wrote, with the app's version, the platform and the screen it came from.
+Marked done when dealt with. The newest 1,000 are kept in `db.json`, and a deleted account's go
+with it. Nothing to configure.
+
+### Lifecycle emails (optional)
+
+With a [Resend](https://resend.com) API key the server sends three emails to each new profile, in
+its own language, each at most once: a **welcome** right after signing up, a nudge on **day 3**
+if nothing has been trained yet, and a summary of the **first week** (workouts, sets, volume,
+records — or that the plan is still waiting). Only to profiles created after the key was set, so
+turning it on never mails everyone at once; during the person's daytime when the app has told
+the server their time zone; never again once they unsubscribe.
+
+```bash
+RESEND_API_KEY=re_...                 # without it nothing is sent
+RESEND_FROM="Tiza <hola@tiza.fit>"    # an address on a domain verified in Resend
+RESEND_REPLY_TO=                      # optional
+```
+
+- **Addresses.** A profile's sign-in e-mail, or the address Apple or Google vouched for at sign-in
+  (kept only to write to, never to find a profile). Passkey-only profiles without an e-mail get
+  none. For Apple's private relay addresses, register the sending domain under *Sign in with
+  Apple for Email Communication* in your Apple Developer account, or Apple drops them.
+- **Unsubscribing** is one click: every email carries the `List-Unsubscribe` and
+  `List-Unsubscribe-Post` headers (Gmail and Apple Mail show their own button) and a link in the
+  footer, signed per profile. The page it opens offers to undo it.
+- **Deliverability.** Verify the domain in Resend (it gives you the SPF and DKIM records) and add a
+  DMARC record; without them most mail ends up in spam. Say in your privacy policy that you send
+  these emails.
 
 ### Sign in with Apple and Google (optional, for the store app)
 

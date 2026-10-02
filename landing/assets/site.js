@@ -38,8 +38,10 @@
     fetch(`${app}/api/code?c=${encodeURIComponent(ref)}`)
       .then(r => (r.ok ? r.json() : null))
       .then(c => {
-        if (!c || !c.days) return
-        banner.textContent = (body.dataset.codeText || '{0}: +{1}').replace('{0}', c.code).replace('{1}', c.days)
+        if (!c || (!c.days && c.kind !== 'tester')) return
+        // A creator's code, a friend's invite (api/growth.js), or a tester's: Pro for good.
+        const text = c.kind === 'friend' ? body.dataset.friendText : c.kind === 'tester' ? body.dataset.testerText : body.dataset.codeText
+        banner.textContent = (text || body.dataset.codeText || '{0}: +{1}').replace('{0}', c.code).replace('{1}', c.days)
         banner.hidden = false
       })
       .catch(() => {})

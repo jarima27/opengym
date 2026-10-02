@@ -5,6 +5,7 @@ import { t } from '../lib/i18n.js'
 import { billingStatus, billingPortal, billingView, billingResume, storeManageUrl } from '../lib/billing.js'
 import { openPaywall } from './Paywall.jsx'
 import { openCancelFlow } from './CancelFlow.jsx'
+import { openRedeem } from './Invite.jsx'
 import { MOBILE } from '../lib/mobile.js'
 import { useStore } from '../store/useStore.js'
 import { Section, Row } from './ui.jsx'
@@ -98,6 +99,8 @@ export default function SubscriptionSection() {
     {action && <Row icon={ACTION[action][0]} iconTint="var(--acc)" accessory="chevron" title={ACTION[action][1]()} onClick={go} />}
     {keepable && <Row icon="reset" iconTint="var(--acc)" accessory="chevron" title={t('Keep my subscription')} onClick={keep} />}
     {MOBILE && <Row icon="reset" iconTint="var(--acc)" accessory="chevron" title={t('Restore purchases')} onClick={restore} />}
+    {/* A tester's code at any time; a creator's or a friend's in the first week (components/Invite.jsx). */}
+    {a.plan !== 'free' && <Row icon="key" iconTint="var(--acc)" accessory="chevron" title={t('Have a code?')} onClick={() => openRedeem(next => (next ? setA(next) : reload.current()))} />}
     {cancellable && <Row icon="xmark" iconTint="var(--red)" danger accessory="chevron" title={t('Cancel subscription')} onClick={cancel} />}
   </Section>
 }

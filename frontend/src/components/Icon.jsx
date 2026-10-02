@@ -107,6 +107,12 @@ const P = {
   cloudSlash: <><path d="M7 18.2h10.2a3.6 3.6 0 0 0 .1-7.2 5.4 5.4 0 0 0-10.4.6A3.3 3.3 0 0 0 7 18.2Z" /><path d="M4 3.6l16 16.8" /></>,
   download: <path d="M12 3.8v11.4M7.6 11.2 12 15.6l4.4-4.4M4.6 19.4h14.8" />,
   upload: <path d="M12 15.6V4.2M7.6 8.2 12 3.8l4.4 4.4M4.6 19.4h14.8" />,
+  // the system's share sheet: a box with the arrow leaving it (a record's card, an invite)
+  share: <><path d="M12 14.5V3.8M8.2 7.4 12 3.6l3.8 3.8" /><path d="M8.5 10.5H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1.5" /></>,
+  // invite a friend: a present, the extra days both of you get
+  gift: <><rect x="4" y="8.5" width="16" height="4" rx="1" /><path d="M5.5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-6.5M12 8.5v12" /><path d="M12 8.5c-1.6-3.6-5.3-4.3-5.3-1.8 0 1.4 2.1 1.8 5.3 1.8Zm0 0c1.6-3.6 5.3-4.3 5.3-1.8 0 1.4-2.1 1.8-5.3 1.8Z" /></>,
+  // feedback: a speech bubble
+  chat: <path d="M5.5 5h13a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3.5V17h-1a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />,
   wrench: <path d="M15.2 3.9a5 5 0 0 0-4.8 6.6l-6 6a2.1 2.1 0 0 0 3 3l6-6a5 5 0 0 0 6.1-6.3l-2.9 2.9-2.8-.7-.7-2.8Z" />,
   // checkered, not a pennant — this marks "finish workout", and a 2×2 grid is
   // what reads as a finish line at 16px

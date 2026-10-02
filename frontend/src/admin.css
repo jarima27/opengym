@@ -153,3 +153,6 @@
 
 /* a finished step's summary reads as a receipt, not a control */
 .adm-step.done>summary .adm-step-t span{color:var(--acc)}
+/* Feedback sent from the app (Admin → Feedback) */
+.adm-feedback{padding:10px 0;border-bottom:var(--hair) solid var(--sep);font-size:.9rem}
+.adm-feedback:last-child{border-bottom:0}

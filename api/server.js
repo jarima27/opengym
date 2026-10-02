@@ -31,9 +31,15 @@ import {
   listPasskeys, addPasskeyRecord, renamePasskeyRecord, removePasskeyRecord, passkeyRemovalRefused, MAX_PASSKEYS
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } from './device-link.js';
+import {
+  kindOf, normalizeCode, codeDays, redeemCheck, applyCode, rewardOwner, makeFriendCode, CODE_RE,
+  FRIEND_DAYS, MAX_FRIEND_REWARDS, cleanFeedback, addFeedback
+} from './growth.js';
+import { emailConfig, contactOf, dueEmail, firstWeek, renderEmail, unsubscribePage, unsubToken, unsubOk, resendBody } from './emails.js';
+import { EMAIL_COPY } from './emails-copy.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 import {
-  billingConfig, accessOf, isPaying, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
+  billingConfig, accessOf, isPaying, storeActive, openTrialEnd, checkoutForm, portalForm, verifyWebhook, applyEvent, stripe, snapshot, transitions,
   revenueCatAuthOk, applyRevenueCat, storeFromSubscriber, revenueCatSubscriber,
   freePlanOpen, claimFreePlan, releaseFreePlan,
   CANCEL_REASONS, retentionOffers, cancelForm, resumeForm, pauseForm, annualForm, applySubscription
@@ -124,7 +130,14 @@ const ANALYTICS = createAnalytics(analyticsConfig());
 /* Creator and trainer codes, UTM attribution and the analytics that read them belong to an
    instance that sells itself; on any other the routes do not exist. */
 const GROWTH_ON = BILLING.on || ANALYTICS.on;
-db.codes = db.codes || [];   // creator codes: { code, label, days, created, revoked }
+// Codes (growth.js): { code, label, days, created, revoked } for a creator's; `kind: 'tester'`
+// with `uses` and `max`; `kind: 'friend'` with its `owner`.
+db.codes = db.codes || [];
+db.feedback = db.feedback || [];   // what people sent from the app (growth.js cleanFeedback)
+/* Lifecycle emails (emails.js): Resend, off unless RESEND_API_KEY. Only profiles created after
+   they were switched on get them (db.emailsSince), so the key never mails everyone at once. */
+const EMAIL = emailConfig();
+if (EMAIL.on && !db.emailsSince) db.emailsSince = Date.now();   // saved with the next write
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2), 0o600); }
@@ -496,6 +509,85 @@ setInterval(() => {
 // Checked every 10s (not 60s) — ticks aren't aligned to the top of the minute, so a 60s
 // interval could sit on your target minute for up to 59s before noticing. 10s caps that at ~9s.
 }, REMINDER_TICK_MS).unref();
+
+/* ---------- lifecycle emails (emails.js) ---------- */
+const EMAIL_TICK_MS = Number(process.env.EMAIL_TICK_MS) || 10 * 60000;
+const EMAIL_FIRST_MS = Number(process.env.EMAIL_FIRST_MS) || 5000;
+const emailing = new Set();
+const unsubscribeUrl = uid => `${ORIGIN.replace(/\/+$/, '')}/api/email/unsubscribe?u=${encodeURIComponent(uid)}&t=${unsubToken(uid, SECRET)}`;
+// Daytime where the person is (9:00–21:00), when the app has said where that is; a welcome goes
+// at once, it answers something they just did.
+function emailHour(S) {
+  const tz = S?.reminder?.tz;
+  const now = tz && typeof tz === 'string' ? userNow(tz) : null;
+  if (!now) return true;
+  const h = Number(now.hhmm.slice(0, 2));
+  return h >= 9 && h < 21;
+}
+async function emailOne(user) {
+  if (!EMAIL.on || emailing.has(user.id) || !db.users.includes(user)) return;
+  let S = null;
+  try { S = readStateCached(user.id); } catch { S = null; }
+  const kind = dueEmail(user, S, { since: db.emailsSince || 0 });
+  if (!kind || (kind !== 'welcome' && !emailHour(S))) return;
+  emailing.add(user.id);
+  try {
+    const unsubscribe = unsubscribeUrl(user.id);
+    const week = kind === 'week1' ? firstWeek(S, user.created) : null;
+    const mail = renderEmail(kind, { name: user.name, week }, S?.lang || user.lang || 'en', { app: ORIGIN, unsubscribe });
+    const r = await fetch(EMAIL.apiBase + '/emails', {
+      method: 'POST',
+      // The same email asked for twice (a retry, two ticks racing) is sent once.
+      headers: { Authorization: 'Bearer ' + EMAIL.key, 'Content-Type': 'application/json', 'Idempotency-Key': `${user.id}-${kind}` },
+      body: JSON.stringify(resendBody(EMAIL, contactOf(user), mail, { unsubscribe, kind })),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) throw new Error(`resend answered ${r.status} ${(await r.text().catch(() => '')).slice(0, 200)}`);
+    user.emails = { ...(user.emails || {}), [kind]: new Date().toISOString() };
+    saveDb();
+    ANALYTICS.capture('email_sent', user, { kind, ...(week ? { workouts: week.workouts } : {}) });
+  } catch (e) {
+    console.error('email', kind, 'to', user.id, '-', e.message);
+    // Three tries per email, a tick apart; then it is let go rather than retried for days.
+    const tries = (user.emailTries = { ...(user.emailTries || {}) });
+    tries[kind] = (tries[kind] || 0) + 1;
+    if (tries[kind] >= 3) user.emails = { ...(user.emails || {}), [kind]: 'failed' };
+    saveDb();
+  } finally {
+    emailing.delete(user.id);
+  }
+}
+// One at a time: Resend counts requests per second, and a tick has all day.
+let emailRound = false;
+if (EMAIL.on) setInterval(async () => {
+  if (emailRound) return;
+  emailRound = true;
+  try { for (const u of [...db.users]) await emailOne(u).catch(() => {}); } finally { emailRound = false; }
+}, EMAIL_TICK_MS).unref();
+
+function emailSubscription(req, res, on) {
+  const q = new URL(req.url, 'http://x').searchParams;
+  const user = db.users.find(u => u.id === q.get('u'));
+  if (!user || !unsubOk(user.id, q.get('t'), SECRET)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end('This link is not valid.');
+  }
+  if (!!user.emailOptOut === !on) { /* already so */ } else {
+    if (on) delete user.emailOptOut; else user.emailOptOut = new Date().toISOString();
+    saveDb();
+    audit(req, on ? 'auth.emails.on' : 'auth.emails.off', { user });
+  }
+  // A mail client's one-click unsubscribe wants a status, not a page.
+  if (req.method === 'POST' && !on) {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end('ok');
+  }
+  let lang = user.lang || 'en';
+  try { lang = readStateCached(user.id)?.lang || lang; } catch { /* the profile's own, else the sign-up's */ }
+  const again = `/api/email/resubscribe?u=${encodeURIComponent(user.id)}&t=${encodeURIComponent(q.get('t'))}`;
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(unsubscribePage(lang, on ? 'in' : 'out', again));
+}
 
 /* ---------- sessions (signed cookie) ---------- */
 function sign(payload) {
@@ -1204,6 +1296,17 @@ function keepAppleToken(user, claims, code) {
     })
     .catch(e => console.error('social: Apple code exchange for', user.id, '-', e.message));
 }
+/* The address Apple or Google vouched for (email_verified), kept only to write to — the lifecycle
+   emails (emails.js) — and never to find or match a profile by (see social.js). An Apple private
+   relay address works too, once the sending domain is registered with Apple. */
+function keepContact(user, claims) {
+  const email = typeof claims?.email === 'string' ? claims.email.trim().toLowerCase() : '';
+  const verified = claims?.email_verified === true || claims?.email_verified === 'true';
+  if (!email || !verified || user.contact?.email === email) return false;
+  user.contact = { email, at: new Date().toISOString() };
+  return true;
+}
+
 const socialRoutes = {
   // { provider: 'apple' | 'google', idToken, name?, code?, src?, token? } → the profile that
   // provider account opened, or a new one. Not exempt from the origin check: a page elsewhere must
@@ -1221,6 +1324,7 @@ const socialRoutes = {
       return json(res, 401, { error: 'that sign-in could not be verified', code: 'bad-token' });
     }
     let user = db.users.find(u => u.oauth?.[provider] === claims.sub);
+    if (user && keepContact(user, claims)) saveDb();
     if (user) {
       if (user.disabled) {
         audit(req, 'auth.social.fail', { ok: false, user, msg: provider + ' · account-disabled' });
@@ -1239,6 +1343,7 @@ const socialRoutes = {
     }
     const created = new Date().toISOString();
     user = { id: crypto.randomBytes(12).toString('base64url'), name: nameFor(body, claims), created, oauth: { [provider]: claims.sub } };
+    keepContact(user, claims);
     if (inv) { user.invitedBy = inv.code; inv.usedBy = user.id; inv.usedAt = created; }
     adoptSource(user, body.src);
     db.users.push(user);
@@ -1957,20 +2062,56 @@ function cleanSource(raw) {
   return Object.keys(out).length ? out : null;
 }
 const activeCode = code => db.codes.find(c => c.code === code && !c.revoked) || null;
-/* A creator code that exists gives its bonus days on top of the trial; one that does not is kept
-   out of the record, so a typo cannot pass for a creator's sign-up. */
+/* A code that exists does what its kind says (growth.js: a creator's days, a friend's days and
+   the friend's reward, a tester's Pro for good); one that does not is kept out of the record, so
+   a typo cannot pass for a creator's sign-up. */
 function adoptSource(user, raw) {
+  // The app's language at sign-up, for what the server writes before the app has said more
+  // (S.lang wins once it is set): the lifecycle emails.
+  const lang = text(raw?.lang).trim();
+  if (Object.hasOwn(EMAIL_COPY, lang) || /^[a-z]{2}(-[A-Z]{2})?$/.test(lang)) user.lang = lang.slice(0, 5);
   const src = cleanSource(raw);
   if (!src) return;
-  if (src.ref) {
-    const code = activeCode(src.ref);
-    if (code) user.bonusDays = code.days;
-    else delete src.ref;
-  }
+  const code = src.ref ? activeCode(src.ref) : null;
+  delete src.ref;
   if (Object.keys(src).length) user.src = src;
+  if (!code || (kindOf(code) === 'tester' && redeemCheck(code, user))) return;
+  const owner = applyCode(code, user, { signup: true });
+  if (owner) rewardFriend(owner);
+}
+
+/* A friend signed up with `ownerId`'s code. The owner's 30 days go where they are worth
+   something: a Stripe subscription that is going to charge has that charge moved back 30 days
+   (trial_end); anyone else has them added to their free time — after the trial, or after a store
+   subscription's paid-up period (a store cannot be told to skip a charge). Up to
+   MAX_FRIEND_REWARDS friends. */
+function rewardFriend(ownerId) {
+  const owner = db.users.find(u => u.id === ownerId);
+  if (!owner) return;
+  const now = Date.now();
+  const b = owner.billing || {};
+  const charging = BILLING.stripe.on && isPaying(b) && b.subscription && !b.endsAt && !b.paused;
+  const freeUntil = Math.max(
+    openTrialEnd(owner, BILLING, db.billingSince || 0),
+    storeActive(owner.store, now) ? owner.store.expiresAt || 0 : 0,
+    isPaying(b) ? b.periodEnd || 0 : 0
+  );
+  if (!rewardOwner(owner, { now, freeUntil, bank: !charging })) return;
+  ANALYTICS.capture('invite_rewarded', owner, { via: charging ? 'stripe' : 'days', friends: owner.invites.rewarded });
+  if (!charging) return;
+  const until = Math.floor((Math.max(now, b.periodEnd || 0) + FRIEND_DAYS * 86400000) / 1000);
+  stripe(BILLING, 'POST', 'subscriptions/' + encodeURIComponent(b.subscription), new URLSearchParams({ trial_end: String(until), proration_behavior: 'none' }))
+    .catch(e => {
+      // Stripe would not move the charge: the days are kept as free time instead, after the period paid for.
+      console.error('billing: could not move the next charge of', owner.id, 'for an invite -', e.message);
+      owner.bonusUntil = Math.max(now, freeUntil, owner.bonusUntil || 0) + FRIEND_DAYS * 86400000;
+      saveDb();
+    });
 }
 function signedUp(user, method) {
   ANALYTICS.capture('signup', user, { method }, { created: user.created });
+  // The welcome goes out within seconds rather than at the next tick.
+  if (EMAIL.on) setTimeout(() => emailOne(user).catch(() => {}), EMAIL_FIRST_MS).unref();
   if (!BILLING.on) return;
   const days = BILLING.trialDays + (user.bonusDays || 0);
   if (days > 0) ANALYTICS.capture('trial_started', user, { kind: 'open', days });
@@ -1984,6 +2125,9 @@ function removeProfile(u) {
   db.users = db.users.filter(x => x.id !== u.id);
   db.creds = (db.creds || []).filter(c => c.userId !== u.id);
   db.subs = (db.subs || []).filter(x => x.userId !== u.id);
+  // What they wrote to the operator, and their invite code (whoever used it keeps what it gave).
+  db.feedback = (db.feedback || []).filter(f => f.uid !== u.id);
+  db.codes = (db.codes || []).filter(c => !(c.kind === 'friend' && c.owner === u.id));
   dropDeviceLinks(db, u.id);
   presence.delete(u.id);
   // The training history and any Coach credential of theirs, both outside db.json.
@@ -2029,6 +2173,7 @@ let PAYWALL = loadPaywall(paywallFile);
 const priceFor = (user, plan) => variantFor(PAYWALL, user.id).prices?.[plan] || BILLING.stripe.prices[plan] || null;
 const priceShown = createPriceCache(id => stripe(BILLING, 'GET', 'prices/' + encodeURIComponent(id)));
 const SYNC_BUDGET = createWindow({ max: 30, windowMs: 3600000 });
+const FEEDBACK_BUDGET = createWindow({ max: 10, windowMs: 3600000 });
 
 // The free first Coach plan (billing.js freePlanOpen): taken when its job starts, given back
 // when that job fails.
@@ -2253,14 +2398,55 @@ const storeRoutes = {
 
 /* ---------- growth: creator codes and the app's own events ---------- */
 const TRACK_BUDGET = createWindow({ max: 120, windowMs: 3600000 });
+const REDEEM_TRIES = createWindow({ max: 10, windowMs: 3600000 });   // guessing codes is not a game
 const growthRoutes = {
   // Whether a creator code is real, and what it gives — for the sign-up screen to say
   // "code LUCIA: one month extra" before anyone commits to anything. Who the creator is stays
   // with the operator.
   'GET /api/code': async (req, res) => {
-    const code = activeCode(text(new URL(req.url, 'http://x').searchParams.get('c')).trim().toUpperCase());
-    if (!code) return json(res, 404, { error: 'no such code' });
-    json(res, 200, { code: code.code, days: code.days });
+    const code = activeCode(normalizeCode(new URL(req.url, 'http://x').searchParams.get('c')));
+    if (!code || (kindOf(code) === 'tester' && code.max > 0 && (code.uses || 0) >= code.max)) return json(res, 404, { error: 'no such code' });
+    json(res, 200, { code: code.code, days: codeDays(code), kind: kindOf(code) });
+  },
+
+  // A code typed into the app after signing up (Settings → Subscription). A tester's makes the
+  // profile Pro for good at any time; a creator's or a friend's still counts during the first
+  // week — the store app has no link to carry one through an install.
+  'POST /api/redeem': async (req, res) => {
+    if (!BILLING.on) return json(res, 404, { error: 'nothing is sold here' });
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const wait = REDEEM_TRIES.take(user.id);
+    if (wait) return tooMany(res, wait);
+    const body = await readBody(req);
+    const row = activeCode(normalizeCode(body.code)) || db.codes.find(c => c.code === normalizeCode(body.code)) || null;
+    const why = redeemCheck(row, user);
+    if (why) return json(res, why === 'unknown' || why === 'revoked' ? 404 : 409, { error: 'this code cannot be used here', code: why });
+    const owner = applyCode(row, user);
+    if (owner) rewardFriend(owner);
+    saveDb();
+    audit(req, 'billing.redeem', { user, msg: row.code + ' · ' + kindOf(row) });
+    ANALYTICS.capture('code_redeemed', user, { kind: kindOf(row), ref: row.code });
+    json(res, 200, { ok: true, kind: kindOf(row), days: codeDays(row), access: billingAccess(user) });
+  },
+
+  // "Invite a friend": the profile's own code, made the first time it is asked for, and how many
+  // friends it has brought. Days for both sides: growth.js FRIEND_DAYS.
+  'GET /api/invite': async (req, res) => {
+    if (!BILLING.on) return json(res, 404, { error: 'nothing is sold here' });
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    let row = db.codes.find(c => c.kind === 'friend' && c.owner === user.id);
+    if (!row) {
+      const taken = code => db.codes.some(c => c.code === code) || db.invites.some(i => i.code === code);
+      row = { code: makeFriendCode(user, taken), kind: 'friend', owner: user.id, days: FRIEND_DAYS, created: new Date().toISOString(), revoked: false };
+      db.codes.push(row);
+      saveDb();
+    }
+    json(res, 200, {
+      code: row.code, active: !row.revoked, days: FRIEND_DAYS, max: MAX_FRIEND_REWARDS,
+      signups: user.invites?.signups || 0, rewarded: user.invites?.rewarded || 0
+    });
   },
 
   // The app's own events (analytics.js CLIENT_EVENTS), forwarded with the profile's attribution.
@@ -2276,25 +2462,38 @@ const growthRoutes = {
     json(res, 200, { ok: true });
   },
 
-  // One row per code: who it is for, what it gives, and what it brought in.
+  // One row per creator's or tester's code: who it is for, what it gives, and what it brought
+  // in. Friends' codes — one per person who opened "Invite a friend" — are summed up instead.
   'GET /api/admin/codes': async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    const codes = db.codes.map(c => {
-      const people = db.users.filter(u => u.src?.ref === c.code);
-      return { ...c, signups: people.length, paying: people.filter(u => snapshot(u).paying).length };
+    const codes = db.codes.filter(c => kindOf(c) !== 'friend').map(c => {
+      const people = db.users.filter(u => u.src?.ref === c.code || (kindOf(c) === 'tester' && u.compCode === c.code));
+      return { ...c, kind: kindOf(c), uses: c.uses || 0, max: c.max || 0, signups: people.length, paying: people.filter(u => snapshot(u).paying).length };
     });
-    json(res, 200, { codes });
+    const friendCodes = new Set(db.codes.filter(c => kindOf(c) === 'friend').map(c => c.code));
+    const invited = db.users.filter(u => friendCodes.has(u.src?.ref));
+    const friends = {
+      codes: friendCodes.size,
+      signups: invited.length,
+      paying: invited.filter(u => snapshot(u).paying).length,
+      rewarded: db.users.reduce((n, u) => n + (u.invites?.rewarded || 0), 0)
+    };
+    json(res, 200, { codes, friends });
   },
 
   'POST /api/admin/codes': async (req, res) => {
     const admin = requireAdmin(req, res); if (!admin) return;
     const body = await readBody(req);
     const code = text(body.code).trim().toUpperCase();
-    if (!/^[A-Z0-9_-]{2,24}$/.test(code)) return json(res, 400, { error: 'a code is 2 to 24 letters, digits, - or _', code: 'format' });
+    if (!CODE_RE.test(code)) return json(res, 400, { error: 'a code is 2 to 24 letters, digits, - or _', code: 'format' });
     if (db.codes.some(c => c.code === code)) return json(res, 409, { error: 'that code exists already', code: 'taken' });
-    const days = Math.round(+body.days);
+    const tester = body.kind === 'tester';
+    const days = tester ? 0 : Math.round(+body.days);
     if (!(days >= 0 && days <= 365)) return json(res, 400, { error: 'days must be 0 to 365', code: 'days' });
+    const max = tester ? Math.round(+body.max || 0) : 0;
+    if (!(max >= 0 && max <= 100000)) return json(res, 400, { error: 'max must be 0 (no cap) or more', code: 'max' });
     const row = { code, label: text(body.label).trim().slice(0, 80), days, created: new Date().toISOString(), revoked: false };
+    if (tester) Object.assign(row, { kind: 'tester', uses: 0, max });
     db.codes.push(row);
     saveDb();
     audit(req, 'admin.code.create', { user: admin, msg: code });
@@ -2786,6 +2985,50 @@ const routes = {
 
   /* ---------- admin dashboard ---------- */
   // One row per user, cheap enough for a personal instance (reads each state file once).
+  // "Send feedback", from Settings and from the first workout's summary: what someone wrote, with
+  // the app's version, the platform and the screen it was sent from (growth.js cleanFeedback).
+  'POST /api/feedback': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const wait = FEEDBACK_BUDGET.take(user.id);
+    if (wait) return tooMany(res, wait);
+    const row = cleanFeedback(await readBody(req), user);
+    if (!row) return json(res, 400, { error: 'nothing to send', code: 'empty' });
+    db.feedback = addFeedback(db.feedback, row);
+    saveDb();
+    ANALYTICS.capture('feedback_sent', user, { screen: row.screen, platform: row.platform });
+    json(res, 200, { ok: true });
+  },
+
+  // The lifecycle emails' unsubscribe link (emails.js): a click unsubscribes — the page says so
+  // and offers to undo it — and so does a mail client's one-click POST (RFC 8058). Signed per
+  // profile with the server's secret; a link that does not verify changes nothing.
+  'GET /api/email/unsubscribe': async (req, res) => emailSubscription(req, res, false),
+  'POST /api/email/unsubscribe': async (req, res) => emailSubscription(req, res, false),
+  'POST /api/email/resubscribe': async (req, res) => emailSubscription(req, res, true),
+
+  // Newest first, with who sent it; the ones marked done only when asked for (?all=1).
+  'GET /api/admin/feedback': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const all = new URL(req.url, 'http://x').searchParams.get('all') === '1';
+    const byId = new Map(db.users.map(u => [u.id, u]));
+    const rows = db.feedback.filter(f => all || !f.done).slice(-300).reverse().map(f => {
+      const u = byId.get(f.uid);
+      return { ...f, name: u?.name || null, email: u?.email || null, plan: u && BILLING.on ? billingAccess(u).plan : null };
+    });
+    json(res, 200, { feedback: rows, open: db.feedback.filter(f => !f.done).length });
+  },
+
+  'POST /api/admin/feedback/done': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const row = db.feedback.find(f => f.id === text(body.id));
+    if (!row) return json(res, 404, { error: 'no such feedback' });
+    row.done = body.done !== false;
+    saveDb();
+    json(res, 200, { ok: true });
+  },
+
   'GET /api/admin/users': async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const users = db.users.map(u => {

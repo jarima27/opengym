@@ -151,6 +151,9 @@ In the Cloudflare dashboard, for the `tiza.fit` zone:
    - Sign in with Apple and Google: the bundle id and the OAuth client ids (and the Apple key for
      revoking tokens).
    - `YMOVE_API_KEY`, and `POSTHOG_KEY` if you use it.
+   - `RESEND_API_KEY` and `RESEND_FROM` for the lifecycle emails, once `tiza.fit` is verified in
+     Resend (its SPF and DKIM records go in Cloudflare's DNS, plus a DMARC record) — SELF_HOSTING.md
+     → *Lifecycle emails*.
    - `TRIAL_DAYS` must match what the website promises (`prices.trialDays` in
      `landing/site.config.json`).
 

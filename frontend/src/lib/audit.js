@@ -48,9 +48,14 @@ const LABELS = {
   'billing.resume': 'Took back a cancellation or a pause',
   'billing.pause': 'Paused their subscription for a month',
   'billing.annual': 'Moved to the annual plan',
-  // Creator and trainer codes (Admin → Creator codes): `msg` is the code.
-  'admin.code.create': 'Created a creator code',
-  'admin.code.revoke': 'Revoked a creator code',
+  // Creator, trainer and tester codes (Admin → Creator codes, Tester codes): `msg` is the code.
+  'admin.code.create': 'Created a creator or tester code',
+  'admin.code.revoke': 'Revoked a code',
+  // A code typed into the app (Settings → Subscription → Have a code?): `msg` is the code and its kind.
+  'billing.redeem': 'Redeemed a code',
+  // The lifecycle emails' unsubscribe link, and its undo (api/emails.js).
+  'auth.emails.off': 'Unsubscribed from the emails',
+  'auth.emails.on': 'Subscribed to the emails again',
   // Admin → Paywall: `msg` is the experiment and each variant's weight.
   'admin.paywall.save': 'Saved the paywall',
   'auth.account.delete': 'Deleted their own account',

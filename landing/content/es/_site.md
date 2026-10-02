@@ -16,6 +16,8 @@ cta: Empieza gratis
 sticky_note: Coach IA: {{trial_days}} días gratis
 badge_featured: El más elegido
 code_banner: Código {0}: {1} días extra gratis al crear tu cuenta
+code_banner_friend: Invitación de un amigo: {1} días de Pro gratis al crear tu cuenta
+code_banner_tester: Código {0}: Pro gratis para siempre
 plan_free: Gratis
 plan_pro: Tiza Pro
 screenshot_alt: Captura de la app Tiza

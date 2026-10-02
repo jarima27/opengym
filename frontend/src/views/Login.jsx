@@ -24,9 +24,12 @@ function CodeBanner() {
     const c = pendingCode()
     if (c) api('/api/code?c=' + encodeURIComponent(c)).then(setCode).catch(() => {})
   }, [])
-  if (!code || !code.days) return null
+  if (!code || (!code.days && code.kind !== 'tester')) return null
   return <div className="card small row" style={{ marginBottom: 18, color: 'var(--acc)', fontWeight: 600, gap: 8, justifyContent: 'center' }}>
-    <Icon name="sparkles" /><span>{t('Code {0}: {1} extra days free', code.code, code.days)}</span>
+    <Icon name={code.kind === 'friend' ? 'gift' : 'sparkles'} />
+    <span>{code.kind === 'tester' ? t('Code {0}: Pro free for good', code.code)
+      : code.kind === 'friend' ? t('A friend’s invite: {0} days of Pro free', code.days)
+        : t('Code {0}: {1} extra days free', code.code, code.days)}</span>
   </div>
 }
 

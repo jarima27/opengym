@@ -6,6 +6,7 @@
 // (https://app/#/?ref=X) — the app uses a hash router, and a link someone types by hand ends up
 // either way. The last link with anything on it wins: that is the one they acted on.
 import { MOBILE } from './mobile.js'
+import { getLang } from './i18n-core.js'
 
 const KEY = 'gym_src'
 const UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content']
@@ -37,11 +38,12 @@ export function captureAttribution(href = globalThis.location?.href) {
 
 export const platform = () => (MOBILE ? (/Android/.test(globalThis.navigator?.userAgent || '') ? 'android' : 'ios') : 'web')
 
-/** What goes with a sign-up: the remembered link, and which app it happened in. */
+/** What goes with a sign-up: the remembered link, which app it happened in, and its language. */
 export function attribution() {
   let saved = null
   try { saved = JSON.parse(storage()?.getItem(KEY) || 'null') } catch { /* unreadable: nothing */ }
-  const out = { platform: platform() }
+  // The app's language goes too: what the server writes before the app has said more (emails).
+  const out = { platform: platform(), lang: getLang() }
   if (saved && typeof saved === 'object') for (const k of ['ref', ...UTM]) if (saved[k]) out[k] = saved[k]
   return out
 }

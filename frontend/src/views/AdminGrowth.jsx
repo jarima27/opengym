@@ -14,11 +14,12 @@ import { Button } from '../components/ui.jsx'
 
 export function CodesCard() {
   const toast = useUI(s => s.toast)
-  const [codes, setCodes] = useState(null)
+  const [data, setData] = useState(null)
   const [form, setForm] = useState({ code: '', label: '', days: 30 })
-  const load = () => api('/api/admin/codes').then(r => setCodes(r.codes)).catch(e => setCodes(e.status === 404 ? false : []))
+  const load = () => api('/api/admin/codes').then(setData).catch(e => setData(e.status === 404 ? false : { codes: [] }))
   useEffect(() => { load() }, [])
-  if (codes === null || codes === false) return null
+  if (data === null || data === false) return null
+  const codes = data.codes.filter(c => c.kind !== 'tester')
 
   const link = code => `${location.origin}${location.pathname}?ref=${code}`
   const copy = text => { navigator.clipboard?.writeText(text).catch(() => {}); toast('Copied') }
@@ -30,6 +31,7 @@ export function CodesCard() {
     confirmText: 'Revoke', danger: true,
     onConfirm: () => api('/api/admin/codes/revoke', { method: 'POST', body: JSON.stringify({ code }) }).then(load).catch(e => toast(e.message))
   })
+  const f = data.friends
 
   return <div className="card">
     <h2 style={{ margin: 0 }}>Creator codes</h2>
@@ -53,6 +55,57 @@ export function CodesCard() {
         {!c.revoked && <button className="iconbtn adm-iconbtn" style={{ color: 'var(--red)' }} onClick={() => revoke(c.code)} aria-label="revoke"><Icon name="trash" /></button>}
       </div>
     </div>) : <div className="adm-empty">No codes yet.</div>}
+    {/* "Invite a friend": one code per person who opened it, summed up rather than listed. */}
+    {f && <div className="small" style={{ marginTop: 12 }}>
+      <strong>Friend invites</strong> · {f.codes} people sharing · <strong>{f.signups}</strong> sign-ups · <strong>{f.paying}</strong> paying · {f.rewarded} rewards of 30 days given
+    </div>}
+  </div>
+}
+
+/* ------------------------------ tester codes ------------------------------ */
+
+// A code that makes whoever redeems it Pro for good (Settings → Subscription → Have a code?, or
+// the sign-up link). For the closed test, partners, friends of the house.
+export function TesterCodesCard() {
+  const toast = useUI(s => s.toast)
+  const [codes, setCodes] = useState(null)
+  const [form, setForm] = useState({ code: '', label: '', max: '' })
+  const load = () => api('/api/admin/codes').then(r => setCodes(r.codes.filter(c => c.kind === 'tester'))).catch(e => setCodes(e.status === 404 ? false : []))
+  useEffect(() => { load() }, [])
+  if (codes === null || codes === false) return null
+
+  const copy = text => { navigator.clipboard?.writeText(text).catch(() => {}); toast('Copied') }
+  const create = () => api('/api/admin/codes', { method: 'POST', body: JSON.stringify({ code: form.code, label: form.label, kind: 'tester', max: +form.max || 0 }) })
+    .then(({ code }) => { copy(code.code); setForm({ code: '', label: '', max: '' }); load() })
+    .catch(e => toast(e.message))
+  const revoke = code => confirmSheet({
+    title: 'Revoke ' + code + '?', message: 'Nobody new can redeem it. Everyone who already did keeps Pro.',
+    confirmText: 'Revoke', danger: true,
+    onConfirm: () => api('/api/admin/codes/revoke', { method: 'POST', body: JSON.stringify({ code }) }).then(load).catch(e => toast(e.message))
+  })
+
+  return <div className="card">
+    <h2 style={{ margin: 0 }}>Tester codes</h2>
+    <div className="adm-lead">
+      Pro for good, free: whoever redeems the code in the app (Settings → Subscription → Have a code?) or signs up with its link is never
+      charged. Leave the cap empty for no limit. Creating a code copies it.
+    </div>
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+      <input className="input" style={{ flex: '1 1 110px', textTransform: 'uppercase' }} placeholder="CODE" maxLength={24} value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
+      <input className="input" style={{ flex: '2 1 160px' }} placeholder="Who it is for" maxLength={80} value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
+      <input className="input" style={{ flex: '0 1 90px' }} type="number" min={0} placeholder="Cap" value={form.max} onChange={e => setForm({ ...form, max: e.target.value })} aria-label="maximum uses" />
+      <Button variant="primary" size="sm" icon="plus" onClick={create} disabled={!form.code.trim()}>Create</Button>
+    </div>
+    {codes.length ? codes.map(c => <div key={c.code} className={'row between' + (c.revoked ? ' dim' : '')} style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)', gap: 10 }}>
+      <div style={{ minWidth: 0 }}>
+        <button className="adm-code" onClick={() => copy(c.code)} aria-label={'copy ' + c.code}>{c.code}</button>
+        <span className="small muted" style={{ marginInlineStart: 8 }}>{c.label || '—'}{c.revoked ? ' · revoked' : ''}</span>
+      </div>
+      <div className="row" style={{ gap: 10, flex: 'none' }}>
+        <span className="small"><strong>{c.uses}</strong>{c.max ? ' / ' + c.max : ''} used</span>
+        {!c.revoked && <button className="iconbtn adm-iconbtn" style={{ color: 'var(--red)' }} onClick={() => revoke(c.code)} aria-label="revoke"><Icon name="trash" /></button>}
+      </div>
+    </div>) : <div className="adm-empty">No tester codes yet.</div>}
   </div>
 }
 

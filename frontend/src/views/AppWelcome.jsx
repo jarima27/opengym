@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { t } from '../lib/i18n.js'
+import { t, getLang } from '../lib/i18n.js'
 import { DEFAULT_SERVER, providerSignIn, passwordSignIn, passwordSignUp, providersFor } from '../lib/app-account.js'
 import { markWelcome } from '../lib/welcome.js'
 import { askAddDeviceData } from '../sheets.jsx'
@@ -47,7 +47,7 @@ export default function AppWelcome() {
   const withProvider = async provider => {
     if (busy) return
     setBusy(provider)
-    try { await signedIn(await providerSignIn(DEFAULT_SERVER, provider, { src: { platform: os } })) }
+    try { await signedIn(await providerSignIn(DEFAULT_SERVER, provider, { src: { platform: os, lang: getLang() } })) }
     catch (e) { if (e?.code !== 'cancelled') ui().toast(passwordError(e)) }
     finally { setBusy(null) }
   }
@@ -109,7 +109,7 @@ export function EmailAccountSheet({ close, os, base = DEFAULT_SERVER }) {
     setBusy(true); setErr(null)
     try {
       const session = signup
-        ? await passwordSignUp(base, { name: name.trim(), email: mail, password: pw, src: { platform: os } })
+        ? await passwordSignUp(base, { name: name.trim(), email: mail, password: pw, src: { platform: os, lang: getLang() } })
         : await passwordSignIn(base, { identifier: mail, password: pw })
       close()
       await signedIn(session)

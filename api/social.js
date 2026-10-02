@@ -9,7 +9,8 @@
    server are identifiers nobody has proven (see "e-mail as a sign-in name" in server.js), so
    letting a provider's verified address open the profile that happens to carry it would let
    anyone who typed someone else's address on a profile of theirs take over that person's first
-   sign-in with Google. The address is not kept at all.
+   sign-in with Google. A verified address is kept only as somewhere to write to (user.contact,
+   for the lifecycle emails in emails.js) — never looked up, never matched.
 
    APPLE_CLIENT_IDS / GOOGLE_CLIENT_IDS: the audiences accepted, comma-separated — the app's
    bundle id for Apple; the OAuth client ids (web, iOS, Android) for Google. */

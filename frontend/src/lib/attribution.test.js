@@ -18,12 +18,12 @@ describe('readAttribution', () => {
 describe('the remembered link', () => {
   beforeEach(() => clearAttribution())
   it('is kept until the sign-up, and the last link with something on it wins', () => {
-    expect(attribution()).toEqual({ platform: 'web' })
+    expect(attribution()).toEqual({ platform: 'web', lang: 'en' })
     captureAttribution('https://app.example/?ref=LUCIA')
     captureAttribution('https://app.example/#/plan')   // an ordinary visit changes nothing
     expect(pendingCode()).toBe('LUCIA')
     captureAttribution('https://app.example/?ref=MARTA&utm_source=tiktok')
-    expect(attribution()).toEqual({ platform: 'web', ref: 'MARTA', utm_source: 'tiktok' })
+    expect(attribution()).toEqual({ platform: 'web', lang: 'en', ref: 'MARTA', utm_source: 'tiktok' })
     clearAttribution()
     expect(pendingCode()).toBe(null)
   })

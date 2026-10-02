@@ -57,6 +57,9 @@ import { stampWorkout } from './lib/sync-merge.js'
 import { weeklyWeights } from './lib/bodyweight.js'
 import { workoutText } from './lib/workout-text.js'
 import { copyText } from './lib/clipboard.js'
+import { openPrCard } from './components/PrCard.jsx'
+import { openFeedback } from './components/Feedback.jsx'
+import { DEMO } from './lib/demo.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2622,6 +2625,7 @@ export function exitWorkoutEdit(onExit = () => nav('/history')) {
 
 function FinishSummary({ w, prs, e1prs = [], close, past = false }) {
   const st = useStore(s => s.S)
+  const signedIn = useStore(s => !!s.user) && !DEMO
   // The moment a finished workout is for (F11): what the next session asks of each lift, from
   // the engine that will build it — and when that session is.
   const ahead = past ? [] : nextTimeLines(st, w)
@@ -2653,9 +2657,12 @@ function FinishSummary({ w, prs, e1prs = [], close, past = false }) {
       <Icon name="calendar" style={{ fontSize: 13, flex: 'none' }} />
       <span>{t('Next session: {0}, {1}', t(DAYN[next.weekday]), next.routine.name)}{st.reminder?.on && st.reminder?.time ? ' · ' + t('we’ll remind you at {0}', st.reminder.time) : ''}</span>
     </div>}
+    {/* Each record can go out as an image for stories (components/PrCard.jsx). */}
     {(prs.length > 0 || e1prs.length > 0) && <div style={{ textAlign: 'start', marginBottom: 12 }}>
-      {prs.map(id => <div key={id} className="small accent row" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} <span className={exerciseNameClass(EXIDX[id])}>{EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id}</span></div>)}
-      {e1prs.map(p => <div key={p.id} className="small accent row" style={{ gap: 5 }}><Icon name="chartLine" style={{ fontSize: 13 }} />{t('Best estimated 1RM:')} <span className={exerciseNameClass(EXIDX[p.id])}>{EXIDX[p.id] ? exerciseNameFor(EXIDX[p.id]) : p.id}</span> · {fmtNum(p.est)} {st.unit}</div>)}
+      {prs.map(id => <div key={id} className="small accent row pr-line" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} <span className={exerciseNameClass(EXIDX[id])}>{EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id}</span>
+        {!past && <button type="button" className="pr-share" onClick={() => openPrCard({ w, exId: id })} aria-label={t('Share your record')}><Icon name="share" />{t('Share')}</button>}</div>)}
+      {e1prs.map(p => <div key={p.id} className="small accent row pr-line" style={{ gap: 5 }}><Icon name="chartLine" style={{ fontSize: 13 }} />{t('Best estimated 1RM:')} <span className={exerciseNameClass(EXIDX[p.id])}>{EXIDX[p.id] ? exerciseNameFor(EXIDX[p.id]) : p.id}</span> · {fmtNum(p.est)} {st.unit}
+        {!past && <button type="button" className="pr-share" onClick={() => openPrCard({ w, exId: p.id, kind: 'e1rm', est: p.est })} aria-label={t('Share your record')}><Icon name="share" />{t('Share')}</button>}</div>)}
     </div>}
     {/* Right under the numbers: the moment a reminder obviously means something (NotifyOffer). */}
     <NotifyOffer count={(st.workouts || []).length} />
@@ -2667,6 +2674,8 @@ function FinishSummary({ w, prs, e1prs = [], close, past = false }) {
     <div style={{ textAlign: 'start' }}><WorkoutMediaSection w={w} hint /></div>
     {/* The third finished workout is the moment the store app asks for a review (once). */}
     <Button variant="primary" onClick={() => { close(); nav('/home'); if (!past) maybeAskForReview(st.workouts.filter(x => x.end).length) }}>{t('Nice!')}</Button>
+    {/* The first one is the moment to ask what it was like — only with a server to send it to. */}
+    {first && signedIn && <Button variant="ghost" className="dim" icon="chat" style={{ marginTop: 6 }} onClick={() => openFeedback('first-workout')}>{t('Anything to tell us? Send feedback')}</Button>}
   </div>
 }
 export function finishWorkout() {
